@@ -34,6 +34,14 @@ jobs:
       - name: App bauen (Debug-APK)
         run: dotnet build ZBoard.csproj -c Debug -f net10.0-android -p:EmbedAssembliesIntoApk=true
 
+      # Nur APKs mit dem festen Testschlüssel lassen sich als Update über ältere Testversionen installieren.
+      - name: Signatur prüfen
+        run: |
+          APK=$(ls bin/Debug/net10.0-android/*-Signed.apk | head -n 1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee signer.txt
+          grep -qi "7f94a11a131b687073d97d011fff3ab194834eb125007ba3a0feaf46eaaa3e8c" signer.txt
+
       - name: APK bereitstellen
         uses: actions/upload-artifact@v5
         with:
