@@ -99,6 +99,11 @@ def tap(pos):
     time.sleep(0.25)
 
 
+def long_press(pos, ms=700):
+    shell(f"input swipe {pos[0]} {pos[1]} {pos[0]} {pos[1]} {ms}")
+    time.sleep(0.4)
+
+
 def type_text(keys, text):
     keys = KEYBOARD.wait_for("de")
     for ch in text:
@@ -271,6 +276,21 @@ def main():
         check("Suchleiste: Wortvorschläge trotz NO_SUGGESTIONS", text == "hau" and last.strip("|") != "",
               f"→ Feld „{text}“, Leiste „{last}“")
         screenshot(out_dir, "5-suchleiste")
+
+        # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")
+        time.sleep(3)
+        layout = KEYBOARD.wait_for("de")
+        for ch in "ab":
+            tap(layout[ch])
+        long_press(layout["q"])  # langer Druck auf q → 1
+        time.sleep(1)
+        text = field_text()
+        log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+        plain = re.findall(r"FIELD (.*)$", log, re.M)
+        plain = plain[-1].strip() if plain else ""
+        check("Passwortfeld: Buchstaben und Ziffern", plain == "ab1", f"→ „{plain}“ (angezeigt „{text}“)")
+        screenshot(out_dir, "5b-passwort")
 
         # Einstellungen öffnen (Startseite und eine Unterseite)
         shell("input keyevent KEYCODE_BACK", check=False)

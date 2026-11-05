@@ -33,6 +33,21 @@ public sealed class TypingTestActivity : Activity
             Hint = search ? "Suchen" : "Testfeld",
         };
         if (search) field.SetSingleLine(true);
+
+        // Extra password=text|number: Passwortfeld (Text) bzw. PIN-Feld (nur Ziffern)
+        switch (Intent?.GetStringExtra("password"))
+        {
+            case "text":
+                field.InputType = InputTypes.ClassText | InputTypes.TextVariationPassword;
+                field.Hint = "Passwort";
+                break;
+            case "number":
+                field.InputType = InputTypes.ClassNumber | InputTypes.NumberVariationPassword;
+                field.Hint = "PIN";
+                break;
+        }
+        // Klartext fürs Log, weil Android Passwörter in der Oberfläche maskiert
+        field.TextChanged += (_, _) => Android.Util.Log.Info("zBoardTest", "FIELD " + field.Text);
         SetContentView(field);
         field.RequestFocus();
     }
