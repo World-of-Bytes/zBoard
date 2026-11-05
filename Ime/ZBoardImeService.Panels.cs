@@ -58,6 +58,8 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _emojiPanel = new EmojiPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
         _clipboardPanel = new ClipboardPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
 
+        _emojiCatalogLanguage = null; // neues Panel braucht den Katalog erneut
+
         _panelHost = new FrameLayout(this);
         _panelHost.AddView(_keyboardView);
         _panelHost.AddView(_emojiPanel);
