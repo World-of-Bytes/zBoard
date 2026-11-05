@@ -6,13 +6,6 @@
   <!-- Spracheingabe; wird erst beim ersten Tippen auf das Mikrofon erfragt -->
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-  <!-- Lesezugriff auf die Tipp-Statistik nur für Auswertungs-Apps mit derselben Signatur -->
-  <permission
-      android:name="de.zeriadtke.zboard.permission.READ_TYPING_STATS"
-      android:protectionLevel="signature"
-      android:label="Tipp-Statistik von zBoard lesen"
-      android:description="@string/stats_permission_description" />
-
   <!-- Paketsichtbarkeit (ab Android 11): Spracherkennungsdienste finden -->
   <queries>
     <intent>

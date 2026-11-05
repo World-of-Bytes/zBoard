@@ -162,19 +162,6 @@ public sealed class ZBoardSettings
         set => PutInt("theme", (int)value);
     }
 
-    /// <summary>Statistik-AddOn. Standard: aus.</summary>
-    public bool StatsEnabled
-    {
-        get => _prefs.GetBoolean("statsEnabled", false);
-        set => PutBool("statsEnabled", value);
-    }
-
-    public int StatsRetentionDays
-    {
-        get => _prefs.GetInt("statsRetentionDays", 30);
-        set => PutInt("statsRetentionDays", value);
-    }
-
     void PutBool(string key, bool value) => _prefs.Edit()!.PutBoolean(key, value)!.Apply();
 
     void PutInt(string key, int value) => _prefs.Edit()!.PutInt(key, value)!.Apply();

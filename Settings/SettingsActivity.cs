@@ -6,11 +6,10 @@ using Android.Views.InputMethods;
 using Android.Widget;
 using ZBoard.Ime;
 using ZBoard.Keyboard;
-using ZBoard.Stats;
 
 namespace ZBoard.Settings;
 
-/// <summary>Startbildschirm: zBoard aktivieren, auswählen, einstellen, testen; Statistik exportieren oder löschen.</summary>
+/// <summary>Startbildschirm: zBoard aktivieren, auswählen, einstellen, testen; Sprachen, Darstellung, Zwischenablage, Spracheingabe.</summary>
 [Activity(
     Name = "de.zeriadtke.zboard.SettingsActivity",
     Label = "zBoard",
@@ -19,12 +18,9 @@ namespace ZBoard.Settings;
     Theme = "@android:style/Theme.DeviceDefault.Settings")]
 public sealed class SettingsActivity : Activity
 {
-    const int ExportRequest = 41;
-
     ZBoardSettings _settings = null!;
     LinearLayout _content = null!;
     TextView _status = null!;
-    TextView _statsInfo = null!;
     float _dp;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -45,7 +41,6 @@ public sealed class SettingsActivity : Activity
         BuildTypingSection();
         BuildLanguageSection();
         BuildAppearanceSection();
-        BuildStatsSection();
         BuildTestSection();
         BuildClipboardVoiceSection();
         BuildAboutSection();
@@ -77,7 +72,6 @@ public sealed class SettingsActivity : Activity
     {
         base.OnResume();
         RefreshStatus();
-        RefreshStatsInfo();
     }
 
     public override void OnWindowFocusChanged(bool hasFocus)
@@ -112,7 +106,7 @@ public sealed class SettingsActivity : Activity
 
         Header("Lernen");
         Text("zBoard merkt sich Wörter und Wortfolgen, die du oft verwendest, und schlägt sie dann vor. "
-             + "Das bleibt auf dem Gerät, wird nie exportiert und ist von der Statistik getrennt. "
+             + "Das bleibt auf dem Gerät und wird nie exportiert. "
              + "In Passwort-, E-Mail- und Adressfeldern lernt zBoard nichts.");
         AddSwitch("Aus meinen Eingaben lernen", _settings.LearnWords, v => _settings.LearnWords = v);
         AddButton("Gelernte Wörter löschen", () =>
@@ -241,32 +235,6 @@ public sealed class SettingsActivity : Activity
         AddButton("Mikrofon freigeben", RequestMicrophone);
     }
 
-    void BuildStatsSection()
-    {
-        Header("Statistik");
-        Text("Erfasst werden nur Zeitpunkte, Druckdauer, Abstände zwischen Anschlägen und die Art der Taste "
-             + "(Buchstabe, Leertaste, Löschen …). Welche Zeichen du tippst, wird nie gespeichert. "
-             + "In Passwortfeldern wird nichts erfasst. Die Daten bleiben auf dem Gerät; lesen kann sie nur "
-             + "eine Auswertungs-App mit derselben Signatur über eine eigene Schnittstelle.");
-
-        AddSwitch("Tipp-Statistik erfassen", _settings.StatsEnabled, v => _settings.StatsEnabled = v);
-        _statsInfo = Text(string.Empty);
-        AddButton("Statistik exportieren (JSON Lines)", ExportStats);
-        AddButton("Alle Statistikdaten löschen", () =>
-        {
-            new AlertDialog.Builder(this)
-                .SetTitle("Statistik löschen?")!
-                .SetMessage("Alle gespeicherten Tipp-Daten werden unwiderruflich entfernt.")!
-                .SetPositiveButton("Löschen", (_, _) =>
-                {
-                    Sink().DeleteAll();
-                    RefreshStatsInfo();
-                })!
-                .SetNegativeButton("Abbrechen", (_, _) => { })!
-                .Show();
-        });
-    }
-
     void BuildTestSection()
     {
         Header("Ausprobieren");
@@ -312,45 +280,7 @@ public sealed class SettingsActivity : Activity
         };
     }
 
-    void RefreshStatsInfo()
-    {
-        if (_statsInfo == null) return;
-        int files = Sink().FileCount;
-        _statsInfo.Text = $"Gespeichert: {files} Tag(e). Aufbewahrung: {_settings.StatsRetentionDays} Tage.";
-    }
-
-    // ---------- Export ----------
-
-    void ExportStats()
-    {
-        var intent = new Intent(Intent.ActionCreateDocument);
-        intent.AddCategory(Intent.CategoryOpenable);
-        intent.SetType("application/json");
-        intent.PutExtra(Intent.ExtraTitle, $"zboard-statistik-{DateTime.Now:yyyy-MM-dd}.jsonl");
-        StartActivityForResult(intent, ExportRequest);
-    }
-
-    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
-    {
-        base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode != ExportRequest || resultCode != Result.Ok || data?.Data is not { } uri) return;
-
-        try
-        {
-            using var stream = ContentResolver!.OpenOutputStream(uri)
-                               ?? throw new IOException("Ziel konnte nicht geöffnet werden.");
-            Sink().ExportTo(stream);
-            Toast.MakeText(this, "Statistik exportiert.", ToastLength.Short)!.Show();
-        }
-        catch (Exception ex)
-        {
-            Toast.MakeText(this, $"Export fehlgeschlagen: {ex.Message}", ToastLength.Long)!.Show();
-        }
-    }
-
     // ---------- UI-Helfer ----------
-
-    JsonlStatsSink Sink() => new(ZBoardImeService.StatsDirectory(this));
 
     InputMethodManager InputMethods() =>
         (InputMethodManager)GetSystemService(Context.InputMethodService)!;

@@ -11,7 +11,6 @@ using Android.Views.InputMethods;
 using Android.Widget;
 using ZBoard.Keyboard;
 using ZBoard.Settings;
-using ZBoard.Stats;
 using ZBoard.Suggestions;
 // Gleichnamige Typen in Android.InputMethodServices / Android.Content.Res eindeutig machen
 using KeyboardView = ZBoard.Keyboard.KeyboardView;
@@ -21,7 +20,7 @@ using Orientation = Android.Widget.Orientation;
 namespace ZBoard.Ime;
 
 /// <summary>
-/// Der Tastatur-Dienst. Verbindet Tastaturansicht, Vorschläge und Statistik und schreibt Text über die InputConnection.
+/// Der Tastatur-Dienst. Verbindet Tastaturansicht und Vorschläge und schreibt Text über die InputConnection.
 /// </summary>
 [Service(
     Name = "de.zeriadtke.zboard.ZBoardImeService",
@@ -43,8 +42,6 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     readonly StringBuilder _composing = new();
 
     ZBoardSettings _settings = null!;
-    JsonlStatsSink _statsSink = null!;
-    KeystrokeStatsRecorder _stats = null!;
 
     KeyboardView? _keyboardView;
     SuggestionBarView? _suggestionBar;
@@ -80,19 +77,10 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     {
         base.OnCreate();
         _settings = new ZBoardSettings(this);
-        _statsSink = new JsonlStatsSink(StatsDirectory(this));
-        _stats = new KeystrokeStatsRecorder(
-            _statsSink,
-            () => SystemClock.UptimeMillis(),
-            () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
         _audio = GetSystemService(AudioService) as Android.Media.AudioManager;
         InitClipboard();
-        Task.Run(() => _statsSink.Purge(_settings.StatsRetentionDays));
     }
-
-    public static string StatsDirectory(Context context) =>
-        Path.Combine(context.FilesDir!.AbsolutePath, "stats");
 
     static string LearningFile(Context context, string language) =>
         Path.Combine(context.FilesDir!.AbsolutePath, "learning", $"{language}.tsv");
@@ -153,13 +141,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         UpdateAutoShift();
 
-        if (_settings.StatsEnabled && _profile.AllowStats) _stats.BeginSession();
     }
 
     public override void OnFinishInputView(bool finishingInput)
     {
         base.OnFinishInputView(finishingInput);
-        _stats.EndSession();
         _composing.Clear();
         _suggestionBar?.Clear();
         FinishPanels();
@@ -204,11 +190,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     {
         if (_settings.Haptics) _keyboardView?.PerformKeyHaptic();
         if (_settings.KeySound) PlayKeySound(key.Action);
-        _stats.KeyDown(uptimeMs);
     }
 
-    public void OnKeyUp(KeyDef key, string? output, long uptimeMs, bool gesture) =>
-        _stats.KeyUp(gesture ? KeyCategory.Gesture : Categorize(key, output), uptimeMs);
+    public void OnKeyUp(KeyDef key, string? output, long uptimeMs, bool gesture)
+    {
+    }
 
     void PlayKeySound(KeyAction action)
     {
@@ -476,7 +462,6 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             {
                 final = corrected;
                 _lastCorrection = new Correction(typed, corrected, separator);
-                _stats.CountAutocorrection();
             }
         }
 
@@ -493,7 +478,6 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         var ic = Ic;
         if (ic == null) return;
 
-        _stats.Suggestion(downUptime, upUptime);
         if (slot.IsLiteral) Engine?.SuppressCorrection(slot.Word);
 
         string? previous = PreviousWord();
@@ -809,18 +793,6 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     }
 
     // ---------- Hilfen ----------
-
-    static KeyCategory Categorize(KeyDef key, string? output) => key.Action switch
-    {
-        KeyAction.Character when output is { Length: > 0 } o && char.IsLetter(o, 0) => KeyCategory.Letter,
-        KeyAction.Character when output is { Length: > 0 } o && char.IsDigit(o, 0) => KeyCategory.Digit,
-        KeyAction.Character => KeyCategory.Punctuation,
-        KeyAction.Space => output == null ? KeyCategory.Other : KeyCategory.Space,
-        KeyAction.Delete => KeyCategory.Backspace,
-        KeyAction.Enter => KeyCategory.Enter,
-        KeyAction.Shift => KeyCategory.Shift,
-        _ => KeyCategory.Other,
-    };
 
     string TextBeforeCursor(int length) =>
         Ic?.GetTextBeforeCursorFormatted(length, 0)?.ToString() ?? string.Empty;

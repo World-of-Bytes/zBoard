@@ -8,10 +8,6 @@ für Deutsch, Englisch, Französisch, Spanisch und Italienisch.
 Anders als Gboard arbeitet zBoard vollständig offline und ohne Internetberechtigung; was es aus deinen Eingaben
 lernt, bleibt auf dem Gerät. Geschrieben ist zBoard in C# mit .NET 10 for Android.
 
-Mit dem **Statistik-AddOn** misst zBoard auf Wunsch, *wie* du tippst: Tempo, Druckdauer, Pausen,
-Korrekturen. Was du tippst, erfasst es nie. Die Daten bleiben auf dem Gerät und lassen sich exportieren oder
-von einer eigenen Auswertungs-App über eine Schnittstelle abrufen.
-
 Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, noch nicht veröffentlicht.
 
 ## zBoard im Vergleich zu Gboard
@@ -36,7 +32,6 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
 | Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
 | Übersetzen, Google-Dienste | ✓ | nicht geplant |
-| Statistik-AddOn (Tippverhalten, keine Inhalte) | – | ✓ standardmäßig aus, Export und Schnittstelle |
 
 ## Bauen und installieren
 
@@ -56,7 +51,7 @@ Danach die App **zBoard** öffnen:
 
 ## Tests
 
-Die Logik ohne Android (Wörterbuch, Autokorrektur, Vorhersage, Lernen, Wischeingabe, Emoji, Zwischenablage, Statistik, Layouts) hat eigene Unit-Tests:
+Die Logik ohne Android (Wörterbuch, Autokorrektur, Vorhersage, Lernen, Wischeingabe, Emoji, Zwischenablage, Layouts) hat eigene Unit-Tests:
 
 ```bash
 dotnet test tests/ZBoard.Core.Tests
@@ -71,11 +66,9 @@ dotnet test tests/ZBoard.Core.Tests
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `KeyProximity`, `SuggestionBarView` |
-| `Stats/` | `KeystrokeStatsRecorder`, `JsonlStatsSink`, `StatsReader`, `StatsProvider` (Schnittstelle des Statistik-AddOns) |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
-| `docs/` | `STATISTIK_ADDON.md` |
 | `tools/` | `build_dictionaries.py` (Wortlisten), `build_emoji.py` (Emoji-Daten) |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
@@ -143,18 +136,6 @@ Die Parameter sind mit simulierten Wischspuren auf dem deutschen Wörterbuch abg
 Verwechslungen sind echte Doppeldeutigkeiten („bist/biest“, „fast/fest“), die auch Gboard nur über die
 Vorschlagsleiste auflöst. Echte Wischspuren auf dem Gerät werden die Werte noch verschieben.
 
-## Statistik-AddOn: Dateiformat
-
-Dateien im app-privaten Speicher: `files/stats/keystrokes-JJJJ-MM-TT.jsonl`, Aufbewahrung 30 Tage.
-
-```json
-{"type":"key","t":1762294812345,"cat":"Letter","hold":84,"flight":132,"session":"…"}
-{"type":"session","session":"…","start":…,"end":…,"keystrokes":214,"cpm":187.3,"correctionRate":0.061,"pausesOver2s":3,"suggestions":4,"autocorrections":2}
-```
-
-`cat` ist eine von: Letter, Digit, Punctuation, Space, Backspace, Enter, Shift, Suggestion, Other.
-Nichts wird in Passwortfeldern oder Feldern mit `IME_FLAG_NO_PERSONALIZED_LEARNING` erfasst.
-
 ## Bewusste Abgrenzung zu Gboard
 
 Funktionen und Bedienung orientieren sich an Gboard. Name, Logo, Icons, Farben, Code und Wörterbuchdaten
@@ -185,12 +166,6 @@ python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json 
 ```
 
 Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.csv` (siehe `tools/build_dictionaries.py --help`).
-
-## Statistik-AddOn: Schnittstelle
-
-Eine eigene Auswertungs-App kann die Tipp-Statistik über einen `ContentProvider` abfragen, etwa um Tempo und
-Korrekturen über Wochen zu verfolgen. Zugriff haben nur Apps mit derselben Signatur wie zBoard.
-Aufbau, Spalten und ein Beispiel: [docs/STATISTIK_ADDON.md](docs/STATISTIK_ADDON.md).
 
 ## Nächste Schritte
 

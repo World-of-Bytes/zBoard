@@ -16,7 +16,7 @@ public enum ShiftState
 /// <summary>Rückmeldungen der Tastaturansicht an den IME-Service.</summary>
 public interface IKeyboardActionListener
 {
-    /// <summary>Finger berührt eine Taste (für Haptik, Ton und Statistik).</summary>
+    /// <summary>Finger berührt eine Taste (für Haptik und Ton).</summary>
     void OnKeyDown(KeyDef key, long uptimeMs);
 
     /// <summary>Finger verlässt die Tastatur. <paramref name="output"/> ist der erzeugte Text oder null.</summary>

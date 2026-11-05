@@ -2,7 +2,6 @@ using System.Text;
 using ZBoard.Clipboard;
 using ZBoard.Emoji;
 using ZBoard.Keyboard;
-using ZBoard.Stats;
 using Xunit;
 
 namespace ZBoard.Core.Tests;
@@ -106,39 +105,6 @@ public class ClipboardTests
         history.Add("a", 3);
 
         Assert.Equal(new[] { "a", "b" }, history.Items(3).Select(i => i.Text));
-    }
-}
-
-public class StatsReaderTests
-{
-    [Fact]
-    public void WrittenEvents_CanBeReadBack()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "zboard-test-" + Guid.NewGuid());
-        try
-        {
-            var sink = new JsonlStatsSink(dir);
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var recorder = new KeystrokeStatsRecorder(sink, () => 1000, () => now);
-            recorder.BeginSession();
-            recorder.KeyDown(100);
-            recorder.KeyUp(KeyCategory.Letter, 180);
-            recorder.KeyDown(300);
-            recorder.KeyUp(KeyCategory.Backspace, 340);
-            recorder.EndSession();
-
-            var keys = StatsReader.ReadKeystrokes(dir, sinceMs: 0);
-            var sessions = StatsReader.ReadSessions(dir, sinceMs: 0);
-
-            Assert.Equal(new[] { KeyCategory.Letter, KeyCategory.Backspace }, keys.Select(k => k.Category));
-            Assert.Equal(120, keys[1].FlightMs);
-            Assert.Equal(2, sessions.Single().Keystrokes);
-            Assert.Empty(StatsReader.ReadKeystrokes(dir, sinceMs: now + 10_000));
-        }
-        finally
-        {
-            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-        }
     }
 }
 

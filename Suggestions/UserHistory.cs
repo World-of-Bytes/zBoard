@@ -5,7 +5,7 @@ namespace ZBoard.Suggestions;
 
 /// <summary>
 /// Was zBoard aus den eigenen Eingaben lernt: eigene Wörter und Wortfolgen.
-/// Bleibt ausschließlich auf dem Gerät, wird nie exportiert und ist vom Statistik-AddOn getrennt.
+/// Bleibt ausschließlich auf dem Gerät und wird nie exportiert.
 /// Plattformunabhängig.
 /// </summary>
 public sealed class UserHistory

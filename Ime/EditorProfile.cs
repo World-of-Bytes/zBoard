@@ -59,9 +59,6 @@ public sealed class EditorProfile
     /// <summary>Lernen nur in normalen Textfeldern; nie in Passwort-, E-Mail-/URL-Feldern oder wenn die App es untersagt.</summary>
     public bool AllowLearning => AllowSuggestions && !IsEmailOrUrl && !NoPersonalizedLearning;
 
-    /// <summary>Statistik nie in Passwort-Feldern oder wenn die App personalisiertes Lernen untersagt.</summary>
-    public bool AllowStats => !IsPassword && !NoPersonalizedLearning;
-
     /// <summary>Enter löst eine Feldaktion aus (Suchen, Senden …) statt einen Zeilenumbruch.</summary>
     public bool HasEnterAction => Action is >= ActionGo and <= ActionPrevious && !NoEnterAction;
 
