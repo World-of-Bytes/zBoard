@@ -365,7 +365,8 @@ public sealed class SettingsActivity : Activity
 
     void BuildAbout()
     {
-        Note("© 2026 World of Bytes, Patrick Zeriadtke – world-of-bytes.de\n"
+        Note($"Version {PackageManager!.GetPackageInfo(PackageName!, 0)!.VersionName}\n\n"
+             + "© 2026 World of Bytes, Patrick Zeriadtke – world-of-bytes.de\n"
              + "zBoard ist freie Software unter der BSD 2-Clause License.\n\n"
              + "Wortlisten (CC BY-SA 4.0): FrequencyWords von Hermit Dave auf Basis von OpenSubtitles 2018; "
              + "Großschreibung deutscher Substantive nach german-nouns von Gregor Weichbrodt auf Basis von Wiktionary. "

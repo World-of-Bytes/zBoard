@@ -11,8 +11,8 @@
 
     <ApplicationId>de.zeriadtke.zboard</ApplicationId>
     <ApplicationTitle>zBoard</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>9</ApplicationVersion>
+    <ApplicationDisplayVersion>0.9</ApplicationDisplayVersion>
   </PropertyGroup>
 
   <!-- Testprojekt und Werkzeuge gehören nicht in die App -->
