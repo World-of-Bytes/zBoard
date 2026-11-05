@@ -165,6 +165,14 @@ def main():
         screenshot(out_dir, "1-tastatur")
         check("Tastatur erscheint", True, f"({len(keys)} Tasten)")
 
+        bounds = re.findall(r"BOUNDS de bottom=(\d+) limit=(\d+) nav=(\d+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
+        if bounds:
+            bottom, limit, nav = map(int, bounds[-1])
+            check("Tastatur über der Navigationsleiste", bottom <= limit,
+                  f"(Unterkante {bottom}, erlaubt bis {limit}, Leiste {nav} px)")
+        else:
+            check("Tastatur über der Navigationsleiste", False, "(keine Lageangabe im Log)")
+
         type_text(keys, "hallo ")
         text = field_text()
         check("Tippen + Großschreibung am Satzanfang", text == "Hallo ", f"→ „{text}“")

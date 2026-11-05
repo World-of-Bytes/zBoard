@@ -27,6 +27,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         new("settings", "⚙"),
     ];
 
+    LinearLayout? _inputRoot;
     FrameLayout? _panelHost;
     EmojiPanelView? _emojiPanel;
     ClipboardPanelView? _clipboardPanel;
@@ -48,6 +49,11 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
     {
         float dp = Resources!.DisplayMetrics!.Density;
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        _inputRoot = root;
+
+        // Ab Android 15 reicht das Tastaturfenster bis unter die Navigationsleiste: Platz dafür freihalten.
+        root.SetOnApplyWindowInsetsListener(new SystemBarInsets());
+        root.SetBackgroundColor(_theme.Background);
 
         _suggestionBar = new SuggestionBarView(this) { ToolbarItems = Toolbar };
         _suggestionBar.SuggestionPicked += OnSuggestionPicked;
@@ -92,6 +98,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
     void ApplyPanelTheme(KeyboardTheme theme)
     {
         _theme = theme;
+        _inputRoot?.SetBackgroundColor(theme.Background); // auch der Streifen hinter der Navigationsleiste
         _panelHost?.SetBackgroundColor(theme.Background);
         _emojiPanel?.Theme = theme;
         _clipboardPanel?.ApplyTheme(theme);
@@ -409,5 +416,32 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
     {
         ShowKeyboardPanel();
         UpdateSuggestions();
+    }
+
+    /// <summary>Innenabstand für Navigationsleiste und Display-Aussparung (links, rechts, unten).</summary>
+    sealed class SystemBarInsets : Java.Lang.Object, View.IOnApplyWindowInsetsListener
+    {
+        public WindowInsets OnApplyWindowInsets(View v, WindowInsets insets)
+        {
+            int left, right, bottom;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                var bars = insets.GetInsets(WindowInsets.Type.NavigationBars() | WindowInsets.Type.DisplayCutout());
+                (left, right, bottom) = (bars.Left, bars.Right, bars.Bottom);
+            }
+            else
+            {
+#pragma warning disable CA1422, CS0618 // vor Android 11 gibt es nur die alte Schnittstelle
+                (left, right, bottom) = (insets.SystemWindowInsetLeft, insets.SystemWindowInsetRight, insets.SystemWindowInsetBottom);
+#pragma warning restore CA1422, CS0618
+            }
+
+            if (v.PaddingLeft != left || v.PaddingRight != right || v.PaddingBottom != bottom)
+            {
+                v.SetPadding(left, 0, right, bottom);
+            }
+
+            return insets;
+        }
     }
 }

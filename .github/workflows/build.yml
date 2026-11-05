@@ -63,7 +63,7 @@ jobs:
       - name: Tastatur im Emulator testen
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 35  # Android 15: Tastaturfenster reicht bis unter die Navigationsleiste
           arch: x86_64
           target: google_apis
           profile: pixel_6

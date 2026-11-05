@@ -439,6 +439,18 @@ public sealed class KeyboardView : View
         }
 
         Android.Util.Log.Info("zBoardTest", line.ToString());
+
+        // Unterkante der Tastatur und die höchste erlaubte Unterkante (Fensterende minus Navigationsleiste)
+        var rootOrigin = new int[2];
+        RootView!.GetLocationOnScreen(rootOrigin);
+        int nav = 0;
+        if (OperatingSystem.IsAndroidVersionAtLeast(30) && RootWindowInsets is { } insets)
+        {
+            nav = insets.GetInsets(WindowInsets.Type.NavigationBars()).Bottom;
+        }
+
+        Android.Util.Log.Info("zBoardTest",
+            $"BOUNDS {_layout?.Id} bottom={origin[1] + Height} limit={rootOrigin[1] + RootView.Height - nav} nav={nav}");
     }
 #endif
 
