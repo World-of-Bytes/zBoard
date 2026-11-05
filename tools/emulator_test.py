@@ -51,7 +51,7 @@ class Keyboard:
                 keys[label] = (int(x), int(y))
             self.layouts[match.group(1)] = keys  # spätere Zeilen überschreiben frühere
 
-    def wait_for(self, layout, timeout=60):
+    def wait_for(self, layout, timeout=150):
         end = time.time() + timeout
         while time.time() < end:
             self.refresh()
