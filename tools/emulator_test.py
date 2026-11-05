@@ -124,11 +124,13 @@ def glide(keys, word, steps=4):
 
 
 def field_text():
-    shell("uiautomator dump /sdcard/zboard-ui.xml")
-    xml = adb("exec-out", "cat", "/sdcard/zboard-ui.xml")
-    for node in ET.fromstring(xml).iter("node"):
-        if node.get("class") == "android.widget.EditText":
-            return node.get("text", "")
+    for attempt in range(3):
+        for node in ui_nodes():
+            if node.get("class") == "android.widget.EditText":
+                return node.get("text", "")
+        # Ein Systemdialog des Emulators („… isn't responding“) kann das Feld verdecken
+        dismiss_system_dialogs()
+        time.sleep(1)
     raise RuntimeError("Eingabefeld nicht gefunden")
 
 
