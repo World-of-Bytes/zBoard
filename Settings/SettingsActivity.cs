@@ -169,10 +169,11 @@ public sealed class SettingsActivity : Activity
 
     string LanguageSummary()
     {
-        var names = _settings.Languages.Select(code => Layouts.LanguageNames.GetValueOrDefault(code, code)).ToList();
-        string text = string.Join(", ", names);
-        return _settings.Languages.Contains("de") ? $"{text} (QWERTZ)" : text;
+        return string.Join(", ", _settings.Languages.Select(code =>
+            $"{Layouts.LanguageNames.GetValueOrDefault(code, code)} ({LayoutName(code)})"));
     }
+
+    static string LayoutName(string code) => code switch { "de" => "QWERTZ", "fr" => "AZERTY", _ => "QWERTY" };
 
     void BuildSetupCard()
     {
@@ -213,8 +214,7 @@ public sealed class SettingsActivity : Activity
         Section("Aktive Sprachen");
         foreach (var (code, name) in Layouts.LanguageNames)
         {
-            string layout = code switch { "de" => "QWERTZ", "fr" => "AZERTY", _ => "QWERTY" };
-            Toggle(name, layout, _settings.Languages.Contains(code), (view, isChecked) =>
+            Toggle(name, LayoutName(code), _settings.Languages.Contains(code), (view, isChecked) =>
             {
                 var list = _settings.Languages.ToList();
                 if (isChecked && !list.Contains(code)) list.Add(code);
