@@ -33,7 +33,7 @@ public sealed record KeyDef(KeyAction Action, string Label, float Width, IReadOn
 /// <param name="Indent">Einrückung links und rechts in Einheiten (z. B. 0.5 für die ASDF-Reihe bei QWERTY).</param>
 public sealed record KeyRow(IReadOnlyList<KeyDef> Keys, float Indent = 0f);
 
-/// <param name="IsAlphabetic">Buchstabenlayout (Umschalt wirkt) oder Symbollayout.</param>
+/// <param name="isAlphabetic">Buchstabenlayout (Umschalt wirkt) oder Symbollayout.</param>
 public sealed class KeyboardLayout(string id, bool isAlphabetic, IReadOnlyList<KeyRow> rows)
 {
     public string Id { get; } = id;
