@@ -7,7 +7,7 @@ using ZBoard.Settings;
 namespace ZBoard.Stats;
 
 /// <summary>
-/// Schnittstelle für zHeal Meridian: liefert die Tipp-Metadaten als Cursor.
+/// Schnittstelle des Statistik-AddOns: liefert die Tipp-Metadaten als Cursor an eine Auswertungs-App.
 /// Lesen dürfen nur Apps mit derselben Signatur (Berechtigung de.zeriadtke.zboard.permission.READ_TYPING_STATS).
 ///
 ///   content://de.zeriadtke.zboard.stats/keystrokes?since=&lt;unix-ms&gt;

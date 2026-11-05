@@ -8,8 +8,9 @@ für Deutsch, Englisch, Französisch, Spanisch und Italienisch.
 Anders als Gboard arbeitet zBoard vollständig offline und ohne Internetberechtigung; was es aus deinen Eingaben
 lernt, bleibt auf dem Gerät. Geschrieben ist zBoard in C# mit .NET 10 for Android.
 
-Für das Projekt **zHeal Meridian** kann zBoard auf Wunsch Tipp-Metadaten erfassen (Zeitpunkte, Druckdauer,
-Pausen, Tastenart), aber nie, welche Zeichen getippt wurden.
+Mit dem **Statistik-AddOn** misst zBoard auf Wunsch, *wie* du tippst: Tempo, Druckdauer, Pausen,
+Korrekturen. Was du tippst, erfasst es nie. Die Daten bleiben auf dem Gerät und lassen sich exportieren oder
+von einer eigenen Auswertungs-App über eine Schnittstelle abrufen.
 
 Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, noch nicht veröffentlicht.
 
@@ -35,7 +36,7 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
 | Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
 | Übersetzen, Google-Dienste | ✓ | nicht geplant |
-| Tipp-Statistik für Forschung (nur Metadaten) | – | ✓ standardmäßig aus |
+| Statistik-AddOn (Tippverhalten, keine Inhalte) | – | ✓ standardmäßig aus, Export und Schnittstelle |
 
 ## Bauen und installieren
 
@@ -70,11 +71,11 @@ dotnet test tests/ZBoard.Core.Tests
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `KeyProximity`, `SuggestionBarView` |
-| `Stats/` | `KeystrokeStatsRecorder`, `JsonlStatsSink`, `StatsReader`, `StatsProvider` (Schnittstelle für zHeal) |
+| `Stats/` | `KeystrokeStatsRecorder`, `JsonlStatsSink`, `StatsReader`, `StatsProvider` (Schnittstelle des Statistik-AddOns) |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
-| `docs/` | `ZHEAL_SCHNITTSTELLE.md` |
+| `docs/` | `STATISTIK_ADDON.md` |
 | `tools/` | `build_dictionaries.py` (Wortlisten), `build_emoji.py` (Emoji-Daten) |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
@@ -142,7 +143,7 @@ Die Parameter sind mit simulierten Wischspuren auf dem deutschen Wörterbuch abg
 Verwechslungen sind echte Doppeldeutigkeiten („bist/biest“, „fast/fest“), die auch Gboard nur über die
 Vorschlagsleiste auflöst. Echte Wischspuren auf dem Gerät werden die Werte noch verschieben.
 
-## Statistik-Format (zHeal Meridian)
+## Statistik-AddOn: Dateiformat
 
 Dateien im app-privaten Speicher: `files/stats/keystrokes-JJJJ-MM-TT.jsonl`, Aufbewahrung 30 Tage.
 
@@ -185,10 +186,11 @@ python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json 
 
 Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.csv` (siehe `tools/build_dictionaries.py --help`).
 
-## zHeal Meridian
+## Statistik-AddOn: Schnittstelle
 
-Die Tipp-Statistik lässt sich über einen `ContentProvider` abfragen, nur von Apps mit derselben Signatur.
-Aufbau, Spalten und ein Beispiel: [docs/ZHEAL_SCHNITTSTELLE.md](docs/ZHEAL_SCHNITTSTELLE.md).
+Eine eigene Auswertungs-App kann die Tipp-Statistik über einen `ContentProvider` abfragen, etwa um Tempo und
+Korrekturen über Wochen zu verfolgen. Zugriff haben nur Apps mit derselben Signatur wie zBoard.
+Aufbau, Spalten und ein Beispiel: [docs/STATISTIK_ADDON.md](docs/STATISTIK_ADDON.md).
 
 ## Nächste Schritte
 

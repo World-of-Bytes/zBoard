@@ -162,7 +162,7 @@ public sealed class ZBoardSettings
         set => PutInt("theme", (int)value);
     }
 
-    /// <summary>Statistik für zHeal Meridian. Standard: aus.</summary>
+    /// <summary>Statistik-AddOn. Standard: aus.</summary>
     public bool StatsEnabled
     {
         get => _prefs.GetBoolean("statsEnabled", false);

@@ -37,7 +37,7 @@ public sealed record SessionSummary(
     int SuggestionsAccepted,
     int Autocorrections);
 
-/// <summary>Ziel für Statistikdaten. zHeal Meridian kann eine eigene Implementierung einhängen.</summary>
+/// <summary>Ziel für Statistikdaten. Eigene Implementierungen lassen sich einhängen.</summary>
 public interface IKeystrokeStatsSink
 {
     void Write(KeystrokeEvent keystroke);

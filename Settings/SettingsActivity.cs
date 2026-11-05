@@ -243,11 +243,11 @@ public sealed class SettingsActivity : Activity
 
     void BuildStatsSection()
     {
-        Header("Statistik für zHeal Meridian");
+        Header("Statistik");
         Text("Erfasst werden nur Zeitpunkte, Druckdauer, Abstände zwischen Anschlägen und die Art der Taste "
              + "(Buchstabe, Leertaste, Löschen …). Welche Zeichen du tippst, wird nie gespeichert. "
              + "In Passwortfeldern wird nichts erfasst. Die Daten bleiben auf dem Gerät; lesen kann sie nur "
-             + "zHeal Meridian (gleiche Signatur) über eine eigene Schnittstelle.");
+             + "eine Auswertungs-App mit derselben Signatur über eine eigene Schnittstelle.");
 
         AddSwitch("Tipp-Statistik erfassen", _settings.StatsEnabled, v => _settings.StatsEnabled = v);
         _statsInfo = Text(string.Empty);

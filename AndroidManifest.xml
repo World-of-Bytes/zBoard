@@ -6,7 +6,7 @@
   <!-- Spracheingabe; wird erst beim ersten Tippen auf das Mikrofon erfragt -->
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-  <!-- Lesezugriff auf die Tipp-Statistik nur für Apps mit derselben Signatur (zHeal Meridian) -->
+  <!-- Lesezugriff auf die Tipp-Statistik nur für Auswertungs-Apps mit derselben Signatur -->
   <permission
       android:name="de.zeriadtke.zboard.permission.READ_TYPING_STATS"
       android:protectionLevel="signature"

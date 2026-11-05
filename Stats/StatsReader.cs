@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace ZBoard.Stats;
 
-/// <summary>Liest die JSON-Lines-Dateien von <see cref="JsonlStatsSink"/> wieder ein (für die zHeal-Schnittstelle).</summary>
+/// <summary>Liest die JSON-Lines-Dateien von <see cref="JsonlStatsSink"/> wieder ein (für die Schnittstelle des Statistik-AddOns).</summary>
 public static class StatsReader
 {
     /// <summary>Anschläge ab <paramref name="sinceMs"/> (Unix-ms), älteste zuerst.</summary>

@@ -1,15 +1,16 @@
-# Schnittstelle für zHeal Meridian
+# Statistik-AddOn: Schnittstelle
 
-zBoard stellt die Tipp-Metadaten über einen Android-`ContentProvider` bereit. Getippte Inhalte sind nie enthalten:
+Das Statistik-AddOn von zBoard stellt Tipp-Metadaten über einen Android-`ContentProvider` bereit, damit eine eigene
+Auswertungs-App sie abrufen kann. Getippte Inhalte sind nie enthalten:
 nur Zeitpunkte, Druckdauer, Abstände und die Art der Taste.
 
 ## Voraussetzungen
 
-- In zBoard ist **Einstellungen → Statistik für zHeal Meridian → Tipp-Statistik erfassen** eingeschaltet
+- In zBoard ist **Einstellungen → Statistik → Tipp-Statistik erfassen** eingeschaltet
   (Standard: aus). Ist sie aus, liefert die Schnittstelle leere Ergebnisse.
-- zHeal Meridian ist mit **demselben Schlüssel signiert** wie zBoard. Die Leseberechtigung hat die Schutzstufe
+- Die Auswertungs-App ist mit **demselben Schlüssel signiert** wie zBoard. Die Leseberechtigung hat die Schutzstufe
   `signature`; andere Apps erhalten keinen Zugriff.
-- zHeal Meridian deklariert im Manifest:
+- Die Auswertungs-App deklariert im Manifest:
 
 ```xml
 <uses-permission android:name="de.zeriadtke.zboard.permission.READ_TYPING_STATS" />
