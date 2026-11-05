@@ -52,12 +52,18 @@ public sealed class EditorProfile
     public int Action { get; private init; }
     public bool NoEnterAction { get; private init; }
 
-    public bool AllowSuggestions => !IsPassword && !IsNumeric && !NoSuggestions;
+    /// <summary>
+    /// Vorschlagsleiste wie bei Gboard in jedem Textfeld außer Passwort- und Zahlenfeldern – auch wenn die App
+    /// TYPE_TEXT_FLAG_NO_SUGGESTIONS setzt. Das tun z. B. Suchleisten (SearchView mit eigener Vorschlagsliste);
+    /// dort zeigt Gboard trotzdem Wortvorschläge an, korrigiert aber nicht automatisch.
+    /// </summary>
+    public bool AllowSuggestions => !IsPassword && !IsNumeric;
 
-    public bool AllowAutocorrect => AllowSuggestions && !IsEmailOrUrl;
+    /// <summary>Automatisch ersetzen nur in normalen Textfeldern, nicht bei E-Mail/URL oder NO_SUGGESTIONS.</summary>
+    public bool AllowAutocorrect => AllowSuggestions && !IsEmailOrUrl && !NoSuggestions;
 
     /// <summary>Lernen nur in normalen Textfeldern; nie in Passwort-, E-Mail-/URL-Feldern oder wenn die App es untersagt.</summary>
-    public bool AllowLearning => AllowSuggestions && !IsEmailOrUrl && !NoPersonalizedLearning;
+    public bool AllowLearning => AllowSuggestions && !IsEmailOrUrl && !NoSuggestions && !NoPersonalizedLearning;
 
     /// <summary>Enter löst eine Feldaktion aus (Suchen, Senden …) statt einen Zeilenumbruch.</summary>
     public bool HasEnterAction => Action is >= ActionGo and <= ActionPrevious && !NoEnterAction;

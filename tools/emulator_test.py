@@ -221,6 +221,19 @@ def main():
         shell("input keyevent KEYCODE_BACK", check=False)
         time.sleep(1)
 
+        # Suchleiste wie in der Google-App: Feld meldet NO_SUGGESTIONS, Gboard zeigt trotzdem Wortvorschläge
+        shell(f"am start -W -n {TEST_ACTIVITY} --ez search true")
+        time.sleep(3)
+        type_text(keys, "hau")
+        time.sleep(1)
+        log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+        shown = re.findall(r"SUGGESTIONS (.*)$", log, re.M)
+        last = shown[-1].strip() if shown else ""
+        text = field_text()
+        check("Suchleiste: Wortvorschläge trotz NO_SUGGESTIONS", text == "hau" and last.strip("|") != "",
+              f"→ Feld „{text}“, Leiste „{last}“")
+        screenshot(out_dir, "5-suchleiste")
+
         found = crashes()
         check("Keine Abstürze", not found, "; ".join(found[:3]))
     except Exception as e:  # noqa: BLE001 – jeder Fehler ist ein Testfehler
