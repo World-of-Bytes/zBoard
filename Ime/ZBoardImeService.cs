@@ -30,7 +30,7 @@ namespace ZBoard.Ime;
     Exported = true)]
 [IntentFilter(new[] { "android.view.InputMethod" })]
 [MetaData("android.view.im", Resource = "@xml/method")]
-public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListener
+public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActionListener
 {
     const int DoubleTapShiftMs = 300;
     const int DoubleSpaceMs = 600;
@@ -87,6 +87,7 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
             () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
         _audio = GetSystemService(AudioService) as Android.Media.AudioManager;
+        InitClipboard();
         Task.Run(() => _statsSink.Purge(_settings.StatsRetentionDays));
     }
 
@@ -120,20 +121,7 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
         }
     }
 
-    public override View? OnCreateInputView()
-    {
-        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-
-        _suggestionBar = new SuggestionBarView(this);
-        _suggestionBar.SuggestionPicked += OnSuggestionPicked;
-
-        _keyboardView = new KeyboardView(this) { Listener = this };
-
-        float dp = Resources!.DisplayMetrics!.Density;
-        root.AddView(_suggestionBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, (int)(44 * dp)));
-        root.AddView(_keyboardView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-        return root;
-    }
+    public override View? OnCreateInputView() => BuildInputView();
 
     public override void OnStartInputView(EditorInfo? info, bool restarting)
     {
@@ -151,6 +139,7 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
         _shift = ShiftState.Off;
         _symbolsPage = _profile.IsNumeric ? 1 : 0;
 
+        StartPanels();
         SetLanguage(_settings.CurrentLanguage);
         ApplyTheme();
         _keyboardView?.EnterLabel = _profile.EnterLabel;
@@ -158,8 +147,8 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
         _keyboardView?.ShowKeyPreview = _settings.KeyPreview;
         if (_suggestionBar != null)
         {
-            _suggestionBar.Visibility = _profile.AllowSuggestions ? ViewStates.Visible : ViewStates.Gone;
-            _suggestionBar.Clear();
+            _suggestionBar.Visibility = ViewStates.Visible;
+            ShowToolbar();
         }
 
         UpdateAutoShift();
@@ -173,6 +162,8 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
         _stats.EndSession();
         _composing.Clear();
         _suggestionBar?.Clear();
+        FinishPanels();
+        StopVoice(cancel: true);
 
         try
         {
@@ -236,6 +227,11 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
     {
         var ic = Ic;
         if (ic == null) return;
+        if (_emojiSearchActive)
+        {
+            EmojiSearchType(text);
+            return;
+        }
 
         _lastCorrection = null;
         bool wordChar = text.Length > 0 && (char.IsLetterOrDigit(text, 0) || text == "'" || (text == "-" && _composing.Length > 0));
@@ -275,6 +271,8 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
 
     public void OnAction(KeyAction action)
     {
+        if (_emojiSearchActive && EmojiSearchAction(action)) return;
+
         switch (action)
         {
             case KeyAction.Space:
@@ -304,6 +302,9 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
                 break;
             case KeyAction.Language:
                 SwitchLanguage();
+                break;
+            case KeyAction.Emoji:
+                ShowEmojiPanel();
                 break;
         }
     }
@@ -623,12 +624,12 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
 
     void UpdateSuggestions()
     {
-        if (_suggestionBar == null) return;
+        if (_suggestionBar == null || _emojiSearchActive || _voiceActive) return;
         var engine = Engine;
         if (engine == null || !_profile.AllowSuggestions)
         {
             _currentSuggestions = SuggestionResult.Empty;
-            _suggestionBar.Clear();
+            ShowToolbar();
             return;
         }
 
@@ -680,7 +681,7 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
         IReadOnlyList<string> predictions = previous == null ? [] : engine.Predict(previous);
         if (predictions.Count == 0)
         {
-            _suggestionBar!.Clear();
+            ShowToolbar();
             return;
         }
 
@@ -781,10 +782,12 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
     {
         if (_keyboardView == null) return;
         bool multipleLanguages = _settings.Languages.Count > 1;
+        bool numberRow = _settings.NumberRow;
         var layout = _symbolsPage == 0
-            ? Layouts.Alphabet(_language, multipleLanguages)
+            ? Layouts.Alphabet(_language, multipleLanguages, numberRow)
             : Layouts.Symbols(_symbolsPage, multipleLanguages);
 
+        _keyboardView.ShowDigitHints = !numberRow;
         _keyboardView.SetLayout(layout);
         _keyboardView.SpaceLabel = Layouts.LanguageNames.TryGetValue(_language, out var name) ? name : _language;
         _keyboardView.Shift = _symbolsPage == 0 ? _shift : ShiftState.Off;
@@ -792,15 +795,17 @@ public sealed class ZBoardImeService : InputMethodService, IKeyboardActionListen
 
     void ApplyTheme()
     {
-        bool dark = _settings.Theme switch
+        bool systemDark = (Resources!.Configuration!.UiMode & UiMode.NightMask) == UiMode.NightYes;
+        var theme = _settings.Theme switch
         {
-            ThemeMode.Light => false,
-            ThemeMode.Dark => true,
-            _ => (Resources!.Configuration!.UiMode & UiMode.NightMask) == UiMode.NightYes,
+            ThemeMode.Light => KeyboardTheme.Light,
+            ThemeMode.Dark => KeyboardTheme.Dark,
+            ThemeMode.Dynamic when OperatingSystem.IsAndroidVersionAtLeast(31) => KeyboardTheme.FromSystem(this, systemDark),
+            _ => systemDark ? KeyboardTheme.Dark : KeyboardTheme.Light,
         };
-        var theme = dark ? KeyboardTheme.Dark : KeyboardTheme.Light;
         _keyboardView?.Theme = theme;
         _suggestionBar?.Theme = theme;
+        ApplyPanelTheme(theme);
     }
 
     // ---------- Hilfen ----------

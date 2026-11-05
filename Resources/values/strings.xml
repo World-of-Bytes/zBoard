@@ -3,4 +3,8 @@
   <string name="app_name">zBoard</string>
   <string name="subtype_de">Deutsch</string>
   <string name="subtype_en">English (US)</string>
+  <string name="subtype_fr">Français</string>
+  <string name="subtype_es">Español</string>
+  <string name="subtype_it">Italiano</string>
+  <string name="stats_permission_description">Erlaubt das Lesen von Tipp-Metadaten (Zeiten, Tastenart), nie der getippten Inhalte.</string>
 </resources>

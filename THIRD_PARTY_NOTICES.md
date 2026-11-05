@@ -29,6 +29,19 @@ Die 5 000 häufigsten Wortpaare je Sprache aus dem [Google Books Ngram Corpus](h
 (Bücher von 2010 bis 2019), aufbereitet von [orgtre/google-books-ngram-frequency](https://github.com/orgtre/google-books-ngram-frequency).
 Änderung: Paare mit Satzzeichen oder Ziffern entfernt, in das Format `erstes<TAB>zweites<TAB>häufigkeit` gebracht.
 
+## Assets/dict/fr.*, es.*, it.*
+
+Französisch, Spanisch und Italienisch aus denselben Quellen wie oben: Wortlisten aus FrequencyWords (CC BY-SA 4.0),
+Wortpaare aus dem Google Books Ngram Corpus via orgtre/google-books-ngram-frequency (CC BY 3.0).
+Änderung: auf 80 000 Wörter gekürzt, Tippfehler gefiltert.
+
+## Assets/emoji/
+
+| Datei | Quelle | Lizenz |
+| --- | --- | --- |
+| `emoji.txt` | [unicode-emoji-json](https://github.com/muan/unicode-emoji-json) von Mu-An Chiou (Emoji, Kategorien, Hauttöne) | MIT |
+| `keywords.*.txt` | [Unicode CLDR](https://github.com/unicode-org/cldr) annotations (Namen und Suchbegriffe) | [Unicode License v3](https://www.unicode.org/license.txt), © Unicode, Inc. |
+
 ## Nur beim Erzeugen benutzt, nicht enthalten
 
 | Quelle | Verwendung | Lizenz |

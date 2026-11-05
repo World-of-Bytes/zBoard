@@ -162,7 +162,21 @@ public sealed class KeyboardView : View
     /// <summary>Vergrößerte Taste über dem Finger anzeigen.</summary>
     public bool ShowKeyPreview { get; set; } = true;
 
-    float KeyHeight => 54 * _dp;
+    /// <summary>Ziffern klein oben rechts auf der obersten Buchstabenreihe (aus, wenn eine Zahlenreihe da ist).</summary>
+    public bool ShowDigitHints { get; set; } = true;
+
+    /// <summary>Tastenhöhe als Faktor (0,8 bis 1,3).</summary>
+    public float HeightScale
+    {
+        get;
+        set
+        {
+            field = Math.Clamp(value, 0.7f, 1.4f);
+            RequestLayout();
+        }
+    } = 1f;
+
+    float KeyHeight => 54 * _dp * HeightScale;
     float VerticalPadding => 6 * _dp;
     float GapX => 3 * _dp;
     float GapY => 5 * _dp;
@@ -290,7 +304,7 @@ public sealed class KeyboardView : View
         canvas.DrawText(label, b.CenterX(), baseline, _text);
 
         // Zahlenhinweis oben rechts (wie die Gboard-Option "Zahlenhinweise")
-        if (_layout?.IsAlphabetic == true && key.IsCharacter && key.Alternates.Count > 0
+        if (ShowDigitHints && _layout?.IsAlphabetic == true && key.IsCharacter && key.Alternates.Count > 0
             && key.Alternates[0] is [var first] && char.IsDigit(first))
         {
             _hint.TextSize = 10 * _dp;
@@ -311,6 +325,7 @@ public sealed class KeyboardView : View
         KeyAction.ToSymbols2 => "=\\<",
         KeyAction.ToAlpha => "ABC",
         KeyAction.Language => "🌐",
+        KeyAction.Emoji => "☺",
         _ => key.Label,
     };
 

@@ -1,4 +1,6 @@
+using Android.Content;
 using Android.Graphics;
+using R = Android.Resource.Color;
 
 namespace ZBoard.Keyboard;
 
@@ -40,4 +42,42 @@ public sealed class KeyboardTheme
         HintText = Color.ParseColor("#9AA0A6"),
         Popup = Color.ParseColor("#454B53"),
     };
+
+    /// <summary>Material You: Farben aus der Systempalette (ab Android 12, abgeleitet vom Hintergrundbild).</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("android31.0")]
+    public static KeyboardTheme FromSystem(Context context, bool dark)
+    {
+        Color C(int id) => ToColor(context.Resources!.GetColor(id, context.Theme));
+
+        return dark
+            ? new KeyboardTheme
+            {
+                Background = C(R.SystemNeutral1900),
+                Key = C(R.SystemNeutral2700),
+                SpecialKey = C(R.SystemNeutral1800),
+                KeyPressed = C(R.SystemNeutral2600),
+                Accent = C(R.SystemAccent1200),
+                AccentText = C(R.SystemAccent1900),
+                Text = C(R.SystemNeutral150),
+                HintText = C(R.SystemNeutral2300),
+                Popup = C(R.SystemNeutral2700),
+            }
+            : new KeyboardTheme
+            {
+                Background = C(R.SystemNeutral1100),
+                Key = C(R.SystemNeutral110),
+                SpecialKey = C(R.SystemNeutral2200),
+                KeyPressed = C(R.SystemNeutral2300),
+                Accent = C(R.SystemAccent1600),
+                AccentText = C(R.SystemNeutral110),
+                Text = C(R.SystemNeutral1900),
+                HintText = C(R.SystemNeutral2600),
+                Popup = C(R.SystemNeutral110),
+            };
+    }
+
+    // Je nach .NET-Binding liefert GetColor eine Zahl oder schon eine Farbe.
+    static Color ToColor(int argb) => new(argb);
+
+    static Color ToColor(Color color) => color;
 }

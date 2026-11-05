@@ -245,6 +245,18 @@ def drop_transposition_typos(lines, skip_capitalized):
     return [(w, f) for w, f in lines if w.lower() not in typos]
 
 
+def build_other(path, limit, min_freq):
+    """Weitere Sprachen (Französisch, Spanisch, Italienisch …): Häufigkeitsliste, Einbuchstabenwörter nur mit Akzent/Apostroph."""
+    lines = []
+    for word, freq in load_frequencies(path, min_freq):
+        if len(word) < 2 and word not in ("a", "y", "o", "e", "à", "è", "é"):
+            continue
+        lines.append((word, freq))
+        if len(lines) >= limit:
+            break
+    return lines
+
+
 def write(path, lines, source_note):
     with open(path, "w", encoding="utf-8") as dst:
         dst.write(f"# {source_note}\n")
@@ -265,6 +277,9 @@ def main():
     p.add_argument("--limit-de", type=int, default=120_000)
     p.add_argument("--limit-en", type=int, default=100_000)
     p.add_argument("--min-freq", type=int, default=3)
+    p.add_argument("--extra", action="append", default=[], metavar="SPRACHE:HÄUFIGKEITEN[:WORTPAARE]",
+                   help="weitere Sprache, z. B. fr:fr_full.txt:2grams_french.csv (mehrfach möglich)")
+    p.add_argument("--limit-extra", type=int, default=80_000)
     args = p.parse_args()
 
     write(f"{args.out_dir}/de.txt", drop_transposition_typos(build_german(args), skip_capitalized=True),
@@ -276,6 +291,13 @@ def main():
         write_bigrams(f"{args.out_dir}/de.bigrams.txt", build_bigrams(args.bigrams_de), note)
     if args.bigrams_en:
         write_bigrams(f"{args.out_dir}/en.bigrams.txt", build_bigrams(args.bigrams_en), note)
+    for spec in args.extra:
+        lang, freq_path, *rest = spec.split(":")
+        write(f"{args.out_dir}/{lang}.txt",
+              drop_transposition_typos(build_other(freq_path, args.limit_extra, args.min_freq), skip_capitalized=False),
+              "Quelle: FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0)")
+        if rest:
+            write_bigrams(f"{args.out_dir}/{lang}.bigrams.txt", build_bigrams(rest[0]), note)
 
 
 if __name__ == "__main__":

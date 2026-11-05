@@ -3,6 +3,23 @@
      Hinweis: Debug-Builds von .NET for Android fügen INTERNET für den Debugger automatisch hinzu, Release-Builds nicht. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.VIBRATE" />
+  <!-- Spracheingabe; wird erst beim ersten Tippen auf das Mikrofon erfragt -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+  <!-- Lesezugriff auf die Tipp-Statistik nur für Apps mit derselben Signatur (zHeal Meridian) -->
+  <permission
+      android:name="de.zeriadtke.zboard.permission.READ_TYPING_STATS"
+      android:protectionLevel="signature"
+      android:label="Tipp-Statistik von zBoard lesen"
+      android:description="@string/stats_permission_description" />
+
+  <!-- Paketsichtbarkeit (ab Android 11): Spracherkennungsdienste finden -->
+  <queries>
+    <intent>
+      <action android:name="android.speech.RecognitionService" />
+    </intent>
+  </queries>
+
   <application
       android:label="zBoard"
       android:allowBackup="false"

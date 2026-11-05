@@ -1,0 +1,108 @@
+using Android.App;
+using Android.Content;
+using Android.Database;
+using ZBoard.Ime;
+using ZBoard.Settings;
+
+namespace ZBoard.Stats;
+
+/// <summary>
+/// Schnittstelle für zHeal Meridian: liefert die Tipp-Metadaten als Cursor.
+/// Lesen dürfen nur Apps mit derselben Signatur (Berechtigung de.zeriadtke.zboard.permission.READ_TYPING_STATS).
+///
+///   content://de.zeriadtke.zboard.stats/keystrokes?since=&lt;unix-ms&gt;
+///   content://de.zeriadtke.zboard.stats/sessions?since=&lt;unix-ms&gt;
+///
+/// Ist die Statistik in zBoard ausgeschaltet, sind die Ergebnisse leer.
+/// </summary>
+[ContentProvider(
+    new[] { "de.zeriadtke.zboard.stats" },
+    Name = "de.zeriadtke.zboard.StatsProvider",
+    Exported = true,
+    ReadPermission = "de.zeriadtke.zboard.permission.READ_TYPING_STATS")]
+public sealed class StatsProvider : ContentProvider
+{
+    public const string Authority = "de.zeriadtke.zboard.stats";
+    public const string Permission = "de.zeriadtke.zboard.permission.READ_TYPING_STATS";
+
+    static readonly string[] KeystrokeColumns = ["timestamp_ms", "category", "hold_ms", "flight_ms", "session_id"];
+
+    static readonly string[] SessionColumns =
+    [
+        "session_id", "start_ms", "end_ms", "keystrokes", "chars_per_minute", "correction_rate",
+        "pauses_over_2s", "suggestions_accepted", "autocorrections",
+    ];
+
+    public override bool OnCreate() => true;
+
+    public override ICursor? Query(
+        Android.Net.Uri uri, string[]? projection, string? selection, string[]? selectionArgs, string? sortOrder)
+    {
+        var context = Context!;
+        long since = long.TryParse(uri.GetQueryParameter("since"), out var s) ? s : 0;
+        bool enabled = new ZBoardSettings(context).StatsEnabled;
+        string directory = ZBoardImeService.StatsDirectory(context);
+
+        switch (uri.LastPathSegment)
+        {
+            case "keystrokes":
+            {
+                var cursor = new MatrixCursor(KeystrokeColumns);
+                if (!enabled) return cursor;
+                foreach (var k in StatsReader.ReadKeystrokes(directory, since))
+                {
+                    cursor.AddRow(new Java.Lang.Object?[]
+                    {
+                        new Java.Lang.Long(k.TimestampMs),
+                        new Java.Lang.String(k.Category.ToString()),
+                        new Java.Lang.Integer(k.HoldMs),
+                        k.FlightMs is { } f ? new Java.Lang.Integer(f) : null,
+                        new Java.Lang.String(k.SessionId.ToString()),
+                    });
+                }
+
+                return cursor;
+            }
+
+            case "sessions":
+            {
+                var cursor = new MatrixCursor(SessionColumns);
+                if (!enabled) return cursor;
+                foreach (var x in StatsReader.ReadSessions(directory, since))
+                {
+                    cursor.AddRow(new Java.Lang.Object?[]
+                    {
+                        new Java.Lang.String(x.SessionId.ToString()),
+                        new Java.Lang.Long(x.StartMs),
+                        new Java.Lang.Long(x.EndMs),
+                        new Java.Lang.Integer(x.Keystrokes),
+                        new Java.Lang.Double(x.CharsPerMinute),
+                        new Java.Lang.Double(x.CorrectionRate),
+                        new Java.Lang.Integer(x.PausesOver2s),
+                        new Java.Lang.Integer(x.SuggestionsAccepted),
+                        new Java.Lang.Integer(x.Autocorrections),
+                    });
+                }
+
+                return cursor;
+            }
+
+            default:
+                return null;
+        }
+    }
+
+    public override string? GetType(Android.Net.Uri uri) => uri.LastPathSegment switch
+    {
+        "keystrokes" => $"vnd.android.cursor.dir/vnd.{Authority}.keystroke",
+        "sessions" => $"vnd.android.cursor.dir/vnd.{Authority}.session",
+        _ => null,
+    };
+
+    // Nur lesend
+    public override Android.Net.Uri? Insert(Android.Net.Uri uri, ContentValues? values) => null;
+
+    public override int Delete(Android.Net.Uri uri, string? selection, string[]? selectionArgs) => 0;
+
+    public override int Update(Android.Net.Uri uri, ContentValues? values, string? selection, string[]? selectionArgs) => 0;
+}

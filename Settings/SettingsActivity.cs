@@ -47,7 +47,30 @@ public sealed class SettingsActivity : Activity
         BuildAppearanceSection();
         BuildStatsSection();
         BuildTestSection();
+        BuildClipboardVoiceSection();
         BuildAboutSection();
+
+        if (Intent?.GetBooleanExtra(ZBoardImeService.RequestMicExtra, false) == true) RequestMicrophone();
+    }
+
+    const int MicRequest = 42;
+
+    void RequestMicrophone()
+    {
+        if (CheckSelfPermission(Android.Manifest.Permission.RecordAudio) == Android.Content.PM.Permission.Granted) return;
+        RequestPermissions([Android.Manifest.Permission.RecordAudio], MicRequest);
+    }
+
+    public override void OnRequestPermissionsResult(
+        int requestCode, string[] permissions, Android.Content.PM.Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != MicRequest) return;
+        bool granted = grantResults.Length > 0 && grantResults[0] == Android.Content.PM.Permission.Granted;
+        Toast.MakeText(this,
+            granted ? "Mikrofon freigegeben. Tippe in der Tastatur erneut auf 🎤." : "Ohne Mikrofon ist keine Spracheingabe möglich.",
+            ToastLength.Long)!.Show();
+        if (granted) Finish();
     }
 
     protected override void OnResume()
@@ -148,6 +171,7 @@ public sealed class SettingsActivity : Activity
             (ThemeMode.Light, "Hell"),
             (ThemeMode.Dark, "Dunkel"),
         ];
+        if (OperatingSystem.IsAndroidVersionAtLeast(31)) options = [.. options, (ThemeMode.Dynamic, "Farben aus dem Hintergrundbild (Material You)")];
 
         foreach (var (mode, label) in options)
         {
@@ -161,6 +185,60 @@ public sealed class SettingsActivity : Activity
         }
 
         _content.AddView(group);
+
+        AddSwitch("Zahlenreihe über den Buchstaben", _settings.NumberRow, v => _settings.NumberRow = v);
+
+        Text("Tastaturhöhe");
+        var height = new SeekBar(this) { Max = 50, Progress = _settings.HeightPercent - 80 };
+        var heightLabel = Text($"{_settings.HeightPercent} %");
+        height.ProgressChanged += (_, e) =>
+        {
+            _settings.HeightPercent = 80 + e.Progress;
+            heightLabel.Text = $"{_settings.HeightPercent} %";
+        };
+        _content.AddView(height);
+
+        Header("Einhandmodus");
+        Text("Schmalere Tastatur am rechten oder linken Rand. Umschalten auch über ✋ in der Werkzeugleiste.");
+        var oneHanded = new RadioGroup(this) { Orientation = Orientation.Vertical };
+        (OneHandedMode Mode, string Label)[] sides =
+        [
+            (OneHandedMode.Off, "Aus"),
+            (OneHandedMode.Right, "Rechts"),
+            (OneHandedMode.Left, "Links"),
+        ];
+        foreach (var (mode, label) in sides)
+        {
+            var radio = new RadioButton(this) { Text = label, Id = View.GenerateViewId() };
+            oneHanded.AddView(radio);
+            if (_settings.OneHanded == mode) radio.Checked = true;
+            radio.CheckedChange += (_, e) =>
+            {
+                if (e.IsChecked) _settings.OneHanded = mode;
+            };
+        }
+
+        _content.AddView(oneHanded);
+    }
+
+    void BuildClipboardVoiceSection()
+    {
+        Header("Zwischenablage");
+        Text("Kopierter Text erscheint eine Stunde lang im Verlauf (📋 in der Werkzeugleiste). Nur Angeheftetes "
+             + "wird gespeichert. Als vertraulich markierte Inhalte, etwa aus Passwort-Managern, übernimmt zBoard nie.");
+        AddSwitch("Zwischenablage-Verlauf", _settings.ClipboardHistory, v => _settings.ClipboardHistory = v);
+        AddButton("Angeheftete Einträge löschen", () =>
+        {
+            _settings.PinnedClips = string.Empty;
+            Toast.MakeText(this, "Gilt ab dem nächsten Start der Tastatur.", ToastLength.Short)!.Show();
+        });
+
+        Header("Spracheingabe");
+        Text("🎤 in der Werkzeugleiste startet die Spracherkennung des Systems. Standardmäßig nur, wenn das Gerät "
+             + "offline erkennen kann (ab Android 12, je nach Hersteller). Sonst würde die Sprache an den Anbieter "
+             + "des Erkennungsdienstes übertragen.");
+        AddSwitch("Nur Offline-Erkennung verwenden", _settings.VoiceOfflineOnly, v => _settings.VoiceOfflineOnly = v);
+        AddButton("Mikrofon freigeben", RequestMicrophone);
     }
 
     void BuildStatsSection()
@@ -168,7 +246,8 @@ public sealed class SettingsActivity : Activity
         Header("Statistik für zHeal Meridian");
         Text("Erfasst werden nur Zeitpunkte, Druckdauer, Abstände zwischen Anschlägen und die Art der Taste "
              + "(Buchstabe, Leertaste, Löschen …). Welche Zeichen du tippst, wird nie gespeichert. "
-             + "In Passwortfeldern wird nichts erfasst. Die Daten bleiben auf dem Gerät.");
+             + "In Passwortfeldern wird nichts erfasst. Die Daten bleiben auf dem Gerät; lesen kann sie nur "
+             + "zHeal Meridian (gleiche Signatur) über eine eigene Schnittstelle.");
 
         AddSwitch("Tipp-Statistik erfassen", _settings.StatsEnabled, v => _settings.StatsEnabled = v);
         _statsInfo = Text(string.Empty);
@@ -210,7 +289,9 @@ public sealed class SettingsActivity : Activity
              + "Großschreibung deutscher Substantive nach german-nouns von Gregor Weichbrodt auf Basis von Wiktionary. "
              + "Lizenz: creativecommons.org/licenses/by-sa/4.0\n\n"
              + "Wortpaare für die Vorhersage (CC BY 3.0): Google Books Ngram Corpus, aufbereitet von "
-             + "orgtre/google-books-ngram-frequency. Lizenz: creativecommons.org/licenses/by/3.0");
+             + "orgtre/google-books-ngram-frequency. Lizenz: creativecommons.org/licenses/by/3.0\n\n"
+             + "Emoji-Daten: unicode-emoji-json von Mu-An Chiou (MIT); Namen und Suchbegriffe: Unicode CLDR "
+             + "(Unicode License v3), © Unicode, Inc.");
     }
 
     // ---------- Status ----------

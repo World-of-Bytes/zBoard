@@ -18,6 +18,9 @@
     <Compile Include="../../Suggestions/UserHistory.cs" Link="Core/UserHistory.cs" />
     <Compile Include="../../Suggestions/GlideDecoder.cs" Link="Core/GlideDecoder.cs" />
     <Compile Include="../../Ime/TextBoundaries.cs" Link="Core/TextBoundaries.cs" />
+    <Compile Include="../../Emoji/EmojiCatalog.cs" Link="Core/EmojiCatalog.cs" />
+    <Compile Include="../../Clipboard/ClipboardHistory.cs" Link="Core/ClipboardHistory.cs" />
+    <Compile Include="../../Stats/StatsReader.cs" Link="Core/StatsReader.cs" />
     <Compile Include="../../Stats/KeystrokeModels.cs" Link="Core/KeystrokeModels.cs" />
     <Compile Include="../../Stats/KeystrokeStatsRecorder.cs" Link="Core/KeystrokeStatsRecorder.cs" />
     <Compile Include="../../Stats/JsonlStatsSink.cs" Link="Core/JsonlStatsSink.cs" />

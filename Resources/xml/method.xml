@@ -15,4 +15,22 @@
       android:languageTag="en-US"
       android:imeSubtypeMode="keyboard" />
 
+  <subtype
+      android:label="@string/subtype_fr"
+      android:imeSubtypeLocale="fr_FR"
+      android:languageTag="fr-FR"
+      android:imeSubtypeMode="keyboard" />
+
+  <subtype
+      android:label="@string/subtype_es"
+      android:imeSubtypeLocale="es_ES"
+      android:languageTag="es-ES"
+      android:imeSubtypeMode="keyboard" />
+
+  <subtype
+      android:label="@string/subtype_it"
+      android:imeSubtypeLocale="it_IT"
+      android:languageTag="it-IT"
+      android:imeSubtypeMode="keyboard" />
+
 </input-method>

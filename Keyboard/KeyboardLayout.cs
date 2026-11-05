@@ -12,6 +12,7 @@ public enum KeyAction
     ToSymbols2,
     ToAlpha,
     Language,
+    Emoji,
 }
 
 /// <summary>Eine Taste im Layout. Breite in Layout-Einheiten (Standardtaste = 1, 0 = füllt den Rest der Reihe).</summary>

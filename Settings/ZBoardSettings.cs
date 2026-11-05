@@ -7,6 +7,16 @@ public enum ThemeMode
     System = 0,
     Light = 1,
     Dark = 2,
+
+    /// <summary>Material You: Farben aus dem Hintergrundbild (ab Android 12).</summary>
+    Dynamic = 3,
+}
+
+public enum OneHandedMode
+{
+    Off = 0,
+    Right = 1,
+    Left = 2,
 }
 
 /// <summary>Einstellungen in SharedPreferences. Werte werden bei jedem Zugriff frisch gelesen.</summary>
@@ -97,6 +107,53 @@ public sealed class ZBoardSettings
     {
         get => _prefs.GetBoolean("keySound", false);
         set => PutBool("keySound", value);
+    }
+
+    /// <summary>Ziffernreihe über den Buchstaben.</summary>
+    public bool NumberRow
+    {
+        get => _prefs.GetBoolean("numberRow", false);
+        set => PutBool("numberRow", value);
+    }
+
+    /// <summary>Tastaturhöhe in Prozent (80–130).</summary>
+    public int HeightPercent
+    {
+        get => Math.Clamp(_prefs.GetInt("heightPercent", 100), 80, 130);
+        set => PutInt("heightPercent", Math.Clamp(value, 80, 130));
+    }
+
+    public OneHandedMode OneHanded
+    {
+        get => (OneHandedMode)_prefs.GetInt("oneHanded", 0);
+        set => PutInt("oneHanded", (int)value);
+    }
+
+    /// <summary>Verlauf der Zwischenablage führen.</summary>
+    public bool ClipboardHistory
+    {
+        get => _prefs.GetBoolean("clipboardHistory", true);
+        set => PutBool("clipboardHistory", value);
+    }
+
+    /// <summary>Spracheingabe nur, wenn das Gerät offline erkennen kann.</summary>
+    public bool VoiceOfflineOnly
+    {
+        get => _prefs.GetBoolean("voiceOfflineOnly", true);
+        set => PutBool("voiceOfflineOnly", value);
+    }
+
+    public string RecentEmoji
+    {
+        get => _prefs.GetString("recentEmoji", string.Empty) ?? string.Empty;
+        set => PutString("recentEmoji", value);
+    }
+
+    /// <summary>Angeheftete Einträge der Zwischenablage.</summary>
+    public string PinnedClips
+    {
+        get => _prefs.GetString("pinnedClips", string.Empty) ?? string.Empty;
+        set => PutString("pinnedClips", value);
     }
 
     public ThemeMode Theme
