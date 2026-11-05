@@ -210,6 +210,9 @@ public sealed class KeyboardView : View
 
     void LayoutKeys()
     {
+#if DEBUG
+        _keysLogged = false;
+#endif
         _keys.Clear();
         _keyCenters.Clear();
         if (_layout == null || Width == 0) return;
@@ -251,6 +254,9 @@ public sealed class KeyboardView : View
     {
         base.OnDraw(canvas);
         canvas.DrawColor(Theme.Background);
+#if DEBUG
+        LogKeyPositions();
+#endif
 
         float radius = 6 * _dp;
         foreach (var pk in _keys)
@@ -387,6 +393,33 @@ public sealed class KeyboardView : View
             canvas.DrawText(popup.Items[i], cell.CenterX(), baseline, _text);
         }
     }
+
+#if DEBUG
+    bool _keysLogged;
+
+    /// <summary>
+    /// Nur Debug: schreibt die Bildschirmposition jeder Taste ins Log (Tag "zBoardTest"),
+    /// damit der Emulator-Test gezielt tippen kann. Format: "KEYS a@540,1700 Space@540,2100 …".
+    /// </summary>
+    void LogKeyPositions()
+    {
+        if (_keysLogged || _keys.Count == 0) return;
+        _keysLogged = true;
+
+        var origin = new int[2];
+        GetLocationOnScreen(origin);
+        var line = new System.Text.StringBuilder("KEYS ").Append(_layout?.Id).Append(' ');
+        foreach (var pk in _keys)
+        {
+            string id = pk.Key.IsCharacter ? pk.Key.Label : pk.Key.Action.ToString();
+            line.Append(id).Append('@')
+                .Append((int)(origin[0] + pk.Bounds.CenterX())).Append(',')
+                .Append((int)(origin[1] + pk.Bounds.CenterY())).Append(' ');
+        }
+
+        Android.Util.Log.Info("zBoardTest", line.ToString());
+    }
+#endif
 
     // ---------- Berührung ----------
 
