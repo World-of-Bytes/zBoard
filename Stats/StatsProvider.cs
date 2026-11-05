@@ -51,14 +51,12 @@ public sealed class StatsProvider : ContentProvider
                 if (!enabled) return cursor;
                 foreach (var k in StatsReader.ReadKeystrokes(directory, since))
                 {
-                    cursor.AddRow(new Java.Lang.Object?[]
-                    {
-                        new Java.Lang.Long(k.TimestampMs),
-                        new Java.Lang.String(k.Category.ToString()),
-                        new Java.Lang.Integer(k.HoldMs),
-                        k.FlightMs is { } f ? new Java.Lang.Integer(f) : null,
-                        new Java.Lang.String(k.SessionId.ToString()),
-                    });
+                    cursor.NewRow()!
+                        .Add(Java.Lang.Long.ValueOf(k.TimestampMs))!
+                        .Add(new Java.Lang.String(k.Category.ToString()))!
+                        .Add(Java.Lang.Integer.ValueOf(k.HoldMs))!
+                        .Add(k.FlightMs is { } f ? Java.Lang.Integer.ValueOf(f) : null)!
+                        .Add(new Java.Lang.String(k.SessionId.ToString()));
                 }
 
                 return cursor;
@@ -70,18 +68,16 @@ public sealed class StatsProvider : ContentProvider
                 if (!enabled) return cursor;
                 foreach (var x in StatsReader.ReadSessions(directory, since))
                 {
-                    cursor.AddRow(new Java.Lang.Object?[]
-                    {
-                        new Java.Lang.String(x.SessionId.ToString()),
-                        new Java.Lang.Long(x.StartMs),
-                        new Java.Lang.Long(x.EndMs),
-                        new Java.Lang.Integer(x.Keystrokes),
-                        new Java.Lang.Double(x.CharsPerMinute),
-                        new Java.Lang.Double(x.CorrectionRate),
-                        new Java.Lang.Integer(x.PausesOver2s),
-                        new Java.Lang.Integer(x.SuggestionsAccepted),
-                        new Java.Lang.Integer(x.Autocorrections),
-                    });
+                    cursor.NewRow()!
+                        .Add(new Java.Lang.String(x.SessionId.ToString()))!
+                        .Add(Java.Lang.Long.ValueOf(x.StartMs))!
+                        .Add(Java.Lang.Long.ValueOf(x.EndMs))!
+                        .Add(Java.Lang.Integer.ValueOf(x.Keystrokes))!
+                        .Add(Java.Lang.Double.ValueOf(x.CharsPerMinute))!
+                        .Add(Java.Lang.Double.ValueOf(x.CorrectionRate))!
+                        .Add(Java.Lang.Integer.ValueOf(x.PausesOver2s))!
+                        .Add(Java.Lang.Integer.ValueOf(x.SuggestionsAccepted))!
+                        .Add(Java.Lang.Integer.ValueOf(x.Autocorrections));
                 }
 
                 return cursor;

@@ -3,14 +3,15 @@
 [![Build](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml/badge.svg)](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml)
 
 zBoard ist eine freie Android-Tastatur, die sich in Bedienung und Funktionsumfang an Gboard orientiert:
-Wortvorschläge, Autokorrektur, Wischeingabe und Nächstes-Wort-Vorhersage für Deutsch und Englisch.
+Wortvorschläge, Autokorrektur, Wischeingabe, Nächstes-Wort-Vorhersage, Emoji, Zwischenablage und Spracheingabe
+für Deutsch, Englisch, Französisch, Spanisch und Italienisch.
 Anders als Gboard arbeitet zBoard vollständig offline und ohne Internetberechtigung; was es aus deinen Eingaben
 lernt, bleibt auf dem Gerät. Geschrieben ist zBoard in C# mit .NET 10 for Android.
 
 Für das Projekt **zHeal Meridian** kann zBoard auf Wunsch Tipp-Metadaten erfassen (Zeitpunkte, Druckdauer,
 Pausen, Tastenart), aber nie, welche Zeichen getippt wurden.
 
-Stand: **Meilenstein M3 von 5** – in Entwicklung, noch nicht veröffentlicht.
+Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, noch nicht veröffentlicht.
 
 ## zBoard im Vergleich zu Gboard
 
@@ -19,7 +20,7 @@ Stand: **Meilenstein M3 von 5** – in Entwicklung, noch nicht veröffentlicht.
 | Lizenz | proprietär, Quellcode nicht öffentlich | BSD 2-Clause (Code), Wortlisten CC BY-SA 4.0 / CC BY 3.0 |
 | Internetzugriff | ja (u. a. GIFs, Übersetzen, Synchronisation) | keine Internetberechtigung |
 | Lernen aus Eingaben | ja, Modelle werden per Federated Learning mit Google-Servern verbessert | ja, ausschließlich auf dem Gerät, abschaltbar und löschbar |
-| Sprachen | sehr viele Sprachen und Layouts | Deutsch (QWERTZ), Englisch (QWERTY) |
+| Sprachen | sehr viele Sprachen und Layouts | Deutsch (QWERTZ), Englisch, Spanisch, Italienisch (QWERTY), Französisch (AZERTY) |
 | Tippen, Umschalt, Symbole, langer Druck für Sonderzeichen | ✓ | ✓ |
 | Wortvorschläge und Autokorrektur | ✓ | ✓ 120 000 deutsche, 100 000 englische Wörter; Tastennachbarn, Vertauschungen, Umlaute |
 | Großschreibung deutscher Substantive | ✓ | ✓ |
@@ -27,12 +28,12 @@ Stand: **Meilenstein M3 von 5** – in Entwicklung, noch nicht veröffentlicht.
 | Wischeingabe (Glide Typing) | ✓ | ✓ |
 | Cursor per Leertaste, Wort-Löschen per Wischen | ✓ | ✓ |
 | Tastenvorschau, Vibration, Ton | ✓ | ✓ |
-| Helles/dunkles Design | ✓ | ✓ |
-| Emoji-Tastatur | ✓ | geplant (M4) |
-| Zwischenablage-Verlauf | ✓ | geplant (M4) |
-| GIFs und Sticker | ✓ | GIFs optional geplant (M4) |
-| Spracheingabe | ✓ | geplant (M5, offline) |
-| Einhandmodus, Größe anpassen | ✓ | geplant (M5) |
+| Designs | ✓ | hell, dunkel, Material You (Farben aus dem Hintergrundbild) |
+| Emoji-Tastatur | ✓ | ✓ mit Kategorien, Hauttönen, „Zuletzt verwendet“ und Suche in allen fünf Sprachen |
+| Zwischenablage-Verlauf | ✓ | ✓ eine Stunde, Anheften, vertrauliche Inhalte ausgenommen |
+| GIFs und Sticker | ✓ | bewusst nicht (bräuchte Internetzugriff) |
+| Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
+| Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
 | Übersetzen, Google-Dienste | ✓ | nicht geplant |
 | Tipp-Statistik für Forschung (nur Metadaten) | – | ✓ standardmäßig aus |
 
@@ -54,7 +55,7 @@ Danach die App **zBoard** öffnen:
 
 ## Tests
 
-Die Logik ohne Android (Wörterbuch, Autokorrektur, Vorhersage, Lernen, Wischeingabe, Statistik) hat eigene Unit-Tests:
+Die Logik ohne Android (Wörterbuch, Autokorrektur, Vorhersage, Lernen, Wischeingabe, Emoji, Zwischenablage, Statistik, Layouts) hat eigene Unit-Tests:
 
 ```bash
 dotnet test tests/ZBoard.Core.Tests
@@ -66,11 +67,15 @@ dotnet test tests/ZBoard.Core.Tests
 | --- | --- |
 | `Ime/` | `ZBoardImeService` (Herzstück), `EditorProfile` (Eigenschaften des Eingabefelds), `TextBoundaries` |
 | `Keyboard/` | Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), Farben |
+| `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
+| `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `KeyProximity`, `SuggestionBarView` |
-| `Stats/` | `KeystrokeEvent`, `KeystrokeStatsRecorder`, `IKeystrokeStatsSink`, `JsonlStatsSink` |
+| `Stats/` | `KeystrokeStatsRecorder`, `JsonlStatsSink`, `StatsReader`, `StatsProvider` (Schnittstelle für zHeal) |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
-| `Assets/dict/` | Wortlisten pro Sprache (`wort<TAB>häufigkeit`) |
-| `tools/` | `build_dictionaries.py` erzeugt die Wortlisten |
+| `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
+| `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
+| `docs/` | `ZHEAL_SCHNITTSTELLE.md` |
+| `tools/` | `build_dictionaries.py` (Wortlisten), `build_emoji.py` (Emoji-Daten) |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
 ## Wörterbücher
@@ -154,9 +159,39 @@ Nichts wird in Passwortfeldern oder Feldern mit `IME_FLAG_NO_PERSONALIZED_LEARNI
 Funktionen und Bedienung orientieren sich an Gboard. Name, Logo, Icons, Farben, Code und Wörterbuchdaten
 von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Release-Build).
 
-## Nächste Schritte (M4)
+## Emoji, Zwischenablage, Spracheingabe
 
-- Auf einem echten Gerät bauen und messen: Ladezeit, Speicher, Tipp-Latenz, Wischerkennung mit echten Spuren
-- Emoji-Tastatur mit Kategorien, Suche und „Zuletzt verwendet“
-- Zwischenablage-Verlauf mit Anheften
-- GIFs (Anbieter klären, optional)
+- **Emoji:** Taste ☺ links neben dem Komma. Unten Kategorien, 🕘 zuletzt verwendet, 🔍 Suche. Bei der Suche schreibt
+  die Tastatur in das Suchfeld der Leiste („Daumen“, „gut“, „lachen“); Treffer erscheinen daneben. Langer Druck auf
+  Personen-Emoji zeigt die Hauttöne. Emoji, die die Schrift des Geräts nicht kennt, werden ausgeblendet.
+- **Werkzeugleiste:** erscheint, wenn es nichts vorzuschlagen gibt: 📋 Zwischenablage, 🎤 Spracheingabe,
+  ✋ Einhandmodus (rechts → links → aus), ⚙ Einstellungen. Eben kopierter Text erscheint dort 90 Sekunden lang
+  als Vorschlag.
+- **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
+  gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
+  werden nie übernommen.
+- **Spracheingabe:** nutzt die Spracherkennung des Systems. Standardmäßig nur, wenn das Gerät offline erkennen kann
+  (ab Android 12, je nach Hersteller); sonst ginge die Sprache an den Anbieter des Erkennungsdienstes. Die
+  Mikrofon-Berechtigung fragt die zBoard-App beim ersten Tippen auf 🎤 ab.
+
+### Emoji-Daten neu erzeugen
+
+```bash
+git clone --depth 1 https://github.com/muan/unicode-emoji-json
+git clone --depth 1 --filter=blob:none --sparse https://github.com/unicode-org/cldr
+git -C cldr sparse-checkout set --no-cone /common/annotations /common/annotationsDerived
+python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json --cldr cldr
+```
+
+Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.csv` (siehe `tools/build_dictionaries.py --help`).
+
+## zHeal Meridian
+
+Die Tipp-Statistik lässt sich über einen `ContentProvider` abfragen, nur von Apps mit derselben Signatur.
+Aufbau, Spalten und ein Beispiel: [docs/ZHEAL_SCHNITTSTELLE.md](docs/ZHEAL_SCHNITTSTELLE.md).
+
+## Nächste Schritte
+
+- Test auf echten Geräten: Tippgefühl, Wischerkennung mit echten Spuren, Ladezeit und Speicher der Wörterbücher,
+  Spracheingabe auf Geräten mit und ohne Offline-Erkennung
+- Veröffentlichung vorbereiten: Release-Signatur, App-Symbol, F-Droid-Metadaten
