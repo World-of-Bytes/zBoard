@@ -19,12 +19,13 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
     const long ClipChipMaxAgeMs = 90_000;
     const float OneHandedWidth = 0.82f;
 
+    /// <summary>Wie bei Gboard: Werkzeuge links, Mikrofon rechts im Kreis.</summary>
     static readonly IReadOnlyList<ToolbarItem> Toolbar =
     [
-        new("clipboard", "📋"),
-        new("voice", "🎤"),
-        new("onehanded", "✋"),
-        new("settings", "⚙"),
+        new("clipboard", Resource.Drawable.ms_content_paste),
+        new("onehanded", Resource.Drawable.ms_back_hand),
+        new("settings", Resource.Drawable.ms_settings),
+        new("voice", Resource.Drawable.ms_mic, Trailing: true),
     ];
 
     LinearLayout? _inputRoot;
@@ -72,7 +73,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost.AddView(_clipboardPanel);
         ApplyOneHanded();
 
-        root.AddView(_suggestionBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, (int)(44 * dp)));
+        root.AddView(_suggestionBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, (int)(48 * dp)));
         root.AddView(_panelHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
         return root;
     }

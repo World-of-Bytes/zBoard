@@ -16,16 +16,26 @@ public sealed partial class ZBoardImeService
 {
     public const string RequestMicExtra = "zboard.request_mic";
 
+    /// <summary>
+    /// So lange warten wir nach dem Ende der Aufnahme auf das Endergebnis. Manche Geräte (Offline-Erkennung)
+    /// liefern danach kein OnResults mehr; dann gilt das letzte Zwischenergebnis.
+    /// </summary>
+    const int VoiceResultTimeoutMs = 2500;
+
     SpeechRecognizer? _recognizer;
     bool _voiceActive;
     bool _voiceHasPartial;
+    bool _voiceEnded;                     // Aufnahme beendet, warten auf das Ergebnis
+    Java.Lang.Runnable? _voiceTimeout;
+    Handler? _voiceHandler;
     string _voicePrefix = string.Empty;   // Leerzeichen vor dem gesprochenen Text, beim Start festgelegt
 
     void StartVoice()
     {
         if (_voiceActive)
         {
-            StopVoice(cancel: false);
+            // Antippen während „Wird erkannt …“: nicht länger warten, Zwischenergebnis übernehmen
+            StopVoice(cancel: _voiceEnded);
             return;
         }
 
@@ -53,9 +63,10 @@ public sealed partial class ZBoardImeService
         _recognizer.SetRecognitionListener(new VoiceListener(this));
         _voiceActive = true;
         _voiceHasPartial = false;
+        _voiceEnded = false;
         string before = TextBeforeCursor(1);
         _voicePrefix = before.Length > 0 && !char.IsWhiteSpace(before[0]) ? " " : string.Empty;
-        _suggestionBar?.SetStatus("🎤 Ich höre zu … (antippen zum Beenden)");
+        _suggestionBar?.SetStatus("Ich höre zu … (antippen zum Beenden)");
         _recognizer.StartListening(recognize);
     }
 
@@ -94,14 +105,35 @@ public sealed partial class ZBoardImeService
         else
         {
             _recognizer.StopListening(); // Ergebnis kommt noch über OnResults
+            OnVoiceRecordingEnded();
         }
+    }
+
+    void OnVoiceRecordingEnded()
+    {
+        if (!_voiceActive || _voiceEnded) return;
+        _voiceEnded = true;
+        _suggestionBar?.SetStatus("Wird erkannt …");
+        _voiceHandler ??= new Handler(Looper.MainLooper!);
+        _voiceTimeout ??= new Java.Lang.Runnable(() =>
+        {
+            if (!_voiceActive) return;
+            _recognizer?.Cancel();
+            EndVoice();
+        });
+        _voiceHandler.RemoveCallbacks(_voiceTimeout);
+        _voiceHandler.PostDelayed(_voiceTimeout, VoiceResultTimeoutMs);
     }
 
     void EndVoice()
     {
-        _recognizer?.Destroy();
+        if (_voiceTimeout != null) _voiceHandler?.RemoveCallbacks(_voiceTimeout);
+        var recognizer = _recognizer;
         _recognizer = null;
         _voiceActive = false;
+        _voiceEnded = false;
+        // Nicht innerhalb eines Rückrufs des Erkenners zerstören
+        if (recognizer != null) (_voiceHandler ??= new Handler(Looper.MainLooper!)).Post(recognizer.Destroy);
         if (_voiceHasPartial)
         {
             Ic?.FinishComposingText();
@@ -114,13 +146,14 @@ public sealed partial class ZBoardImeService
     void OnVoicePartial(string text)
     {
         var ic = Ic;
-        if (ic == null || string.IsNullOrWhiteSpace(text)) return;
+        if (!_voiceActive || ic == null || string.IsNullOrWhiteSpace(text)) return;
         ic.SetComposingText(J(VoiceText(text)), 1);
         _voiceHasPartial = true;
     }
 
     void OnVoiceFinal(string? text)
     {
+        if (!_voiceActive) return; // schon per Zeitlimit beendet
         var ic = Ic;
         if (ic != null && !string.IsNullOrWhiteSpace(text))
         {
@@ -141,6 +174,14 @@ public sealed partial class ZBoardImeService
 
     void OnVoiceError(SpeechRecognizerError error)
     {
+        if (!_voiceActive) return;
+        if (_voiceHasPartial)
+        {
+            // Erkannt wurde schon etwas: behalten statt Fehlermeldung
+            EndVoice();
+            return;
+        }
+
         string message = error switch
         {
             SpeechRecognizerError.NoMatch or SpeechRecognizerError.SpeechTimeout => "Nichts verstanden.",
@@ -171,7 +212,7 @@ public sealed partial class ZBoardImeService
         {
         }
 
-        public void OnEndOfSpeech() => owner._suggestionBar?.SetStatus("🎤 Wird erkannt …");
+        public void OnEndOfSpeech() => owner.OnVoiceRecordingEnded();
 
         public void OnError(SpeechRecognizerError error) => owner.OnVoiceError(error);
 

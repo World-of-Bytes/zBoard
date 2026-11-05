@@ -795,7 +795,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         {
             ThemeMode.Light => KeyboardTheme.Light,
             ThemeMode.Dark => KeyboardTheme.Dark,
-            ThemeMode.Dynamic when OperatingSystem.IsAndroidVersionAtLeast(31) => KeyboardTheme.FromSystem(this, systemDark),
+            // Wie Gboard: ab Android 12 standardmäßig Material-You-Farben passend zum Hintergrundbild
+            _ when OperatingSystem.IsAndroidVersionAtLeast(31) => KeyboardTheme.FromSystem(this, systemDark),
             _ => systemDark ? KeyboardTheme.Dark : KeyboardTheme.Light,
         };
         _keyboardView?.Theme = theme;

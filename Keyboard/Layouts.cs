@@ -221,14 +221,14 @@ public static class Layouts
         BottomRow(KeyAction.ToAlpha, showLanguageKey),
     ]);
 
-    /// <summary>Untere Reihe: Ebenen-Taste, Emoji, Komma, (Sprache), Leertaste, Punkt, Enter.</summary>
+    /// <summary>Untere Reihe wie bei Gboard: Ebenen-Taste, Komma, Emoji, (Sprache), Leertaste, Punkt, Enter.</summary>
     static KeyRow BottomRow(KeyAction modeKey, bool showLanguageKey)
     {
         List<KeyDef> keys =
         [
             Special(modeKey, 1.5f),
-            Special(KeyAction.Emoji, 1f),
             Char(","),
+            Special(KeyAction.Emoji, 1f),
         ];
         if (showLanguageKey) keys.Add(Special(KeyAction.Language, 1f));
 

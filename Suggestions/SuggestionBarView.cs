@@ -11,8 +11,8 @@ namespace ZBoard.Suggestions;
 /// <param name="IsLiteral">Der Nutzer wählt sein getipptes Wort statt der Korrektur.</param>
 public sealed record SuggestionSlot(string Display, string Word, bool Emphasized, bool IsLiteral);
 
-/// <summary>Eintrag der Werkzeugleiste.</summary>
-public sealed record ToolbarItem(string Id, string Icon);
+/// <summary>Eintrag der Werkzeugleiste (Material-Symbol). <paramref name="Trailing"/>: rechts im Kreis (Mikrofon).</summary>
+public sealed record ToolbarItem(string Id, int Icon, bool Trailing = false);
 
 /// <summary>
 /// Leiste über der Tastatur. Zeigt je nach Lage drei Vorschläge, die Werkzeugleiste (mit dem zuletzt kopierten Text),
@@ -33,11 +33,12 @@ public sealed class SuggestionBarView : View
     }
 
     readonly float _dp;
+    readonly Icons _icons;
     readonly Paint _text = new(PaintFlags.AntiAlias);
     readonly Paint _line = new(PaintFlags.AntiAlias);
     readonly Paint _fill = new(PaintFlags.AntiAlias);
     readonly SuggestionSlot?[] _slots = new SuggestionSlot?[3];
-    readonly List<(RectF Bounds, string Id, string Label)> _targets = [];
+    readonly List<(RectF Bounds, string Id, string Label, int Icon)> _targets = [];
 
     Mode _mode = Mode.Toolbar;
     string? _clipChip;
@@ -50,6 +51,7 @@ public sealed class SuggestionBarView : View
     public SuggestionBarView(Context context) : base(context)
     {
         _dp = context.Resources!.DisplayMetrics!.Density;
+        _icons = new Icons(context);
         _text.TextAlign = Paint.Align.Center;
         _line.StrokeWidth = 1 * _dp;
     }
@@ -140,7 +142,7 @@ public sealed class SuggestionBarView : View
                 LayoutEmojiSearch();
                 break;
             case Mode.Status:
-                _targets.Add((new RectF(0, 0, Width, Height), StatusId, _status));
+                _targets.Add((new RectF(0, 0, Width, Height), StatusId, _status, Resource.Drawable.ms_mic));
                 break;
         }
 
@@ -152,25 +154,35 @@ public sealed class SuggestionBarView : View
         float w = Width / 3f;
         for (int i = 0; i < 3; i++)
         {
-            if (_slots[i] is { } slot) _targets.Add((new RectF(i * w, 0, (i + 1) * w, Height), $"slot{i}", slot.Display));
+            if (_slots[i] is { } slot) _targets.Add((new RectF(i * w, 0, (i + 1) * w, Height), $"slot{i}", slot.Display, 0));
         }
     }
 
     void LayoutToolbar()
     {
+        // Gboard: gleich breite Felder, das Mikrofon ganz rechts
+        float slot = Width / 5f;
+        float right = Width;
+        foreach (var item in ToolbarItems.Where(t => t.Trailing))
+        {
+            _targets.Add((new RectF(right - slot, 0, right, Height), item.Id, string.Empty, item.Icon));
+            right -= slot;
+        }
+
         float x = 0;
         if (_clipChip != null)
         {
             float chipWidth = Width * 0.45f;
-            _targets.Add((new RectF(0, 0, chipWidth, Height), ClipChipId, "📋 " + Shorten(_clipChip)));
+            _targets.Add((new RectF(0, 0, chipWidth, Height), ClipChipId, Shorten(_clipChip), Resource.Drawable.ms_content_paste));
             x = chipWidth;
         }
 
-        if (ToolbarItems.Count == 0) return;
-        float w = (Width - x) / ToolbarItems.Count;
-        foreach (var item in ToolbarItems)
+        var leading = ToolbarItems.Where(t => !t.Trailing).ToList();
+        if (leading.Count == 0) return;
+        float w = Math.Min(slot, (right - x) / leading.Count);
+        foreach (var item in leading)
         {
-            _targets.Add((new RectF(x, 0, x + w, Height), item.Id, item.Icon));
+            _targets.Add((new RectF(x, 0, x + w, Height), item.Id, string.Empty, item.Icon));
             x += w;
         }
     }
@@ -178,33 +190,46 @@ public sealed class SuggestionBarView : View
     void LayoutEmojiSearch()
     {
         float pillWidth = Width * 0.35f;
-        _targets.Add((new RectF(0, 0, pillWidth, Height), SearchPillId, "🔍 " + _searchQuery + "▏"));
+        _targets.Add((new RectF(0, 0, pillWidth, Height), SearchPillId, _searchQuery + "▏", Resource.Drawable.ms_search));
         float cell = 44 * _dp;
         float x = pillWidth;
         foreach (var emoji in _searchResults)
         {
             if (x + cell > Width) break;
-            _targets.Add((new RectF(x, 0, x + cell, Height), "emoji:" + emoji, emoji));
+            _targets.Add((new RectF(x, 0, x + cell, Height), "emoji:" + emoji, emoji, 0));
             x += cell;
         }
     }
 
     void DrawTarget(Canvas canvas, int index)
     {
-        var (bounds, id, label) = _targets[index];
-
-        if (index == _pressed)
-        {
-            _fill.Color = Theme.KeyPressed;
-            canvas.DrawRect(bounds, _fill);
-        }
+        var (bounds, id, label, icon) = _targets[index];
+        bool pressed = index == _pressed;
 
         bool pill = id is ClipChipId or SearchPillId;
         if (pill)
         {
-            _fill.Color = Theme.Key;
+            _fill.Color = pressed ? Theme.KeyPressed : Theme.Key;
             var r = new RectF(bounds.Left + 6 * _dp, bounds.Top + 6 * _dp, bounds.Right - 6 * _dp, bounds.Bottom - 6 * _dp);
-            canvas.DrawRoundRect(r, 14 * _dp, 14 * _dp, _fill);
+            canvas.DrawRoundRect(r, r.Height() / 2, r.Height() / 2, _fill);
+        }
+        else if (_mode == Mode.Toolbar && label.Length == 0)
+        {
+            // Symbol: runde Fläche beim Drücken, das Mikrofon dauerhaft im Kreis
+            bool trailing = ToolbarItems.Any(t => t.Id == id && t.Trailing);
+            if (pressed || trailing)
+            {
+                _fill.Color = pressed ? Theme.KeyPressed : Theme.Key;
+                canvas.DrawCircle(bounds.CenterX(), bounds.CenterY(), Math.Min(bounds.Height(), bounds.Width()) * 0.42f, _fill);
+            }
+
+            _icons.Draw(canvas, icon, bounds.CenterX(), bounds.CenterY(), 24 * _dp, Theme.Text);
+            return;
+        }
+        else if (pressed)
+        {
+            _fill.Color = Theme.KeyPressed;
+            canvas.DrawRect(bounds, _fill);
         }
 
         if (_mode == Mode.Suggestions && index > 0)
@@ -216,14 +241,25 @@ public sealed class SuggestionBarView : View
         bool emphasized = id.StartsWith("slot") && _slots[id[^1] - '0']?.Emphasized == true;
         _text.SetTypeface(emphasized ? Typeface.DefaultBold : Typeface.Default);
         _text.Color = _mode == Mode.Status ? Theme.Accent : Theme.Text;
-        _text.TextSize = (id.StartsWith("emoji:") || _mode == Mode.Toolbar && !pill ? 20 : 16) * _dp;
+        _text.TextSize = (id.StartsWith("emoji:") || _mode == Mode.Toolbar && !pill ? 20 : 17) * _dp;
 
-        float available = bounds.Width() - 16 * _dp;
+        float iconSize = icon != 0 ? 20 * _dp : 0;
+        float iconGap = icon != 0 ? 6 * _dp : 0;
+        float available = bounds.Width() - 24 * _dp - iconSize - iconGap;
         float measured = _text.MeasureText(label);
         if (measured > available) _text.TextSize *= available / measured;
+        measured = _text.MeasureText(label);
+
+        float total = iconSize + iconGap + measured;
+        float textCenter = bounds.CenterX() + (iconSize + iconGap) / 2;
+        if (icon != 0)
+        {
+            var iconColor = _mode == Mode.Status ? Theme.Accent : Theme.Text;
+            _icons.Draw(canvas, icon, bounds.CenterX() - total / 2 + iconSize / 2, bounds.CenterY(), iconSize, iconColor);
+        }
 
         float baseline = bounds.CenterY() - (_text.Descent() + _text.Ascent()) / 2;
-        canvas.DrawText(label, bounds.CenterX(), baseline, _text);
+        canvas.DrawText(label, textCenter, baseline, _text);
     }
 
     static string Shorten(string text)

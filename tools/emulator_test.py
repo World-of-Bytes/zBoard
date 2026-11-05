@@ -222,7 +222,7 @@ def main():
         time.sleep(1)
 
         # Suchleiste wie in der Google-App: Feld meldet NO_SUGGESTIONS, Gboard zeigt trotzdem Wortvorschläge
-        shell(f"am start -W -n {TEST_ACTIVITY} --ez search true")
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --ez search true")
         time.sleep(3)
         type_text(keys, "hau")
         time.sleep(1)

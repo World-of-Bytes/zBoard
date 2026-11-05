@@ -42,6 +42,12 @@ Wortpaare aus dem Google Books Ngram Corpus via orgtre/google-books-ngram-freque
 | `emoji.txt` | [unicode-emoji-json](https://github.com/muan/unicode-emoji-json) von Mu-An Chiou (Emoji, Kategorien, Hauttöne) | MIT |
 | `keywords.*.txt` | [Unicode CLDR](https://github.com/unicode-org/cldr) annotations (Namen und Suchbegriffe) | [Unicode License v3](https://www.unicode.org/license.txt), © Unicode, Inc. |
 
+## Resources/drawable/ms_*.xml
+
+Symbole aus [Material Symbols](https://github.com/google/material-design-icons) von Google, © Google LLC,
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). Änderung: von SVG in Android-VectorDrawables umgewandelt
+(`tools/build_icons.py`).
+
 ## Nur beim Erzeugen benutzt, nicht enthalten
 
 | Quelle | Verwendung | Lizenz |

@@ -55,10 +55,13 @@ public sealed class KeyboardView : View
     const float DeleteSwipeStartKeys = 0.6f;
     const float DeleteSwipeKeysPerWord = 0.9f;
 
-    sealed class PlacedKey(KeyDef key, RectF bounds)
+    sealed class PlacedKey(KeyDef key, RectF bounds, bool functional)
     {
         public KeyDef Key { get; } = key;
         public RectF Bounds { get; } = bounds;
+
+        /// <summary>Zeichentaste in der unteren Reihe (Komma, Punkt): wie Gboard in der Farbe der Sondertasten.</summary>
+        public bool Functional { get; } = functional;
     }
 
     sealed class Press(PlacedKey key, int pointerId, float startX, float startY)
@@ -87,6 +90,7 @@ public sealed class KeyboardView : View
     }
 
     readonly float _dp;
+    readonly Icons _icons;
     readonly Paint _fill = new(PaintFlags.AntiAlias);
     readonly Paint _text = new(PaintFlags.AntiAlias);
     readonly Paint _hint = new(PaintFlags.AntiAlias);
@@ -106,6 +110,7 @@ public sealed class KeyboardView : View
     public KeyboardView(Context context) : base(context)
     {
         _dp = context.Resources!.DisplayMetrics!.Density;
+        _icons = new Icons(context);
         _text.TextAlign = Paint.Align.Center;
         _hint.TextAlign = Paint.Align.Center;
         _trail.SetStyle(Paint.Style.Stroke);
@@ -184,10 +189,10 @@ public sealed class KeyboardView : View
         }
     } = 1f;
 
-    float KeyHeight => 54 * _dp * HeightScale;
-    float VerticalPadding => 6 * _dp;
+    float KeyHeight => 58 * _dp * HeightScale;
+    float VerticalPadding => 4 * _dp;
     float GapX => 3 * _dp;
-    float GapY => 5 * _dp;
+    float GapY => 4.5f * _dp;
 
     public void SetLayout(KeyboardLayout layout)
     {
@@ -227,6 +232,7 @@ public sealed class KeyboardView : View
 
         _unit = Width / _layout.Units;
         float y = VerticalPadding;
+        var lastRow = _layout.Rows[^1];
         foreach (var row in _layout.Rows)
         {
             float fixedUnits = row.Keys.Where(k => k.Width > 0).Sum(k => k.Width);
@@ -240,7 +246,7 @@ public sealed class KeyboardView : View
             {
                 float w = (key.Width > 0 ? key.Width : fillUnits) * _unit;
                 var bounds = new RectF(x + GapX, y + GapY, x + w - GapX, y + KeyHeight - GapY);
-                _keys.Add(new PlacedKey(key, bounds));
+                _keys.Add(new PlacedKey(key, bounds, key.IsCharacter && row == lastRow));
 
                 if (key.IsCharacter && key.Label.Length == 1 && char.IsLetter(key.Label[0]))
                 {
@@ -266,12 +272,16 @@ public sealed class KeyboardView : View
         LogKeyPositions();
 #endif
 
-        float radius = 6 * _dp;
+        float radius = 7 * _dp;
         foreach (var pk in _keys)
         {
             bool pressed = _press is { Gliding: false } current && current.Key == pk && _popup == null;
-            _fill.Color = pressed ? Theme.KeyPressed : KeyColor(pk.Key);
-            canvas.DrawRoundRect(pk.Bounds, radius, radius, _fill);
+            _fill.Color = pressed ? Theme.KeyPressed : KeyColor(pk);
+            // Wie Gboard: Ebenen- und Enter-Taste als Pille
+            float r = pk.Key.Action is KeyAction.Enter or KeyAction.ToSymbols or KeyAction.ToAlpha
+                ? pk.Bounds.Height() / 2
+                : radius;
+            canvas.DrawRoundRect(pk.Bounds, r, r, _fill);
             DrawKeyLabel(canvas, pk);
         }
 
@@ -283,33 +293,61 @@ public sealed class KeyboardView : View
         }
     }
 
-    Color KeyColor(KeyDef key) => key.Action switch
+    Color KeyColor(PlacedKey pk) => pk.Key.Action switch
     {
-        KeyAction.Character or KeyAction.Space => Theme.Key,
-        KeyAction.Enter => Theme.Accent,
+        KeyAction.Character when pk.Functional => Theme.SpecialKey,
+        KeyAction.Character or KeyAction.Space or KeyAction.Emoji => Theme.Key,
+        KeyAction.Enter => Theme.EnterKey,
         _ => Theme.SpecialKey,
+    };
+
+    /// <summary>Material-Symbol statt Text, oder 0.</summary>
+    int IconFor(KeyDef key) => key.Action switch
+    {
+        KeyAction.Shift => Shift switch
+        {
+            ShiftState.Locked => Resource.Drawable.ms_shift_lock_fill1,
+            ShiftState.OneShot => Resource.Drawable.ms_shift_fill1,
+            _ => Resource.Drawable.ms_shift,
+        },
+        KeyAction.Delete when _press is not { DeleteSwipe: true, DeleteWords: > 0 } => Resource.Drawable.ms_backspace,
+        KeyAction.Enter => Icons.ForEnter(EnterLabel),
+        KeyAction.Emoji => Resource.Drawable.ms_sentiment_satisfied,
+        KeyAction.Language => Resource.Drawable.ms_language,
+        _ => 0,
     };
 
     void DrawKeyLabel(Canvas canvas, PlacedKey pk)
     {
         var key = pk.Key;
         var b = pk.Bounds;
+
+        if (IconFor(key) is var icon and not 0)
+        {
+            var color = key.Action switch
+            {
+                KeyAction.Enter => Theme.EnterText,
+                KeyAction.Shift when Shift != ShiftState.Off => Theme.Accent,
+                _ => Theme.Text,
+            };
+            _icons.Draw(canvas, icon, b.CenterX(), b.CenterY(), 24 * _dp, color);
+            return;
+        }
+
         string label = DisplayLabel(key);
 
         float size = key.Action switch
         {
-            KeyAction.Character => 22,
+            KeyAction.Character => 24,
             KeyAction.Space => 13,
-            KeyAction.ToSymbols or KeyAction.ToSymbols2 or KeyAction.ToAlpha => 14,
+            KeyAction.ToSymbols or KeyAction.ToSymbols2 or KeyAction.ToAlpha => 15,
             KeyAction.Delete when _press is { DeleteSwipe: true } => 15,
             _ => 20,
         };
         _text.TextSize = size * _dp;
         _text.Color = key.Action switch
         {
-            KeyAction.Enter => Theme.AccentText,
             KeyAction.Space => Theme.HintText,
-            KeyAction.Shift when Shift != ShiftState.Off => Theme.Accent,
             KeyAction.Delete when _press is { DeleteSwipe: true, DeleteWords: > 0 } => Theme.Accent,
             _ => Theme.Text,
         };
@@ -334,7 +372,7 @@ public sealed class KeyboardView : View
         KeyAction.Delete when _press is { DeleteSwipe: true, DeleteWords: > 0 } d => $"⌫ {d.DeleteWords}",
         KeyAction.Delete => "⌫",
         KeyAction.Enter => EnterLabel,
-        KeyAction.Space => SpaceLabel,
+        KeyAction.Space => Languages.Count > 1 ? SpaceLabel : string.Empty, // wie Gboard: leer bei nur einer Sprache
         KeyAction.ToSymbols => "?123",
         KeyAction.ToSymbols2 => "=\\<",
         KeyAction.ToAlpha => "ABC",
