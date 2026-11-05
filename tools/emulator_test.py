@@ -69,8 +69,11 @@ class Keyboard:
         print(shell("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'", check=False))
         print("Absturz-Log:\n" + adb("logcat", "-d", "-b", "crash", check=False)[-4000:])
         log = adb("logcat", "-d", check=False).splitlines()
-        relevant = [l for l in log if re.search(r"zboard|ZBoard|monodroid|AndroidRuntime|InputMethod|mono-rt|DOTNET", l)]
-        print("Log (Auszug):\n" + "\n".join(relevant[-80:]))
+        noise = r"InputMethodEntryManager|GoogleInputMethodService|LatinCommon|SystemSubtypes|DictionarySuperpacks|ApkAssets"
+        relevant = [l for l in log
+                    if re.search(r"zboard|ZBoard|monodroid|AndroidRuntime|mono|DOTNET|InputMethodManagerService|ImeTracker|FATAL", l)
+                    and not re.search(noise, l)]
+        print("Log (Auszug):\n" + "\n".join(relevant[-120:]))
         raise RuntimeError(f"Tastatur mit Layout '{layout}' erscheint nicht (keine Tastenpositionen im Log)")
 
 
