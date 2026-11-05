@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Testet die plattformunabhängigen Teile von zBoard ohne Android-Gerät: dotnet test -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Keyboard/KeyboardLayout.cs" Link="Core/KeyboardLayout.cs" />
+    <Compile Include="../../Keyboard/Layouts.cs" Link="Core/Layouts.cs" />
+    <Compile Include="../../Suggestions/WordDictionary.cs" Link="Core/WordDictionary.cs" />
+    <Compile Include="../../Suggestions/KeyProximity.cs" Link="Core/KeyProximity.cs" />
+    <Compile Include="../../Suggestions/SuggestionEngine.cs" Link="Core/SuggestionEngine.cs" />
+    <Compile Include="../../Suggestions/BigramModel.cs" Link="Core/BigramModel.cs" />
+    <Compile Include="../../Suggestions/UserHistory.cs" Link="Core/UserHistory.cs" />
+    <Compile Include="../../Suggestions/GlideDecoder.cs" Link="Core/GlideDecoder.cs" />
+    <Compile Include="../../Ime/TextBoundaries.cs" Link="Core/TextBoundaries.cs" />
+    <Compile Include="../../Stats/KeystrokeModels.cs" Link="Core/KeystrokeModels.cs" />
+    <Compile Include="../../Stats/KeystrokeStatsRecorder.cs" Link="Core/KeystrokeStatsRecorder.cs" />
+    <Compile Include="../../Stats/JsonlStatsSink.cs" Link="Core/JsonlStatsSink.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

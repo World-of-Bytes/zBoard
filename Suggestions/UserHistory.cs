@@ -1,0 +1,203 @@
+using System.Globalization;
+using System.Text;
+
+namespace ZBoard.Suggestions;
+
+/// <summary>
+/// Was zBoard aus den eigenen Eingaben lernt: eigene Wörter und Wortfolgen.
+/// Bleibt ausschließlich auf dem Gerät, wird nie exportiert und ist von der zHeal-Statistik getrennt.
+/// Plattformunabhängig.
+/// </summary>
+public sealed class UserHistory
+{
+    /// <summary>Ab so vielen Verwendungen gilt ein unbekanntes Wort als bekannt (keine Autokorrektur mehr).</summary>
+    public const int KnownThreshold = 2;
+
+    const int MaxWords = 5000;
+    const int MaxBigrams = 20000;
+
+    readonly Lock _lock = new();
+    readonly Dictionary<string, (string Form, int Count)> _words = new(StringComparer.Ordinal);
+    readonly Dictionary<string, Dictionary<string, int>> _bigrams = new(StringComparer.Ordinal);
+    int _bigramCount;
+
+    public bool IsDirty { get; private set; }
+
+    public int WordCount
+    {
+        get { lock (_lock) return _words.Count; }
+    }
+
+    /// <summary>Merkt sich <paramref name="word"/> und, falls vorhanden, die Folge <paramref name="previous"/> → <paramref name="word"/>.</summary>
+    public void Learn(string? previous, string word)
+    {
+        if (!IsLearnable(word)) return;
+
+        lock (_lock)
+        {
+            var key = word.ToLowerInvariant();
+            // Kleinschreibung gewinnt: "Hallo" am Satzanfang soll ein späteres "hallo" nicht überschreiben.
+            _words[key] = _words.TryGetValue(key, out var entry)
+                ? (char.IsLower(word[0]) ? word : entry.Form, entry.Count + 1)
+                : (word, 1);
+
+            if (previous != null && IsLearnable(previous))
+            {
+                var prevKey = previous.ToLowerInvariant();
+                if (!_bigrams.TryGetValue(prevKey, out var followers))
+                {
+                    followers = new Dictionary<string, int>(StringComparer.Ordinal);
+                    _bigrams[prevKey] = followers;
+                }
+
+                if (!followers.ContainsKey(word)) _bigramCount++;
+                followers[word] = followers.GetValueOrDefault(word) + 1;
+            }
+
+            Prune();
+            IsDirty = true;
+        }
+    }
+
+    public int CountOf(string word)
+    {
+        lock (_lock) return _words.TryGetValue(word.ToLowerInvariant(), out var e) ? e.Count : 0;
+    }
+
+    public bool IsKnown(string word) => CountOf(word) >= KnownThreshold;
+
+    /// <summary>Gelernte Schreibweise, sobald das Wort als bekannt gilt; sonst null.</summary>
+    public string? LearnedForm(string word)
+    {
+        lock (_lock)
+        {
+            return _words.TryGetValue(word.ToLowerInvariant(), out var e) && e.Count >= KnownThreshold ? e.Form : null;
+        }
+    }
+
+    /// <summary>Gelernte Wörter (ab <see cref="KnownThreshold"/>), die mit <paramref name="prefix"/> beginnen.</summary>
+    public List<(string Word, int Count)> Complete(string prefix)
+    {
+        var lower = prefix.ToLowerInvariant();
+        lock (_lock)
+        {
+            return _words
+                .Where(kv => kv.Value.Count >= KnownThreshold && kv.Key.StartsWith(lower, StringComparison.Ordinal))
+                .Select(kv => (kv.Value.Form, kv.Value.Count))
+                .OrderByDescending(x => x.Count)
+                .Take(6)
+                .ToList();
+        }
+    }
+
+    /// <summary>Gelernte Folgewörter von <paramref name="previous"/>, häufigstes zuerst.</summary>
+    public List<(string Next, int Count)> Followers(string previous)
+    {
+        lock (_lock)
+        {
+            return _bigrams.TryGetValue(previous.ToLowerInvariant(), out var followers)
+                ? followers.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).Take(6).ToList()
+                : [];
+        }
+    }
+
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _words.Clear();
+            _bigrams.Clear();
+            _bigramCount = 0;
+            IsDirty = true;
+        }
+    }
+
+    // ---------- Speichern / Laden (Textformat: w<TAB>wort<TAB>anzahl, b<TAB>vorher<TAB>wort<TAB>anzahl) ----------
+
+    public void Save(Stream stream)
+    {
+        lock (_lock)
+        {
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
+            foreach (var (_, (form, count)) in _words)
+            {
+                writer.Write("w\t"); writer.Write(form); writer.Write('\t');
+                writer.WriteLine(count.ToString(CultureInfo.InvariantCulture));
+            }
+
+            foreach (var (prev, followers) in _bigrams)
+            {
+                foreach (var (next, count) in followers)
+                {
+                    writer.Write("b\t"); writer.Write(prev); writer.Write('\t'); writer.Write(next); writer.Write('\t');
+                    writer.WriteLine(count.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+
+            IsDirty = false;
+        }
+    }
+
+    public static UserHistory Load(Stream stream)
+    {
+        var history = new UserHistory();
+        using var reader = new StreamReader(stream);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+            var p = line.Split('\t');
+            if (p.Length == 3 && p[0] == "w" && int.TryParse(p[2], out var wc))
+            {
+                history._words[p[1].ToLowerInvariant()] = (p[1], wc);
+            }
+            else if (p.Length == 4 && p[0] == "b" && int.TryParse(p[3], out var bc))
+            {
+                if (!history._bigrams.TryGetValue(p[1], out var followers))
+                {
+                    followers = new Dictionary<string, int>(StringComparer.Ordinal);
+                    history._bigrams[p[1]] = followers;
+                }
+
+                if (!followers.ContainsKey(p[2])) history._bigramCount++;
+                followers[p[2]] = bc;
+            }
+        }
+
+        return history;
+    }
+
+    // ---------- Hilfen ----------
+
+    /// <summary>Nur echte Wörter lernen: mit Buchstaben, ohne @ (E-Mail) und nicht überlang.</summary>
+    static bool IsLearnable(string word) =>
+        word.Length is > 0 and <= 40
+        && word.Any(char.IsLetter)
+        && word.All(c => char.IsLetterOrDigit(c) || c is '\'' or '-');
+
+    /// <summary>Hält die Größe begrenzt: die seltensten Einträge fallen zuerst heraus.</summary>
+    void Prune()
+    {
+        if (_words.Count > MaxWords)
+        {
+            foreach (var key in _words.OrderBy(kv => kv.Value.Count).Take(_words.Count - MaxWords * 9 / 10)
+                         .Select(kv => kv.Key).ToList())
+            {
+                _words.Remove(key);
+            }
+        }
+
+        if (_bigramCount > MaxBigrams)
+        {
+            var all = _bigrams.SelectMany(kv => kv.Value.Select(f => (Prev: kv.Key, Next: f.Key, Count: f.Value)))
+                .OrderBy(x => x.Count)
+                .Take(_bigramCount - MaxBigrams * 9 / 10)
+                .ToList();
+            foreach (var (prev, next, _) in all)
+            {
+                _bigrams[prev].Remove(next);
+                if (_bigrams[prev].Count == 0) _bigrams.Remove(prev);
+                _bigramCount--;
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bewusst KEINE INTERNET-Berechtigung: zBoard arbeitet vollständig lokal.
+     Hinweis: Debug-Builds von .NET for Android fügen INTERNET für den Debugger automatisch hinzu, Release-Builds nicht. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <application
+      android:label="zBoard"
+      android:allowBackup="false"
+      android:supportsRtl="true" />
+</manifest>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="de.zeriadtke.zboard.SettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+
+  <subtype
+      android:label="@string/subtype_de"
+      android:imeSubtypeLocale="de_DE"
+      android:languageTag="de-DE"
+      android:imeSubtypeMode="keyboard" />
+
+  <subtype
+      android:label="@string/subtype_en"
+      android:imeSubtypeLocale="en_US"
+      android:languageTag="en-US"
+      android:imeSubtypeMode="keyboard" />
+
+</input-method>
