@@ -129,6 +129,8 @@ public sealed class SettingsActivity : Activity
         Header("Sprachen");
         Text("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.");
         AddSwitch("Eigene Taste 🌐 zum Sprachwechsel", _settings.ShowLanguageKey, v => _settings.ShowLanguageKey = v);
+        Text("Umlaute und ß: lange auf u, o, a bzw. s drücken.");
+        AddSwitch("Deutsch: eigene Tasten für ü, ö, ä", _settings.UmlautKeys, v => _settings.UmlautKeys = v);
 
         foreach (var (code, name) in Layouts.LanguageNames)
         {

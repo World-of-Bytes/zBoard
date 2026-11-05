@@ -175,6 +175,7 @@ def main():
         screenshot(out_dir, "1-tastatur")
         check("Tastatur erscheint", True, f"({len(keys)} Tasten)")
         check("Keine Sprachtaste (Wechsel per langem Druck auf die Leertaste)", "Language" not in keys)
+        check("Deutsch wie Gboard: keine eigenen Umlaut-Tasten", not any(k in keys for k in ("ü", "ö", "ä")))
 
         bounds = re.findall(r"BOUNDS de bottom=(\d+) limit=(\d+) nav=(\d+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
         if bounds:

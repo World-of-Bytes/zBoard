@@ -116,6 +116,13 @@ public sealed class ZBoardSettings
         set => PutBool("showLanguageKey", value);
     }
 
+    /// <summary>Deutsch: eigene Tasten für ü, ö, ä (sonst per langem Druck auf u, o, a wie bei Gboard).</summary>
+    public bool UmlautKeys
+    {
+        get => _prefs.GetBoolean("umlautKeys", false);
+        set => PutBool("umlautKeys", value);
+    }
+
     /// <summary>Ziffernreihe über den Buchstaben.</summary>
     public bool NumberRow
     {

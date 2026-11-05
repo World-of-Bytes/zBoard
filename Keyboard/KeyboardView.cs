@@ -318,12 +318,12 @@ public sealed class KeyboardView : View
         canvas.DrawText(label, b.CenterX(), baseline, _text);
 
         // Zahlenhinweis oben rechts (wie die Gboard-Option "Zahlenhinweise")
-        if (ShowDigitHints && _layout?.IsAlphabetic == true && key.IsCharacter && key.Alternates.Count > 0
-            && key.Alternates[0] is [var first] && char.IsDigit(first))
+        if (ShowDigitHints && _layout?.IsAlphabetic == true && key.IsCharacter
+            && key.Alternates.FirstOrDefault(a => a is [var c] && char.IsDigit(c)) is { } digit)
         {
             _hint.TextSize = 10 * _dp;
             _hint.Color = Theme.HintText;
-            canvas.DrawText(key.Alternates[0], b.Right - 7 * _dp, b.Top + 12 * _dp, _hint);
+            canvas.DrawText(digit, b.Right - 7 * _dp, b.Top + 12 * _dp, _hint);
         }
     }
 

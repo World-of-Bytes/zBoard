@@ -123,6 +123,19 @@ public class LayoutTests
     }
 
     [Fact]
+    public void German_UmlautsOnLongPress_UnlessKeysEnabled()
+    {
+        var plain = Layouts.Alphabet("de", false);
+        Assert.DoesNotContain(plain.Rows.SelectMany(r => r.Keys), k => k.Label is "ü" or "ö" or "ä");
+        Assert.Equal("ü", plain.Rows[0].Keys.Single(k => k.Label == "u").Alternates[0]);
+        Assert.Equal(10f, plain.Units);
+
+        var withKeys = Layouts.Alphabet("de", false, umlautKeys: true);
+        Assert.Contains(withKeys.Rows.SelectMany(r => r.Keys), k => k.Label == "ä");
+        Assert.Equal(11f, withKeys.Units);
+    }
+
+    [Fact]
     public void French_IsAzerty() => Assert.Equal("a", Layouts.Alphabet("fr", false).Rows[0].Keys[0].Label);
 
     [Fact]

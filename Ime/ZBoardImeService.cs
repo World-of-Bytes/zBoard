@@ -779,7 +779,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _keyboardView.Languages = [.. languages.Select(l => (l, Layouts.LanguageNames.TryGetValue(l, out var n) ? n : l))];
         bool numberRow = _settings.NumberRow;
         var layout = _symbolsPage == 0
-            ? Layouts.Alphabet(_language, multipleLanguages, numberRow)
+            ? Layouts.Alphabet(_language, multipleLanguages, numberRow, _settings.UmlautKeys)
             : Layouts.Symbols(_symbolsPage, multipleLanguages);
 
         _keyboardView.ShowDigitHints = !numberRow;

@@ -28,8 +28,11 @@ public static class Layouts
         _ => "en-US",
     };
 
-    /// <summary>Buchstabenebene; mit <paramref name="numberRow"/> steht eine Ziffernreihe darüber.</summary>
-    public static KeyboardLayout Alphabet(string language, bool showLanguageKey, bool numberRow = false)
+    /// <summary>
+    /// Buchstabenebene; mit <paramref name="numberRow"/> steht eine Ziffernreihe darüber,
+    /// <paramref name="umlautKeys"/> gibt Deutsch eigene Tasten für ü, ö, ä.
+    /// </summary>
+    public static KeyboardLayout Alphabet(string language, bool showLanguageKey, bool numberRow = false, bool umlautKeys = false)
     {
         var (rows, units) = language switch
         {
@@ -37,7 +40,7 @@ public static class Layouts
             "fr" => (Azerty(), 10f),
             "es" => (Spanish(), 10f),
             "it" => (Italian(), 10f),
-            _ => (Qwertz(), 11f),
+            _ => (Qwertz(umlautKeys), umlautKeys ? 11f : 10f),
         };
 
         List<KeyRow> all = [];
@@ -52,25 +55,43 @@ public static class Layouts
 
     // ---------- Buchstabenreihen ----------
 
-    static KeyRow[] Qwertz() =>
-    [
-        new KeyRow(
+    /// <summary>
+    /// Deutsch wie bei Gboard: 10 Tasten je Reihe, Umlaute und ß per langem Druck (zuerst angeboten).
+    /// Mit <paramref name="umlautKeys"/> stehen ü, ö, ä als eigene Tasten am rechten Rand (11 Tasten je Reihe).
+    /// </summary>
+    static KeyRow[] Qwertz(bool umlautKeys)
+    {
+        List<KeyDef> top =
         [
             Char("q", "1"), Char("w", "2"), Char("e", "3", "é", "è", "ê", "ë", "ē"), Char("r", "4"), Char("t", "5"),
-            Char("z", "6"), Char("u", "7", "ú", "ù", "û", "ū"), Char("i", "8", "í", "ì", "î", "ï"),
-            Char("o", "9", "ó", "ò", "ô", "õ", "ø", "œ"), Char("p", "0"), Char("ü"),
-        ]),
-        new KeyRow(
+            Char("z", "6"), Char("u", "ü", "7", "ú", "ù", "û", "ū"), Char("i", "8", "í", "ì", "î", "ï"),
+            Char("o", "ö", "9", "ó", "ò", "ô", "õ", "ø", "œ"), Char("p", "0"),
+        ];
+        List<KeyDef> middle =
         [
-            Char("a", "à", "á", "â", "ã", "å", "æ", "ā"), Char("s", "ß", "ś", "š"), Char("d"), Char("f"), Char("g"),
-            Char("h"), Char("j"), Char("k"), Char("l"), Char("ö"), Char("ä"),
-        ]),
-        new KeyRow(
+            Char("a", "ä", "à", "á", "â", "ã", "å", "æ", "ā"), Char("s", "ß", "ś", "š"), Char("d"), Char("f"), Char("g"),
+            Char("h"), Char("j"), Char("k"), Char("l"),
+        ];
+        float shiftWidth = 1.5f;
+        if (umlautKeys)
+        {
+            top.Add(Char("ü"));
+            middle.Add(Char("ö"));
+            middle.Add(Char("ä"));
+            shiftWidth = 2f;
+        }
+
+        return
         [
-            Special(KeyAction.Shift, 2f), Char("y", "ý", "ÿ"), Char("x"), Char("c", "ç", "ć", "č"), Char("v"), Char("b"),
-            Char("n", "ñ", "ń"), Char("m"), Special(KeyAction.Delete, 2f),
-        ]),
-    ];
+            new KeyRow(top),
+            new KeyRow(middle, Indent: umlautKeys ? 0f : 0.5f),
+            new KeyRow(
+            [
+                Special(KeyAction.Shift, shiftWidth), Char("y", "ý", "ÿ"), Char("x"), Char("c", "ç", "ć", "č"), Char("v"),
+                Char("b"), Char("n", "ñ", "ń"), Char("m"), Special(KeyAction.Delete, shiftWidth),
+            ]),
+        ];
+    }
 
     static KeyRow[] Qwerty() =>
     [
