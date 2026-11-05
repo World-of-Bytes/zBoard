@@ -13,6 +13,7 @@ using ZBoard.Keyboard;
 using ZBoard.Settings;
 using ZBoard.Stats;
 using ZBoard.Suggestions;
+using KeyboardView = ZBoard.Keyboard.KeyboardView; // Android.InputMethodServices hat eine gleichnamige Klasse
 
 namespace ZBoard.Ime;
 
