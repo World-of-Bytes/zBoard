@@ -1,3 +1,5 @@
+<img src="docs/logo/zboard-logo.svg" alt="zBoard-Logo" width="128" align="right">
+
 # zBoard
 
 [![Build](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml/badge.svg)](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml)
@@ -164,6 +166,8 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/unicode-org/c
 git -C cldr sparse-checkout set --no-cone /common/annotations /common/annotationsDerived
 python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json --cldr cldr
 ```
+
+Das Logo und das App-Symbol (Farben von World of Bytes) erzeugt `python3 tools/build_logo.py`.
 
 Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.csv` (siehe `tools/build_dictionaries.py --help`).
 
