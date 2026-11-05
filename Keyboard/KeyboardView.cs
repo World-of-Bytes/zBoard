@@ -184,12 +184,22 @@ public sealed class KeyboardView : View
         get;
         set
         {
-            field = Math.Clamp(value, 0.7f, 1.4f);
+            float clamped = Math.Clamp(value, 0.7f, 1.4f);
+            if (clamped == field) return; // kein unnötiges Neu-Layout beim Öffnen der Tastatur
+            field = clamped;
             RequestLayout();
         }
     } = 1f;
 
+    /// <summary>Gewünschte Reihenhöhe.</summary>
     float KeyHeight => 58 * _dp * HeightScale;
+
+    /// <summary>
+    /// Tatsächliche Reihenhöhe. Gibt das Fenster weniger Platz als gewünscht (manche Geräte vergrößern das
+    /// Tastaturfenster nicht sofort), werden die Reihen etwas flacher, statt dass die obere Reihe verschwindet.
+    /// </summary>
+    float _rowHeight;
+    bool _relayoutPosted;
     float VerticalPadding => 4 * _dp;
     float GapX => 3 * _dp;
     float GapY => 4.5f * _dp;
@@ -212,7 +222,26 @@ public sealed class KeyboardView : View
     {
         int width = MeasureSpec.GetSize(widthMeasureSpec);
         int rows = _layout?.Rows.Count ?? 4;
-        SetMeasuredDimension(width, (int)(rows * KeyHeight + 2 * VerticalPadding));
+        int desired = (int)(rows * KeyHeight + 2 * VerticalPadding);
+        int height = MeasureSpec.GetMode(heightMeasureSpec) switch
+        {
+            MeasureSpecMode.Exactly => MeasureSpec.GetSize(heightMeasureSpec),
+            MeasureSpecMode.AtMost => Math.Min(desired, MeasureSpec.GetSize(heightMeasureSpec)),
+            _ => desired,
+        };
+
+        if (height < desired && !_relayoutPosted)
+        {
+            // Fenster war zu klein: einmal neu anfordern, damit es auf die volle Höhe wachsen kann
+            _relayoutPosted = true;
+            Post(() =>
+            {
+                _relayoutPosted = false;
+                RootView?.RequestLayout();
+            });
+        }
+
+        SetMeasuredDimension(width, height);
     }
 
     protected override void OnSizeChanged(int w, int h, int oldw, int oldh)
@@ -231,6 +260,8 @@ public sealed class KeyboardView : View
         if (_layout == null || Width == 0) return;
 
         _unit = Width / _layout.Units;
+        _rowHeight = Math.Min(KeyHeight, (Height - 2 * VerticalPadding) / _layout.Rows.Count);
+        if (_rowHeight <= 0) _rowHeight = KeyHeight;
         float y = VerticalPadding;
         var lastRow = _layout.Rows[^1];
         foreach (var row in _layout.Rows)
@@ -245,7 +276,7 @@ public sealed class KeyboardView : View
             foreach (var key in row.Keys)
             {
                 float w = (key.Width > 0 ? key.Width : fillUnits) * _unit;
-                var bounds = new RectF(x + GapX, y + GapY, x + w - GapX, y + KeyHeight - GapY);
+                var bounds = new RectF(x + GapX, y + GapY, x + w - GapX, y + _rowHeight - GapY);
                 _keys.Add(new PlacedKey(key, bounds, key.IsCharacter && row == lastRow));
 
                 if (key.IsCharacter && key.Label.Length == 1 && char.IsLetter(key.Label[0]))
@@ -256,7 +287,7 @@ public sealed class KeyboardView : View
                 x += w;
             }
 
-            y += KeyHeight;
+            y += _rowHeight;
         }
     }
 
@@ -767,7 +798,7 @@ public sealed class KeyboardView : View
         float cell = Math.Max(b.Width(), 36 * _dp);
         float total = cell * items.Count;
         float left = Math.Max(4 * _dp, Math.Min(b.CenterX() - cell / 2, Width - 4 * _dp - total));
-        float height = KeyHeight - 4 * _dp;
+        float height = (_rowHeight > 0 ? _rowHeight : KeyHeight) - 4 * _dp;
         float top = Math.Max(0, b.Top - height - 4 * _dp);
 
         _popup = new Popup(items, new RectF(left, top, left + total, top + height), cell);
@@ -786,7 +817,7 @@ public sealed class KeyboardView : View
         float cell = Math.Max(64 * _dp, names.Max(n => _text.MeasureText(n)) + 24 * _dp);
         float total = cell * names.Count;
         float left = Math.Max(4 * _dp, Math.Min(b.CenterX() - total / 2, Width - 4 * _dp - total));
-        float height = KeyHeight - 4 * _dp;
+        float height = (_rowHeight > 0 ? _rowHeight : KeyHeight) - 4 * _dp;
         float top = Math.Max(0, b.Top - height - 4 * _dp);
 
         _popup = new Popup(names, new RectF(left, top, left + total, top + height), cell,
