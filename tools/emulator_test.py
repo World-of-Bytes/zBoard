@@ -16,7 +16,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-PACKAGE = "de.zeriadtke.zboard"
+PACKAGE = "de.World_of_Bytes.zBoard"
 IME = f"{PACKAGE}/.ZBoardImeService"
 TEST_ACTIVITY = f"{PACKAGE}/{PACKAGE}.TypingTestActivity"
 
@@ -276,14 +276,17 @@ def main():
         time.sleep(3)
         screenshot(out_dir, "6-einstellungen")
         settings_ui = ui_texts()
-        check("Einstellungen: Startseite", "zBoard-Einstellungen" in settings_ui and "Korrekturen & Vorschläge" in settings_ui)
-        tap_text("Korrekturen & Vorschläge")
+        # Oberfläche auf Deutsch oder Englisch, je nach Systemsprache des Emulators
+        german = "zBoard-Einstellungen" in settings_ui
+        check("Einstellungen: Startseite", german or "zBoard settings" in settings_ui,
+              "(Deutsch)" if german else "(Englisch)")
+        tap_text("Korrekturen & Vorschläge" if german else "Text correction")
         time.sleep(1.5)
         screenshot(out_dir, "7-korrekturen")
-        check("Einstellungen: Unterseite", "Autokorrektur" in ui_texts())
+        check("Einstellungen: Unterseite", ("Autokorrektur" if german else "Auto-correction") in ui_texts())
         shell("input keyevent KEYCODE_BACK", check=False)
         time.sleep(1.5)
-        check("Einstellungen: Zurück zur Startseite", "Glide Typing" in ui_texts())
+        check("Einstellungen: Zurück zur Startseite", ("Glide Typing" if german else "Glide typing") in ui_texts())
 
         found = crashes()
         check("Keine Abstürze", not found, "; ".join(found[:3]))

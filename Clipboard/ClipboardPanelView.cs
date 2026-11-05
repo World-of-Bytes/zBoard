@@ -4,6 +4,7 @@ using Android.Text;
 using Android.Views;
 using Android.Widget;
 using ZBoard.Keyboard;
+using ZBoard.Localization;
 
 namespace ZBoard.Clipboard;
 
@@ -80,7 +81,7 @@ public sealed class ClipboardPanelView : LinearLayout
         {
             var empty = new TextView(Context)
             {
-                Text = "Kopierter Text erscheint hier für eine Stunde. Angeheftetes bleibt.",
+                Text = L.T("Kopierter Text erscheint hier für eine Stunde. Angeheftetes bleibt.", "Copied text appears here for one hour. Pinned items stay."),
                 TextSize = 14,
             };
             empty.SetTextColor(_theme.HintText);
@@ -107,13 +108,13 @@ public sealed class ClipboardPanelView : LinearLayout
         row.AddView(text, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
 
         var pin = FlatButton(Context!, item.Pinned ? "📌" : "📍");
-        pin.ContentDescription = item.Pinned ? "Lösen" : "Anheften";
+        pin.ContentDescription = item.Pinned ? L.T("Lösen", "Unpin") : L.T("Anheften", "Pin");
         pin.Alpha = item.Pinned ? 1f : 0.45f;
         pin.Click += (_, _) => Listener?.OnClipPin(item.Text, !item.Pinned);
         row.AddView(pin);
 
         var remove = FlatButton(Context!, "✕");
-        remove.ContentDescription = "Entfernen";
+        remove.ContentDescription = L.T("Entfernen", "Remove");
         remove.SetTextColor(_theme.HintText);
         remove.Click += (_, _) => Listener?.OnClipRemove(item.Text);
         row.AddView(remove);

@@ -86,7 +86,7 @@ public sealed class SuggestionBarView : View
         _slots[2] = right;
         _mode = left == null && middle == null && right == null ? Mode.Toolbar : Mode.Suggestions;
         Reset();
-#if DEBUG
+#if DEBUG || ZBOARD_TESTHOOKS
         Android.Util.Log.Info("zBoardTest", "SUGGESTIONS " + string.Join("|", _slots.Select(s => s?.Word ?? "")));
 #endif
     }

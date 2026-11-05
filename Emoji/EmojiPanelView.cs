@@ -4,6 +4,7 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using ZBoard.Keyboard;
+using ZBoard.Localization;
 
 namespace ZBoard.Emoji;
 
@@ -153,7 +154,7 @@ public sealed class EmojiPanelView : View
         {
             _text.TextSize = 14 * _dp;
             _text.Color = Theme.HintText;
-            canvas.DrawText("Noch keine Emoji verwendet", Width / 2f, GridHeight / 2f, _text);
+            canvas.DrawText(L.T("Noch keine Emoji verwendet", "No recently used emoji"), Width / 2f, GridHeight / 2f, _text);
         }
 
         _text.TextSize = cell * 0.6f;

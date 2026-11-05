@@ -8,6 +8,7 @@ using Android.Views.InputMethods;
 using Android.Widget;
 using ZBoard.Ime;
 using ZBoard.Keyboard;
+using ZBoard.Localization;
 using Color = Android.Graphics.Color;
 using Orientation = Android.Widget.Orientation;
 
@@ -18,7 +19,7 @@ namespace ZBoard.Settings;
 /// jeder Eintrag öffnet eine Unterseite. Farben wie die Tastatur (Material You ab Android 12).
 /// </summary>
 [Activity(
-    Name = "de.zeriadtke.zboard.SettingsActivity",
+    Name = "de.World_of_Bytes.zBoard.SettingsActivity",
     Label = "zBoard",
     MainLauncher = true,
     Exported = true,
@@ -41,16 +42,16 @@ public sealed class SettingsActivity : Activity
 
     static readonly Page[] Pages =
     [
-        new("languages", Resource.Drawable.ms_language, "Sprachen", () => null, a => a.BuildLanguages()),
-        new("preferences", Resource.Drawable.ms_tune, "Einstellungen", () => null, a => a.BuildPreferences()),
-        new("theme", Resource.Drawable.ms_palette, "Design", () => null, a => a.BuildTheme()),
-        new("corrections", Resource.Drawable.ms_spellcheck, "Korrekturen & Vorschläge", () => null, a => a.BuildCorrections()),
-        new("glide", Resource.Drawable.ms_gesture, "Glide Typing", () => null, a => a.BuildGlide()),
-        new("voice", Resource.Drawable.ms_mic, "Spracheingabe", () => null, a => a.BuildVoice()),
-        new("clipboard", Resource.Drawable.ms_content_paste, "Zwischenablage", () => null, a => a.BuildClipboard()),
-        new("dictionary", Resource.Drawable.ms_menu_book, "Wörterbuch", () => null, a => a.BuildDictionary()),
-        new("test", Resource.Drawable.ms_keyboard, "Tastatur ausprobieren", () => null, a => a.BuildTest()),
-        new("about", Resource.Drawable.ms_info, "Über zBoard", () => null, a => a.BuildAbout()),
+        new("languages", Resource.Drawable.ms_language, L.T("Sprachen", "Languages"), () => null, a => a.BuildLanguages()),
+        new("preferences", Resource.Drawable.ms_tune, L.T("Einstellungen", "Preferences"), () => null, a => a.BuildPreferences()),
+        new("theme", Resource.Drawable.ms_palette, L.T("Design", "Theme"), () => null, a => a.BuildTheme()),
+        new("corrections", Resource.Drawable.ms_spellcheck, L.T("Korrekturen & Vorschläge", "Text correction"), () => null, a => a.BuildCorrections()),
+        new("glide", Resource.Drawable.ms_gesture, L.T("Glide Typing", "Glide typing"), () => null, a => a.BuildGlide()),
+        new("voice", Resource.Drawable.ms_mic, L.T("Spracheingabe", "Voice typing"), () => null, a => a.BuildVoice()),
+        new("clipboard", Resource.Drawable.ms_content_paste, L.T("Zwischenablage", "Clipboard"), () => null, a => a.BuildClipboard()),
+        new("dictionary", Resource.Drawable.ms_menu_book, L.T("Wörterbuch", "Dictionary"), () => null, a => a.BuildDictionary()),
+        new("test", Resource.Drawable.ms_keyboard, L.T("Tastatur ausprobieren", "Try the keyboard"), () => null, a => a.BuildTest()),
+        new("about", Resource.Drawable.ms_info, L.T("Über zBoard", "About zBoard"), () => null, a => a.BuildAbout()),
     ];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -154,7 +155,7 @@ public sealed class SettingsActivity : Activity
 
     void BuildMain()
     {
-        var title = Label("zBoard-Einstellungen", 32, _colors.Text);
+        var title = Label(L.T("zBoard-Einstellungen", "zBoard settings"), 32, _colors.Text);
         title.SetPadding(Dp(24), Dp(56), Dp(24), Dp(24));
         _content.AddView(title);
 
@@ -189,20 +190,21 @@ public sealed class SettingsActivity : Activity
         var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
         cardParams.SetMargins(Dp(16), 0, Dp(16), Dp(16));
 
-        card.AddView(Label("zBoard einrichten", 18, _colors.Text));
+        card.AddView(Label(L.T("zBoard einrichten", "Set up zBoard"), 18, _colors.Text));
         card.AddView(Label(enabled
-            ? "zBoard ist aktiviert, aber noch nicht als Tastatur ausgewählt."
-            : "Aktiviere zBoard in den Systemeinstellungen und wähle es dann als Tastatur aus.", 14, _colors.HintText));
+            ? L.T("zBoard ist aktiviert, aber noch nicht als Tastatur ausgewählt.", "zBoard is enabled but not yet selected as your keyboard.")
+            : L.T("Aktiviere zBoard in den Systemeinstellungen und wähle es dann als Tastatur aus.",
+                "Enable zBoard in the system settings, then select it as your keyboard."), 14, _colors.HintText));
 
         var buttons = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         buttons.SetGravity(GravityFlags.End);
         if (!enabled)
         {
-            buttons.AddView(TextButton("Aktivieren",
+            buttons.AddView(TextButton(L.T("Aktivieren", "Enable"),
                 () => StartActivity(new Intent(Android.Provider.Settings.ActionInputMethodSettings))));
         }
 
-        buttons.AddView(TextButton("Auswählen", () => InputMethods().ShowInputMethodPicker()));
+        buttons.AddView(TextButton(L.T("Auswählen", "Select"), () => InputMethods().ShowInputMethodPicker()));
         card.AddView(buttons);
         _content.AddView(card, cardParams);
     }
@@ -211,7 +213,7 @@ public sealed class SettingsActivity : Activity
 
     void BuildLanguages()
     {
-        Section("Aktive Sprachen");
+        Section(L.T("Aktive Sprachen", "Active languages"));
         foreach (var (code, name) in Layouts.LanguageNames)
         {
             Toggle(name, LayoutName(code), _settings.Languages.Contains(code), (view, isChecked) =>
@@ -222,7 +224,7 @@ public sealed class SettingsActivity : Activity
 
                 if (list.Count == 0)
                 {
-                    Toast.MakeText(this, "Mindestens eine Sprache muss aktiv bleiben.", ToastLength.Short)!.Show();
+                    Toast.MakeText(this, L.T("Mindestens eine Sprache muss aktiv bleiben.", "At least one language must stay active."), ToastLength.Short)!.Show();
                     view.Checked = true;
                     return;
                 }
@@ -231,29 +233,30 @@ public sealed class SettingsActivity : Activity
             });
         }
 
-        Note("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.");
+        Note(L.T("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.", "To switch, long-press the space bar and pick a language."));
 
         Section("Deutsch");
-        Toggle("Eigene Tasten für ü, ö, ä", "Sonst wie bei Gboard per langem Druck auf u, o, a (ß auf s)",
+        Toggle(L.T("Eigene Tasten für ü, ö, ä", "Separate keys for ü, ö, ä"),
+            L.T("Sonst per langem Druck auf u, o, a (ß auf s)", "Otherwise by long-pressing u, o, a (ß on s)"),
             _settings.UmlautKeys, (_, v) => _settings.UmlautKeys = v);
     }
 
     void BuildPreferences()
     {
-        Section("Tasten");
-        Toggle("Zahlenreihe", "Ziffern 1–0 über den Buchstaben", _settings.NumberRow, (_, v) => _settings.NumberRow = v);
-        Toggle("Sprachwechseltaste anzeigen", "Taste mit Globus neben der Leertaste",
+        Section(L.T("Tasten", "Keys"));
+        Toggle(L.T("Zahlenreihe", "Number row"), L.T("Ziffern 1–0 über den Buchstaben", "Digits 1–0 above the letters"), _settings.NumberRow, (_, v) => _settings.NumberRow = v);
+        Toggle(L.T("Sprachwechseltaste anzeigen", "Show language switch key"), L.T("Taste mit Globus neben der Leertaste", "Globe key next to the space bar"),
             _settings.ShowLanguageKey, (_, v) => _settings.ShowLanguageKey = v);
 
-        Section("Layout");
-        Choice("Einhandmodus",
+        Section(L.T("Layout", "Layout"));
+        Choice(L.T("Einhandmodus", "One-handed mode"),
         [
-            ("Aus", _settings.OneHanded == OneHandedMode.Off, () => _settings.OneHanded = OneHandedMode.Off),
-            ("Rechts", _settings.OneHanded == OneHandedMode.Right, () => _settings.OneHanded = OneHandedMode.Right),
-            ("Links", _settings.OneHanded == OneHandedMode.Left, () => _settings.OneHanded = OneHandedMode.Left),
+            (L.T("Aus", "Off"), _settings.OneHanded == OneHandedMode.Off, () => _settings.OneHanded = OneHandedMode.Off),
+            (L.T("Rechts", "Right"), _settings.OneHanded == OneHandedMode.Right, () => _settings.OneHanded = OneHandedMode.Right),
+            (L.T("Links", "Left"), _settings.OneHanded == OneHandedMode.Left, () => _settings.OneHanded = OneHandedMode.Left),
         ]);
 
-        var heightLabel = Label($"Tastaturhöhe: {_settings.HeightPercent} %", 17, _colors.Text);
+        var heightLabel = Label($"{L.T("Tastaturhöhe", "Keyboard height")}: {_settings.HeightPercent} %", 17, _colors.Text);
         heightLabel.SetPadding(Dp(24), Dp(12), Dp(24), 0);
         _content.AddView(heightLabel);
         var height = new SeekBar(this) { Max = 50, Progress = _settings.HeightPercent - 80 };
@@ -261,96 +264,103 @@ public sealed class SettingsActivity : Activity
         height.ProgressChanged += (_, e) =>
         {
             _settings.HeightPercent = 80 + e.Progress;
-            heightLabel.Text = $"Tastaturhöhe: {_settings.HeightPercent} %";
+            heightLabel.Text = $"{L.T("Tastaturhöhe", "Keyboard height")}: {_settings.HeightPercent} %";
         };
         _content.AddView(height);
 
-        Section("Tastendruck");
-        Toggle("Ton bei Tastendruck", null, _settings.KeySound, (_, v) => _settings.KeySound = v);
-        Toggle("Haptisches Feedback bei Tastendruck", null, _settings.Haptics, (_, v) => _settings.Haptics = v);
-        Toggle("Pop-up bei Tastendruck", "Vergrößerte Taste über dem Finger", _settings.KeyPreview, (_, v) => _settings.KeyPreview = v);
+        Section(L.T("Tastendruck", "Key press"));
+        Toggle(L.T("Ton bei Tastendruck", "Sound on keypress"), null, _settings.KeySound, (_, v) => _settings.KeySound = v);
+        Toggle(L.T("Haptisches Feedback bei Tastendruck", "Haptic feedback on keypress"), null, _settings.Haptics, (_, v) => _settings.Haptics = v);
+        Toggle(L.T("Pop-up bei Tastendruck", "Popup on keypress"), L.T("Vergrößerte Taste über dem Finger", "Enlarged key above your finger"), _settings.KeyPreview, (_, v) => _settings.KeyPreview = v);
     }
 
     void BuildTheme()
     {
         List<(string, bool, Action)> options =
         [
-            (OperatingSystem.IsAndroidVersionAtLeast(31) ? "Wie das System (Farben aus dem Hintergrundbild)" : "Wie das System",
+            (OperatingSystem.IsAndroidVersionAtLeast(31)
+                    ? L.T("Wie das System (Farben aus dem Hintergrundbild)", "System default (colors from your wallpaper)")
+                    : L.T("Wie das System", "System default"),
                 _settings.Theme is ThemeMode.System or ThemeMode.Dynamic, () => _settings.Theme = ThemeMode.System),
-            ("Hell", _settings.Theme == ThemeMode.Light, () => _settings.Theme = ThemeMode.Light),
-            ("Dunkel", _settings.Theme == ThemeMode.Dark, () => _settings.Theme = ThemeMode.Dark),
+            (L.T("Hell", "Light"), _settings.Theme == ThemeMode.Light, () => _settings.Theme = ThemeMode.Light),
+            (L.T("Dunkel", "Dark"), _settings.Theme == ThemeMode.Dark, () => _settings.Theme = ThemeMode.Dark),
         ];
-        Choice("Design", options);
-        Note("Die Einstellungen übernehmen das Design beim nächsten Öffnen.");
+        Choice(L.T("Design", "Theme"), options);
+        Note(L.T("Die Einstellungen übernehmen das Design beim nächsten Öffnen.", "The settings pick up the theme the next time they open."));
     }
 
     void BuildCorrections()
     {
-        Section("Vorschläge");
-        Toggle("Vorschlagsleiste: nächstes Wort", "Vorschläge, bevor du zu tippen beginnst",
+        Section(L.T("Vorschläge", "Suggestions"));
+        Toggle(L.T("Vorschlagsleiste: nächstes Wort", "Next-word suggestions"), L.T("Vorschläge, bevor du zu tippen beginnst", "Suggestions before you start typing"),
             _settings.NextWordPrediction, (_, v) => _settings.NextWordPrediction = v);
 
-        Section("Korrekturen");
-        Toggle("Autokorrektur", "Tippfehler beim Drücken der Leertaste korrigieren", _settings.AutoCorrect, (_, v) => _settings.AutoCorrect = v);
-        Toggle("Automatische Großschreibung", "Am Satzanfang und bei Substantiven", _settings.AutoCaps, (_, v) => _settings.AutoCaps = v);
-        Toggle("Punkt durch doppeltes Leerzeichen", null, _settings.DoubleSpacePeriod, (_, v) => _settings.DoubleSpacePeriod = v);
+        Section(L.T("Korrekturen", "Corrections"));
+        Toggle(L.T("Autokorrektur", "Auto-correction"), L.T("Tippfehler beim Drücken der Leertaste korrigieren", "Fix typos when you press the space bar"), _settings.AutoCorrect, (_, v) => _settings.AutoCorrect = v);
+        Toggle(L.T("Automatische Großschreibung", "Auto-capitalization"), L.T("Am Satzanfang und bei Substantiven", "At the start of sentences and for German nouns"), _settings.AutoCaps, (_, v) => _settings.AutoCaps = v);
+        Toggle(L.T("Punkt durch doppeltes Leerzeichen", "Double-space period"), null, _settings.DoubleSpacePeriod, (_, v) => _settings.DoubleSpacePeriod = v);
     }
 
     void BuildGlide()
     {
-        Toggle("Glide Typing aktivieren", "Wörter eingeben, indem du von Buchstabe zu Buchstabe wischst",
+        Toggle(L.T("Glide Typing aktivieren", "Enable glide typing"), L.T("Wörter eingeben, indem du von Buchstabe zu Buchstabe wischst", "Type words by sliding from letter to letter"),
             _settings.GlideTyping, (_, v) => _settings.GlideTyping = v);
-        Note("Wischen über die Leertaste bewegt den Cursor. Wischen von der Löschtaste nach links markiert Wörter zum Löschen.");
+        Note(L.T("Wischen über die Leertaste bewegt den Cursor. Wischen von der Löschtaste nach links markiert Wörter zum Löschen.", "Sliding along the space bar moves the cursor. Sliding left from the delete key selects words to delete."));
     }
 
     void BuildVoice()
     {
-        Toggle("Nur Offline-Erkennung", "Sprache verlässt das Gerät nicht (ab Android 12, je nach Hersteller)",
+        Toggle(L.T("Nur Offline-Erkennung", "Offline recognition only"), L.T("Sprache verlässt das Gerät nicht (ab Android 12, je nach Hersteller)", "Your voice never leaves the device (Android 12+, depending on the manufacturer)"),
             _settings.VoiceOfflineOnly, (_, v) => _settings.VoiceOfflineOnly = v);
-        Row(Resource.Drawable.ms_mic, "Mikrofon freigeben", "Einmalig nötig für die Spracheingabe", RequestMicrophone);
-        Note("Das Mikrofon rechts in der Vorschlagsleiste startet die Spracherkennung des Systems. Antippen während der "
-             + "Aufnahme beendet sie.");
+        Row(Resource.Drawable.ms_mic, L.T("Mikrofon freigeben", "Allow microphone"), L.T("Einmalig nötig für die Spracheingabe", "Needed once for voice typing"), RequestMicrophone);
+        Note(L.T("Das Mikrofon rechts in der Vorschlagsleiste startet die Spracherkennung des Systems. Antippen während der "
+               + "Aufnahme beendet sie.",
+            "The microphone on the right of the suggestion bar starts the system's speech recognition. Tap while "
+            + "recording to stop."));
     }
 
     void BuildClipboard()
     {
-        Toggle("Zwischenablage-Verlauf", "Kopierte Texte eine Stunde lang anzeigen",
+        Toggle(L.T("Zwischenablage-Verlauf", "Clipboard history"), L.T("Kopierte Texte eine Stunde lang anzeigen", "Show copied text for one hour"),
             _settings.ClipboardHistory, (_, v) => _settings.ClipboardHistory = v);
-        Row(Resource.Drawable.ms_content_paste, "Angeheftete Einträge löschen", null, () =>
+        Row(Resource.Drawable.ms_content_paste, L.T("Angeheftete Einträge löschen", "Delete pinned items"), null, () =>
         {
             _settings.PinnedClips = string.Empty;
-            Toast.MakeText(this, "Gilt ab dem nächsten Öffnen der Tastatur.", ToastLength.Short)!.Show();
+            Toast.MakeText(this, L.T("Gilt ab dem nächsten Öffnen der Tastatur.", "Takes effect the next time the keyboard opens."), ToastLength.Short)!.Show();
         });
-        Note("Nur Angeheftetes wird gespeichert. Als vertraulich markierte Inhalte, etwa aus Passwort-Managern, "
-             + "übernimmt zBoard nie.");
+        Note(L.T("Nur Angeheftetes wird gespeichert. Als vertraulich markierte Inhalte, etwa aus Passwort-Managern, "
+               + "übernimmt zBoard nie.",
+            "Only pinned items are saved. zBoard never takes content marked as sensitive, e.g. from password managers."));
     }
 
     void BuildDictionary()
     {
-        Toggle("Aus meinen Eingaben lernen", "Häufig verwendete Wörter und Wortfolgen vorschlagen",
+        Toggle(L.T("Aus meinen Eingaben lernen", "Learn from my typing"), L.T("Häufig verwendete Wörter und Wortfolgen vorschlagen", "Suggest words and phrases you use often"),
             _settings.LearnWords, (_, v) => _settings.LearnWords = v);
-        Row(Resource.Drawable.ms_menu_book, "Gelernte Wörter löschen", null, () =>
+        Row(Resource.Drawable.ms_menu_book, L.T("Gelernte Wörter löschen", "Delete learned words"), null, () =>
         {
             new AlertDialog.Builder(this)
-                .SetTitle("Gelerntes löschen?")!
-                .SetMessage("Alle gelernten Wörter und Wortfolgen werden entfernt.")!
-                .SetPositiveButton("Löschen", (_, _) =>
+                .SetTitle(L.T("Gelerntes löschen?", "Delete learned words?"))!
+                .SetMessage(L.T("Alle gelernten Wörter und Wortfolgen werden entfernt.", "All learned words and phrases will be removed."))!
+                .SetPositiveButton(L.T("Löschen", "Delete"), (_, _) =>
                 {
                     ZBoardImeService.ClearLearned(this);
-                    Toast.MakeText(this, "Gelernte Wörter gelöscht.", ToastLength.Short)!.Show();
+                    Toast.MakeText(this, L.T("Gelernte Wörter gelöscht.", "Learned words deleted."), ToastLength.Short)!.Show();
                 })!
-                .SetNegativeButton("Abbrechen", (_, _) => { })!
+                .SetNegativeButton(L.T("Abbrechen", "Cancel"), (_, _) => { })!
                 .Show();
         });
-        Note("Gelerntes bleibt auf dem Gerät und wird nie exportiert. In Passwort-, E-Mail- und Adressfeldern lernt "
-             + "zBoard nichts.");
+        Note(L.T("Gelerntes bleibt auf dem Gerät und wird nie exportiert. In Passwort-, E-Mail- und Adressfeldern lernt "
+               + "zBoard nichts.",
+            "Learned words stay on the device and are never exported. zBoard learns nothing in password, email and "
+            + "address fields."));
     }
 
     void BuildTest()
     {
         var input = new EditText(this)
         {
-            Hint = "Hier tippen, um zBoard zu testen",
+            Hint = L.T("Hier tippen, um zBoard zu testen", "Type here to try zBoard"),
             InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagCapSentences
                         | Android.Text.InputTypes.TextFlagMultiLine,
         };
@@ -367,15 +377,24 @@ public sealed class SettingsActivity : Activity
     {
         Note($"Version {PackageManager!.GetPackageInfo(PackageName!, 0)!.VersionName}\n\n"
              + "© 2026 World of Bytes, Patrick Zeriadtke – world-of-bytes.de\n"
-             + "zBoard ist freie Software unter der BSD 2-Clause License.\n\n"
-             + "Wortlisten (CC BY-SA 4.0): FrequencyWords von Hermit Dave auf Basis von OpenSubtitles 2018; "
-             + "Großschreibung deutscher Substantive nach german-nouns von Gregor Weichbrodt auf Basis von Wiktionary. "
-             + "Lizenz: creativecommons.org/licenses/by-sa/4.0\n\n"
-             + "Wortpaare für die Vorhersage (CC BY 3.0): Google Books Ngram Corpus, aufbereitet von "
-             + "orgtre/google-books-ngram-frequency. Lizenz: creativecommons.org/licenses/by/3.0\n\n"
-             + "Emoji-Daten: unicode-emoji-json von Mu-An Chiou (MIT); Namen und Suchbegriffe: Unicode CLDR "
-             + "(Unicode License v3), © Unicode, Inc.\n\n"
-             + "Symbole: Material Symbols von Google (Apache License 2.0).");
+             + L.T("zBoard ist freie Software unter der BSD 2-Clause License.", "zBoard is free software under the BSD 2-Clause License.")
+             + "\n" + L.T("Datenschutz", "Privacy") + ": world-of-bytes.de/zboard/datenschutz\n\n"
+             + L.T("Wortlisten (CC BY-SA 4.0): FrequencyWords von Hermit Dave auf Basis von OpenSubtitles 2018; "
+                   + "Großschreibung deutscher Substantive nach german-nouns von Gregor Weichbrodt auf Basis von Wiktionary. "
+                   + "Lizenz: creativecommons.org/licenses/by-sa/4.0\n\n"
+                   + "Wortpaare für die Vorhersage (CC BY 3.0): Google Books Ngram Corpus, aufbereitet von "
+                   + "orgtre/google-books-ngram-frequency. Lizenz: creativecommons.org/licenses/by/3.0\n\n"
+                   + "Emoji-Daten: unicode-emoji-json von Mu-An Chiou (MIT); Namen und Suchbegriffe: Unicode CLDR "
+                   + "(Unicode License v3), © Unicode, Inc.\n\n"
+                   + "Symbole: Material Symbols von Google (Apache License 2.0).",
+                 "Word lists (CC BY-SA 4.0): FrequencyWords by Hermit Dave based on OpenSubtitles 2018; "
+                   + "capitalization of German nouns from german-nouns by Gregor Weichbrodt based on Wiktionary. "
+                   + "License: creativecommons.org/licenses/by-sa/4.0\n\n"
+                   + "Word pairs for prediction (CC BY 3.0): Google Books Ngram Corpus, prepared by "
+                   + "orgtre/google-books-ngram-frequency. License: creativecommons.org/licenses/by/3.0\n\n"
+                   + "Emoji data: unicode-emoji-json by Mu-An Chiou (MIT); names and keywords: Unicode CLDR "
+                   + "(Unicode License v3), © Unicode, Inc.\n\n"
+                   + "Icons: Material Symbols by Google (Apache License 2.0)."));
     }
 
     // ---------- Mikrofon ----------
@@ -384,7 +403,7 @@ public sealed class SettingsActivity : Activity
     {
         if (CheckSelfPermission(Android.Manifest.Permission.RecordAudio) == Android.Content.PM.Permission.Granted)
         {
-            Toast.MakeText(this, "Das Mikrofon ist bereits freigegeben.", ToastLength.Short)!.Show();
+            Toast.MakeText(this, L.T("Das Mikrofon ist bereits freigegeben.", "The microphone is already allowed."), ToastLength.Short)!.Show();
             return;
         }
 
@@ -398,7 +417,9 @@ public sealed class SettingsActivity : Activity
         if (requestCode != MicRequest) return;
         bool granted = grantResults.Length > 0 && grantResults[0] == Android.Content.PM.Permission.Granted;
         Toast.MakeText(this,
-            granted ? "Mikrofon freigegeben. Tippe in der Tastatur erneut auf das Mikrofon." : "Ohne Mikrofon ist keine Spracheingabe möglich.",
+            granted
+                ? L.T("Mikrofon freigegeben. Tippe in der Tastatur erneut auf das Mikrofon.", "Microphone allowed. Tap the microphone in the keyboard again.")
+                : L.T("Ohne Mikrofon ist keine Spracheingabe möglich.", "Voice input needs the microphone."),
             ToastLength.Long)!.Show();
         if (granted && Intent?.GetBooleanExtra(ZBoardImeService.RequestMicExtra, false) == true) Finish();
     }
@@ -475,7 +496,7 @@ public sealed class SettingsActivity : Activity
     /// <summary>Unterseite: Zurück-Pfeil und großer Titel.</summary>
     void PageHeader(string title)
     {
-        var back = new ImageView(this) { ContentDescription = "Zurück" };
+        var back = new ImageView(this) { ContentDescription = L.T("Zurück", "Back") };
         back.SetImageResource(Resource.Drawable.ms_arrow_back);
         back.SetColorFilter(_colors.Text);
         back.SetPadding(Dp(12), Dp(12), Dp(12), Dp(12));

@@ -10,6 +10,7 @@ using ZBoard.Settings;
 using ZBoard.Suggestions;
 using KeyboardView = ZBoard.Keyboard.KeyboardView;
 using Orientation = Android.Widget.Orientation;
+using ZBoard.Localization;
 
 namespace ZBoard.Ime;
 
@@ -378,7 +379,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         if (_clipboardPanel == null || _keyboardView == null) return;
         if (!_settings.ClipboardHistory)
         {
-            Toast.MakeText(this, "Der Zwischenablage-Verlauf ist in den Einstellungen ausgeschaltet.", ToastLength.Short)!.Show();
+            Toast.MakeText(this, L.T("Der Zwischenablage-Verlauf ist in den Einstellungen ausgeschaltet.", "Clipboard history is turned off in the settings."), ToastLength.Short)!.Show();
             return;
         }
 

@@ -5,6 +5,7 @@ using Android.Speech;
 using Android.Widget;
 using ZBoard.Keyboard;
 using ZBoard.Settings;
+using ZBoard.Localization;
 
 namespace ZBoard.Ime;
 
@@ -66,7 +67,7 @@ public sealed partial class ZBoardImeService
         _voiceEnded = false;
         string before = TextBeforeCursor(1);
         _voicePrefix = before.Length > 0 && !char.IsWhiteSpace(before[0]) ? " " : string.Empty;
-        _suggestionBar?.SetStatus("Ich höre zu … (antippen zum Beenden)");
+        _suggestionBar?.SetStatus(L.T("Ich höre zu … (antippen zum Beenden)", "Listening … (tap to stop)"));
         _recognizer.StartListening(recognize);
     }
 
@@ -80,14 +81,14 @@ public sealed partial class ZBoardImeService
         if (_settings.VoiceOfflineOnly)
         {
             Toast.MakeText(this,
-                "Dieses Gerät bietet keine Offline-Spracherkennung. In den zBoard-Einstellungen lässt sich die Online-Erkennung des Systems erlauben.",
+                L.T("Dieses Gerät bietet keine Offline-Spracherkennung. In den zBoard-Einstellungen lässt sich die Online-Erkennung des Systems erlauben.", "This device has no offline speech recognition. You can allow the system's online recognition in the zBoard settings."),
                 ToastLength.Long)!.Show();
             return null;
         }
 
         if (!SpeechRecognizer.IsRecognitionAvailable(this))
         {
-            Toast.MakeText(this, "Auf diesem Gerät ist keine Spracherkennung installiert.", ToastLength.Long)!.Show();
+            Toast.MakeText(this, L.T("Auf diesem Gerät ist keine Spracherkennung installiert.", "No speech recognition is installed on this device."), ToastLength.Long)!.Show();
             return null;
         }
 
@@ -113,7 +114,7 @@ public sealed partial class ZBoardImeService
     {
         if (!_voiceActive || _voiceEnded) return;
         _voiceEnded = true;
-        _suggestionBar?.SetStatus("Wird erkannt …");
+        _suggestionBar?.SetStatus(L.T("Wird erkannt …", "Recognizing …"));
         _voiceHandler ??= new Handler(Looper.MainLooper!);
         _voiceTimeout ??= new Java.Lang.Runnable(() =>
         {
@@ -184,11 +185,11 @@ public sealed partial class ZBoardImeService
 
         string message = error switch
         {
-            SpeechRecognizerError.NoMatch or SpeechRecognizerError.SpeechTimeout => "Nichts verstanden.",
-            SpeechRecognizerError.Audio => "Mikrofon nicht verfügbar.",
-            SpeechRecognizerError.InsufficientPermissions => "Keine Berechtigung für das Mikrofon.",
-            SpeechRecognizerError.Network or SpeechRecognizerError.NetworkTimeout => "Spracherkennung braucht eine Verbindung.",
-            _ => "Spracherkennung fehlgeschlagen.",
+            SpeechRecognizerError.NoMatch or SpeechRecognizerError.SpeechTimeout => L.T("Nichts verstanden.", "Didn't catch that."),
+            SpeechRecognizerError.Audio => L.T("Mikrofon nicht verfügbar.", "Microphone not available."),
+            SpeechRecognizerError.InsufficientPermissions => L.T("Keine Berechtigung für das Mikrofon.", "No permission to use the microphone."),
+            SpeechRecognizerError.Network or SpeechRecognizerError.NetworkTimeout => L.T("Spracherkennung braucht eine Verbindung.", "Speech recognition needs a connection."),
+            _ => L.T("Spracherkennung fehlgeschlagen.", "Speech recognition failed."),
         };
         Toast.MakeText(this, message, ToastLength.Short)!.Show();
         EndVoice();

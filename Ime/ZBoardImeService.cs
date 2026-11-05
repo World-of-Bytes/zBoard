@@ -23,7 +23,7 @@ namespace ZBoard.Ime;
 /// Der Tastatur-Dienst. Verbindet Tastaturansicht und Vorschläge und schreibt Text über die InputConnection.
 /// </summary>
 [Service(
-    Name = "de.zeriadtke.zboard.ZBoardImeService",
+    Name = "de.World_of_Bytes.zBoard.ZBoardImeService",
     Label = "zBoard",
     Permission = "android.permission.BIND_INPUT_METHOD",
     Exported = true)]

@@ -223,7 +223,7 @@ public sealed class KeyboardView : View
 
     void LayoutKeys()
     {
-#if DEBUG
+#if DEBUG || ZBOARD_TESTHOOKS
         _loggedOrigin = null;
 #endif
         _keys.Clear();
@@ -268,7 +268,7 @@ public sealed class KeyboardView : View
     {
         base.OnDraw(canvas);
         canvas.DrawColor(Theme.Background);
-#if DEBUG
+#if DEBUG || ZBOARD_TESTHOOKS
         LogKeyPositions();
 #endif
 
@@ -440,7 +440,7 @@ public sealed class KeyboardView : View
         }
     }
 
-#if DEBUG
+#if DEBUG || ZBOARD_TESTHOOKS
     (int X, int Y)? _loggedOrigin;
     Java.Lang.Runnable? _positionWatch;
 

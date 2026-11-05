@@ -9,7 +9,7 @@
     <RootNamespace>ZBoard</RootNamespace>
     <AssemblyName>ZBoard</AssemblyName>
 
-    <ApplicationId>de.zeriadtke.zboard</ApplicationId>
+    <ApplicationId>de.World_of_Bytes.zBoard</ApplicationId>
     <ApplicationTitle>zBoard</ApplicationTitle>
     <ApplicationVersion>9</ApplicationVersion>
     <ApplicationDisplayVersion>0.9</ApplicationDisplayVersion>
@@ -23,8 +23,16 @@
     <None Remove="signing/**" />
   </ItemGroup>
 
+  <!--
+    Testhaken (Tastenpositionen im Log, Testfeld-Activity) für den Emulator-Test. In Debug immer an; ein
+    Release-Build bekommt sie nur mit -p:ZBoardTestHooks=true (Prüfung der AOT-Version im Emulator), nie im Store-Build.
+  -->
+  <PropertyGroup Condition="'$(ZBoardTestHooks)' == 'true'">
+    <DefineConstants>$(DefineConstants);ZBOARD_TESTHOOKS</DefineConstants>
+  </PropertyGroup>
+
   <!-- Debug/Testversionen immer mit demselben Testschlüssel signieren, damit Updates installierbar sind -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(ZBoardTestHooks)' == 'true'">
     <AndroidKeyStore>true</AndroidKeyStore>
     <AndroidSigningKeyStore>$(MSBuildThisFileDirectory)signing/zboard-test.keystore</AndroidSigningKeyStore>
     <AndroidSigningStorePass>zboard-test</AndroidSigningStorePass>
@@ -32,11 +40,16 @@
     <AndroidSigningKeyPass>zboard-test</AndroidSigningKeyPass>
   </PropertyGroup>
 
-  <!-- Release: schneller Start der Tastatur beim ersten Öffnen -->
+  <!--
+    Release: AOT für schnellen Start, App-Bundle (.aab) für Google Play und APK zum direkten Installieren.
+    Signiert wird mit dem Upload-Schlüssel aus den Repository-Secrets (siehe .github/workflows/build.yml):
+    -p:AndroidSigningKeyStore=… -p:AndroidSigningStorePass=… -p:AndroidSigningKeyAlias=… -p:AndroidSigningKeyPass=…
+  -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidPackageFormats>aab;apk</AndroidPackageFormats>
     <RunAOTCompilation>true</RunAOTCompilation>
     <AndroidEnableProfiledAot>true</AndroidEnableProfiledAot>
+    <AndroidKeyStore>true</AndroidKeyStore>
   </PropertyGroup>
 
 </Project>

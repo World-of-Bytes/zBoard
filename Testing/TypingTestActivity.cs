@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG || ZBOARD_TESTHOOKS
 using Android.App;
 using Android.OS;
 using Android.Text;
@@ -13,7 +13,7 @@ namespace ZBoard.Testing;
 /// (NO_SUGGESTIONS + AUTO_COMPLETE, Enter = Suchen), wie z. B. in der Google-App.
 /// </summary>
 [Activity(
-    Name = "de.zeriadtke.zboard.TypingTestActivity",
+    Name = "de.World_of_Bytes.zBoard.TypingTestActivity",
     Label = "zBoard Test",
     Exported = true,
     WindowSoftInputMode = SoftInput.StateAlwaysVisible | SoftInput.AdjustResize)]

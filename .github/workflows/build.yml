@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Store-Version: auf GitHub ein Release veröffentlichen (Tag z. B. v0.9) → signiertes .aab/.apk hängt danach am Release
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -49,17 +52,61 @@ jobs:
           path: bin/Debug/net10.0-android/*-Signed.apk
           if-no-files-found: error
 
+  # Release-Build (AOT, getrimmt) mit Testhaken und Testschlüssel: so nah an der Store-Version wie möglich,
+  # aber im Emulator prüfbar und über ältere Testversionen installierbar.
+  release-test-build:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Android-Workload installieren
+        run: dotnet workload install android
+
+      - name: App bauen (Release mit AOT, Testhaken)
+        run: dotnet build ZBoard.csproj -c Release -f net10.0-android -p:ZBoardTestHooks=true -p:AndroidPackageFormats=apk
+
+      - name: Signatur prüfen
+        run: |
+          APK=$(ls bin/Release/net10.0-android/*-Signed.apk | head -n 1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee signer.txt
+          grep -qi "7f94a11a131b687073d97d011fff3ab194834eb125007ba3a0feaf46eaaa3e8c" signer.txt
+
+      - name: APK bereitstellen
+        uses: actions/upload-artifact@v5
+        with:
+          name: zboard-release-apk
+          path: bin/Release/net10.0-android/*-Signed.apk
+          if-no-files-found: error
+
   emulator-test:
-    needs: build
+    if: github.event_name != 'release'
+    needs: [build, release-test-build]
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [debug, release]
 
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v5
         with:
-          name: zboard-debug-apk
+          name: zboard-${{ matrix.variant }}-apk
           path: apk
 
       - name: KVM für den Emulator freigeben
@@ -83,14 +130,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: emulator-test
+          name: emulator-test-${{ matrix.variant }}
           path: emulator-test/
           if-no-files-found: warn
 
   # Neueste getestete Version unter einer festen Adresse:
   # https://github.com/World-of-Bytes/zBoard/releases/download/testversion/zboard-test.apk
   testversion:
-    needs: [build, emulator-test]
+    needs: [release-test-build, emulator-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -99,7 +146,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v5
         with:
-          name: zboard-debug-apk
+          name: zboard-release-apk
           path: apk
 
       - name: Testversion veröffentlichen
@@ -112,4 +159,71 @@ jobs:
           gh release create testversion zboard-test.apk --repo "$REPO" --prerelease \
             --target "${{ github.sha }}" \
             --title "Testversion (neuester Stand)" \
-            --notes "Automatisch gebaut aus ${GITHUB_SHA::7}, Emulator-Test bestanden. Debug-Version zum Ausprobieren (ohne AOT, daher etwas langsamer beim Start als die spätere Release-Version)."
+            --notes "Automatisch gebaut aus ${GITHUB_SHA::7}, Emulator-Test bestanden. Release-Build (AOT) mit dem öffentlichen Testschlüssel – zum Ausprobieren, nicht die Play-Store-Version."
+
+  # Store-Version: läuft, wenn auf GitHub ein Release veröffentlicht wird (oder von Hand).
+  # Braucht die Repository-Secrets ZBOARD_UPLOAD_KEYSTORE (Keystore als Base64), ZBOARD_UPLOAD_STORE_PASSWORD,
+  # ZBOARD_UPLOAD_KEY_ALIAS und ZBOARD_UPLOAD_KEY_PASSWORD.
+  store-release:
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Upload-Schlüssel vorhanden?
+        env:
+          KEYSTORE: ${{ secrets.ZBOARD_UPLOAD_KEYSTORE }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::Secret ZBOARD_UPLOAD_KEYSTORE fehlt – Anleitung in signing/README.md"
+            exit 1
+          fi
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Android-Workload installieren
+        run: dotnet workload install android
+
+      - name: Store-Version bauen (.aab und .apk)
+        env:
+          STORE_PASS: ${{ secrets.ZBOARD_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ZBOARD_UPLOAD_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ZBOARD_UPLOAD_KEY_PASSWORD }}
+        run: >
+          dotnet publish ZBoard.csproj -c Release -f net10.0-android -o store
+          -p:AndroidSigningKeyStore="$RUNNER_TEMP/upload.keystore"
+          -p:AndroidSigningStorePass="$STORE_PASS"
+          -p:AndroidSigningKeyAlias="$KEY_ALIAS"
+          -p:AndroidSigningKeyPass="$KEY_PASS"
+
+      - name: Dateien benennen
+        run: |
+          VERSION=$(grep -oP '(?<=<ApplicationDisplayVersion>)[^<]+' ZBoard.csproj)
+          mkdir out
+          cp store/*-Signed.aab "out/zboard-$VERSION.aab"
+          cp store/*-Signed.apk "out/zboard-$VERSION.apk"
+          ls -l out
+
+      - name: Bereitstellen
+        uses: actions/upload-artifact@v5
+        with:
+          name: zboard-store
+          path: out/
+
+      - name: An das GitHub-Release hängen
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" out/* --repo "${{ github.repository }}" --clobber
