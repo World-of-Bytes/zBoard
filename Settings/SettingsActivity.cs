@@ -1,115 +1,335 @@
 using Android.App;
 using Android.Content;
+using Android.Content.Res;
+using Android.Graphics;
 using Android.OS;
 using Android.Views;
 using Android.Views.InputMethods;
 using Android.Widget;
 using ZBoard.Ime;
 using ZBoard.Keyboard;
+using Color = Android.Graphics.Color;
+using Orientation = Android.Widget.Orientation;
 
 namespace ZBoard.Settings;
 
-/// <summary>Startbildschirm: zBoard aktivieren, auswählen, einstellen, testen; Sprachen, Darstellung, Zwischenablage, Spracheingabe.</summary>
+/// <summary>
+/// Einstellungen im Aufbau von Gboard: Startseite mit großem Titel und Einträgen mit Symbol,
+/// jeder Eintrag öffnet eine Unterseite. Farben wie die Tastatur (Material You ab Android 12).
+/// </summary>
 [Activity(
     Name = "de.zeriadtke.zboard.SettingsActivity",
     Label = "zBoard",
     MainLauncher = true,
     Exported = true,
-    Theme = "@android:style/Theme.DeviceDefault.Settings")]
+    Theme = "@android:style/Theme.DeviceDefault.NoActionBar")]
 public sealed class SettingsActivity : Activity
 {
+    const int MicRequest = 42;
+
     ZBoardSettings _settings = null!;
+    KeyboardTheme _colors = KeyboardTheme.Light;
+    ScrollView _scroll = null!;
     LinearLayout _content = null!;
-    TextView _status = null!;
     float _dp;
+    string _page = Main;
+    Java.Lang.Object? _backCallback;
+
+    const string Main = "main";
+
+    record Page(string Id, int Icon, string Title, Func<string?> Subtitle, Action<SettingsActivity> Build);
+
+    static readonly Page[] Pages =
+    [
+        new("languages", Resource.Drawable.ms_language, "Sprachen", () => null, a => a.BuildLanguages()),
+        new("preferences", Resource.Drawable.ms_tune, "Einstellungen", () => null, a => a.BuildPreferences()),
+        new("theme", Resource.Drawable.ms_palette, "Design", () => null, a => a.BuildTheme()),
+        new("corrections", Resource.Drawable.ms_spellcheck, "Korrekturen & Vorschläge", () => null, a => a.BuildCorrections()),
+        new("glide", Resource.Drawable.ms_gesture, "Glide Typing", () => null, a => a.BuildGlide()),
+        new("voice", Resource.Drawable.ms_mic, "Spracheingabe", () => null, a => a.BuildVoice()),
+        new("clipboard", Resource.Drawable.ms_content_paste, "Zwischenablage", () => null, a => a.BuildClipboard()),
+        new("dictionary", Resource.Drawable.ms_menu_book, "Wörterbuch", () => null, a => a.BuildDictionary()),
+        new("test", Resource.Drawable.ms_keyboard, "Tastatur ausprobieren", () => null, a => a.BuildTest()),
+        new("about", Resource.Drawable.ms_info, "Über zBoard", () => null, a => a.BuildAbout()),
+    ];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
-        base.OnCreate(savedInstanceState);
         _settings = new ZBoardSettings(this);
+        _colors = CurrentColors();
+        // Schalter, Dialoge und Eingabefelder passend hell oder dunkel
+        SetTheme(IsDark ? Android.Resource.Style.ThemeDeviceDefaultNoActionBar : Android.Resource.Style.ThemeDeviceDefaultLightNoActionBar);
+        base.OnCreate(savedInstanceState);
         _dp = Resources!.DisplayMetrics!.Density;
 
         _content = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        int pad = Dp(16);
-        _content.SetPadding(pad, pad, pad, pad);
+        _scroll = new ScrollView(this) { FillViewport = true };
+        _scroll.SetBackgroundColor(_colors.Background);
+        _scroll.AddView(_content);
+        _scroll.SetOnApplyWindowInsetsListener(new SystemBarPadding());
+        SetContentView(_scroll);
+        ApplySystemBars();
 
-        var scroll = new ScrollView(this);
-        scroll.AddView(_content);
-        SetContentView(scroll);
-
-        BuildSetupSection();
-        BuildTypingSection();
-        BuildLanguageSection();
-        BuildAppearanceSection();
-        BuildTestSection();
-        BuildClipboardVoiceSection();
-        BuildAboutSection();
-
+        ShowPage(savedInstanceState?.GetString("page") ?? Main);
         if (Intent?.GetBooleanExtra(ZBoardImeService.RequestMicExtra, false) == true) RequestMicrophone();
     }
 
-    const int MicRequest = 42;
-
-    void RequestMicrophone()
+    protected override void OnSaveInstanceState(Bundle outState)
     {
-        if (CheckSelfPermission(Android.Manifest.Permission.RecordAudio) == Android.Content.PM.Permission.Granted) return;
-        RequestPermissions([Android.Manifest.Permission.RecordAudio], MicRequest);
-    }
-
-    public override void OnRequestPermissionsResult(
-        int requestCode, string[] permissions, Android.Content.PM.Permission[] grantResults)
-    {
-        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != MicRequest) return;
-        bool granted = grantResults.Length > 0 && grantResults[0] == Android.Content.PM.Permission.Granted;
-        Toast.MakeText(this,
-            granted ? "Mikrofon freigegeben. Tippe in der Tastatur erneut auf 🎤." : "Ohne Mikrofon ist keine Spracheingabe möglich.",
-            ToastLength.Long)!.Show();
-        if (granted) Finish();
+        base.OnSaveInstanceState(outState);
+        outState.PutString("page", _page);
     }
 
     protected override void OnResume()
     {
         base.OnResume();
-        RefreshStatus();
+        if (_page == Main) ShowPage(Main); // Einrichtungsstatus aktualisieren
     }
 
     public override void OnWindowFocusChanged(bool hasFocus)
     {
         base.OnWindowFocusChanged(hasFocus);
-        if (hasFocus) RefreshStatus(); // nach dem Auswahldialog aktualisieren
+        if (hasFocus && _page == Main) ShowPage(Main); // nach dem Auswahldialog
     }
 
-    // ---------- Abschnitte ----------
+    // ---------- Navigation ----------
 
-    void BuildSetupSection()
+    void ShowPage(string id)
     {
-        Header("Einrichtung");
-        _status = Text(string.Empty);
-        AddButton("1. zBoard in den Systemeinstellungen aktivieren",
-            () => StartActivity(new Intent(Android.Provider.Settings.ActionInputMethodSettings)));
-        AddButton("2. zBoard als Tastatur auswählen",
-            () => InputMethods().ShowInputMethodPicker());
+        _page = id;
+        _content.RemoveAllViews();
+        if (id == Main)
+        {
+            BuildMain();
+        }
+        else
+        {
+            var page = Pages.First(p => p.Id == id);
+            PageHeader(page.Title);
+            page.Build(this);
+        }
+
+        _scroll.ScrollTo(0, 0);
+        UpdateBackHandling();
     }
 
-    void BuildTypingSection()
+    void GoBack()
     {
-        Header("Tippen");
-        AddSwitch("Autokorrektur", _settings.AutoCorrect, v => _settings.AutoCorrect = v);
-        AddSwitch("Automatische Großschreibung", _settings.AutoCaps, v => _settings.AutoCaps = v);
-        AddSwitch("Doppelte Leertaste setzt Punkt", _settings.DoubleSpacePeriod, v => _settings.DoubleSpacePeriod = v);
-        AddSwitch("Wischeingabe (Wörter über die Tasten wischen)", _settings.GlideTyping, v => _settings.GlideTyping = v);
-        AddSwitch("Tastenvorschau beim Drücken", _settings.KeyPreview, v => _settings.KeyPreview = v);
-        AddSwitch("Vibration bei Tastendruck", _settings.Haptics, v => _settings.Haptics = v);
-        AddSwitch("Ton bei Tastendruck", _settings.KeySound, v => _settings.KeySound = v);
-        AddSwitch("Nächstes Wort vorschlagen", _settings.NextWordPrediction, v => _settings.NextWordPrediction = v);
+        if (_page == Main) Finish();
+        else ShowPage(Main);
+    }
 
-        Header("Lernen");
-        Text("zBoard merkt sich Wörter und Wortfolgen, die du oft verwendest, und schlägt sie dann vor. "
-             + "Das bleibt auf dem Gerät und wird nie exportiert. "
-             + "In Passwort-, E-Mail- und Adressfeldern lernt zBoard nichts.");
-        AddSwitch("Aus meinen Eingaben lernen", _settings.LearnWords, v => _settings.LearnWords = v);
-        AddButton("Gelernte Wörter löschen", () =>
+    // Ab Android 13 (bei targetSdk 36 Pflicht): Zurück-Geste über OnBackInvokedDispatcher.
+    void UpdateBackHandling()
+    {
+        if (!OperatingSystem.IsAndroidVersionAtLeast(33)) return;
+        var dispatcher = OnBackInvokedDispatcher;
+        if (_page != Main && _backCallback == null)
+        {
+            var callback = new BackCallback(this);
+            dispatcher.RegisterOnBackInvokedCallback(0, callback);
+            _backCallback = callback;
+        }
+        else if (_page == Main && _backCallback is Android.Window.IOnBackInvokedCallback registered)
+        {
+            dispatcher.UnregisterOnBackInvokedCallback(registered);
+            _backCallback = null;
+        }
+    }
+
+#pragma warning disable CS0618, CS0672 // bis Android 12 der klassische Weg
+    public override void OnBackPressed()
+    {
+        if (_page != Main) ShowPage(Main);
+        else base.OnBackPressed();
+    }
+#pragma warning restore CS0618, CS0672
+
+    sealed class BackCallback(SettingsActivity owner) : Java.Lang.Object, Android.Window.IOnBackInvokedCallback
+    {
+        public void OnBackInvoked() => owner.GoBack();
+    }
+
+    // ---------- Startseite ----------
+
+    void BuildMain()
+    {
+        var title = Label("zBoard-Einstellungen", 32, _colors.Text);
+        title.SetPadding(Dp(24), Dp(56), Dp(24), Dp(24));
+        _content.AddView(title);
+
+        BuildSetupCard();
+
+        foreach (var page in Pages)
+        {
+            string? subtitle = page.Id == "languages" ? LanguageSummary() : page.Subtitle();
+            Row(page.Icon, page.Title, subtitle, () => ShowPage(page.Id));
+        }
+    }
+
+    string LanguageSummary()
+    {
+        var names = _settings.Languages.Select(code => Layouts.LanguageNames.GetValueOrDefault(code, code)).ToList();
+        string text = string.Join(", ", names);
+        return _settings.Languages.Contains("de") ? $"{text} (QWERTZ)" : text;
+    }
+
+    void BuildSetupCard()
+    {
+        var imm = InputMethods();
+        bool enabled = imm.EnabledInputMethodList?.Any(i => i.PackageName == PackageName) == true;
+        string? current = Android.Provider.Settings.Secure.GetString(ContentResolver, Android.Provider.Settings.Secure.DefaultInputMethod);
+        bool selected = current?.StartsWith(PackageName + "/", StringComparison.Ordinal) == true;
+        if (enabled && selected) return;
+
+        var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        card.SetPadding(Dp(20), Dp(16), Dp(20), Dp(12));
+        card.Background = Rounded(_colors.Key, 24);
+        var cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        cardParams.SetMargins(Dp(16), 0, Dp(16), Dp(16));
+
+        card.AddView(Label("zBoard einrichten", 18, _colors.Text));
+        card.AddView(Label(enabled
+            ? "zBoard ist aktiviert, aber noch nicht als Tastatur ausgewählt."
+            : "Aktiviere zBoard in den Systemeinstellungen und wähle es dann als Tastatur aus.", 14, _colors.HintText));
+
+        var buttons = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        buttons.SetGravity(GravityFlags.End);
+        if (!enabled)
+        {
+            buttons.AddView(TextButton("Aktivieren",
+                () => StartActivity(new Intent(Android.Provider.Settings.ActionInputMethodSettings))));
+        }
+
+        buttons.AddView(TextButton("Auswählen", () => InputMethods().ShowInputMethodPicker()));
+        card.AddView(buttons);
+        _content.AddView(card, cardParams);
+    }
+
+    // ---------- Unterseiten ----------
+
+    void BuildLanguages()
+    {
+        Section("Aktive Sprachen");
+        foreach (var (code, name) in Layouts.LanguageNames)
+        {
+            string layout = code switch { "de" => "QWERTZ", "fr" => "AZERTY", _ => "QWERTY" };
+            Toggle(name, layout, _settings.Languages.Contains(code), (view, isChecked) =>
+            {
+                var list = _settings.Languages.ToList();
+                if (isChecked && !list.Contains(code)) list.Add(code);
+                if (!isChecked) list.Remove(code);
+
+                if (list.Count == 0)
+                {
+                    Toast.MakeText(this, "Mindestens eine Sprache muss aktiv bleiben.", ToastLength.Short)!.Show();
+                    view.Checked = true;
+                    return;
+                }
+
+                _settings.Languages = list;
+            });
+        }
+
+        Note("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.");
+
+        Section("Deutsch");
+        Toggle("Eigene Tasten für ü, ö, ä", "Sonst wie bei Gboard per langem Druck auf u, o, a (ß auf s)",
+            _settings.UmlautKeys, (_, v) => _settings.UmlautKeys = v);
+    }
+
+    void BuildPreferences()
+    {
+        Section("Tasten");
+        Toggle("Zahlenreihe", "Ziffern 1–0 über den Buchstaben", _settings.NumberRow, (_, v) => _settings.NumberRow = v);
+        Toggle("Sprachwechseltaste anzeigen", "Taste mit Globus neben der Leertaste",
+            _settings.ShowLanguageKey, (_, v) => _settings.ShowLanguageKey = v);
+
+        Section("Layout");
+        Choice("Einhandmodus",
+        [
+            ("Aus", _settings.OneHanded == OneHandedMode.Off, () => _settings.OneHanded = OneHandedMode.Off),
+            ("Rechts", _settings.OneHanded == OneHandedMode.Right, () => _settings.OneHanded = OneHandedMode.Right),
+            ("Links", _settings.OneHanded == OneHandedMode.Left, () => _settings.OneHanded = OneHandedMode.Left),
+        ]);
+
+        var heightLabel = Label($"Tastaturhöhe: {_settings.HeightPercent} %", 17, _colors.Text);
+        heightLabel.SetPadding(Dp(24), Dp(12), Dp(24), 0);
+        _content.AddView(heightLabel);
+        var height = new SeekBar(this) { Max = 50, Progress = _settings.HeightPercent - 80 };
+        height.SetPadding(Dp(24), Dp(8), Dp(24), Dp(16));
+        height.ProgressChanged += (_, e) =>
+        {
+            _settings.HeightPercent = 80 + e.Progress;
+            heightLabel.Text = $"Tastaturhöhe: {_settings.HeightPercent} %";
+        };
+        _content.AddView(height);
+
+        Section("Tastendruck");
+        Toggle("Ton bei Tastendruck", null, _settings.KeySound, (_, v) => _settings.KeySound = v);
+        Toggle("Haptisches Feedback bei Tastendruck", null, _settings.Haptics, (_, v) => _settings.Haptics = v);
+        Toggle("Pop-up bei Tastendruck", "Vergrößerte Taste über dem Finger", _settings.KeyPreview, (_, v) => _settings.KeyPreview = v);
+    }
+
+    void BuildTheme()
+    {
+        List<(string, bool, Action)> options =
+        [
+            (OperatingSystem.IsAndroidVersionAtLeast(31) ? "Wie das System (Farben aus dem Hintergrundbild)" : "Wie das System",
+                _settings.Theme is ThemeMode.System or ThemeMode.Dynamic, () => _settings.Theme = ThemeMode.System),
+            ("Hell", _settings.Theme == ThemeMode.Light, () => _settings.Theme = ThemeMode.Light),
+            ("Dunkel", _settings.Theme == ThemeMode.Dark, () => _settings.Theme = ThemeMode.Dark),
+        ];
+        Choice("Design", options);
+        Note("Die Einstellungen übernehmen das Design beim nächsten Öffnen.");
+    }
+
+    void BuildCorrections()
+    {
+        Section("Vorschläge");
+        Toggle("Vorschlagsleiste: nächstes Wort", "Vorschläge, bevor du zu tippen beginnst",
+            _settings.NextWordPrediction, (_, v) => _settings.NextWordPrediction = v);
+
+        Section("Korrekturen");
+        Toggle("Autokorrektur", "Tippfehler beim Drücken der Leertaste korrigieren", _settings.AutoCorrect, (_, v) => _settings.AutoCorrect = v);
+        Toggle("Automatische Großschreibung", "Am Satzanfang und bei Substantiven", _settings.AutoCaps, (_, v) => _settings.AutoCaps = v);
+        Toggle("Punkt durch doppeltes Leerzeichen", null, _settings.DoubleSpacePeriod, (_, v) => _settings.DoubleSpacePeriod = v);
+    }
+
+    void BuildGlide()
+    {
+        Toggle("Glide Typing aktivieren", "Wörter eingeben, indem du von Buchstabe zu Buchstabe wischst",
+            _settings.GlideTyping, (_, v) => _settings.GlideTyping = v);
+        Note("Wischen über die Leertaste bewegt den Cursor. Wischen von der Löschtaste nach links markiert Wörter zum Löschen.");
+    }
+
+    void BuildVoice()
+    {
+        Toggle("Nur Offline-Erkennung", "Sprache verlässt das Gerät nicht (ab Android 12, je nach Hersteller)",
+            _settings.VoiceOfflineOnly, (_, v) => _settings.VoiceOfflineOnly = v);
+        Row(Resource.Drawable.ms_mic, "Mikrofon freigeben", "Einmalig nötig für die Spracheingabe", RequestMicrophone);
+        Note("Das Mikrofon rechts in der Vorschlagsleiste startet die Spracherkennung des Systems. Antippen während der "
+             + "Aufnahme beendet sie.");
+    }
+
+    void BuildClipboard()
+    {
+        Toggle("Zwischenablage-Verlauf", "Kopierte Texte eine Stunde lang anzeigen",
+            _settings.ClipboardHistory, (_, v) => _settings.ClipboardHistory = v);
+        Row(Resource.Drawable.ms_content_paste, "Angeheftete Einträge löschen", null, () =>
+        {
+            _settings.PinnedClips = string.Empty;
+            Toast.MakeText(this, "Gilt ab dem nächsten Öffnen der Tastatur.", ToastLength.Short)!.Show();
+        });
+        Note("Nur Angeheftetes wird gespeichert. Als vertraulich markierte Inhalte, etwa aus Passwort-Managern, "
+             + "übernimmt zBoard nie.");
+    }
+
+    void BuildDictionary()
+    {
+        Toggle("Aus meinen Eingaben lernen", "Häufig verwendete Wörter und Wortfolgen vorschlagen",
+            _settings.LearnWords, (_, v) => _settings.LearnWords = v);
+        Row(Resource.Drawable.ms_menu_book, "Gelernte Wörter löschen", null, () =>
         {
             new AlertDialog.Builder(this)
                 .SetTitle("Gelerntes löschen?")!
@@ -122,139 +342,30 @@ public sealed class SettingsActivity : Activity
                 .SetNegativeButton("Abbrechen", (_, _) => { })!
                 .Show();
         });
+        Note("Gelerntes bleibt auf dem Gerät und wird nie exportiert. In Passwort-, E-Mail- und Adressfeldern lernt "
+             + "zBoard nichts.");
     }
 
-    void BuildLanguageSection()
+    void BuildTest()
     {
-        Header("Sprachen");
-        Text("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.");
-        AddSwitch("Eigene Taste 🌐 zum Sprachwechsel", _settings.ShowLanguageKey, v => _settings.ShowLanguageKey = v);
-        Text("Umlaute und ß: lange auf u, o, a bzw. s drücken.");
-        AddSwitch("Deutsch: eigene Tasten für ü, ö, ä", _settings.UmlautKeys, v => _settings.UmlautKeys = v);
-
-        foreach (var (code, name) in Layouts.LanguageNames)
-        {
-            var box = new CheckBox(this)
-            {
-                Text = name,
-                Checked = _settings.Languages.Contains(code),
-            };
-            box.CheckedChange += (_, e) =>
-            {
-                var list = _settings.Languages.ToList();
-                if (e.IsChecked && !list.Contains(code)) list.Add(code);
-                if (!e.IsChecked) list.Remove(code);
-
-                if (list.Count == 0)
-                {
-                    Toast.MakeText(this, "Mindestens eine Sprache muss aktiv bleiben.", ToastLength.Short)!.Show();
-                    box.Checked = true;
-                    return;
-                }
-
-                _settings.Languages = list;
-            };
-            _content.AddView(box);
-        }
-    }
-
-    void BuildAppearanceSection()
-    {
-        Header("Darstellung");
-        var group = new RadioGroup(this) { Orientation = Orientation.Vertical };
-        (ThemeMode Mode, string Label)[] options =
-        [
-            (ThemeMode.System, "Wie das System"),
-            (ThemeMode.Light, "Hell"),
-            (ThemeMode.Dark, "Dunkel"),
-        ];
-        if (OperatingSystem.IsAndroidVersionAtLeast(31)) options = [.. options, (ThemeMode.Dynamic, "Farben aus dem Hintergrundbild (Material You)")];
-
-        foreach (var (mode, label) in options)
-        {
-            var radio = new RadioButton(this) { Text = label, Id = View.GenerateViewId() };
-            group.AddView(radio);
-            if (_settings.Theme == mode) radio.Checked = true;
-            radio.CheckedChange += (_, e) =>
-            {
-                if (e.IsChecked) _settings.Theme = mode;
-            };
-        }
-
-        _content.AddView(group);
-
-        AddSwitch("Zahlenreihe über den Buchstaben", _settings.NumberRow, v => _settings.NumberRow = v);
-
-        Text("Tastaturhöhe");
-        var height = new SeekBar(this) { Max = 50, Progress = _settings.HeightPercent - 80 };
-        var heightLabel = Text($"{_settings.HeightPercent} %");
-        height.ProgressChanged += (_, e) =>
-        {
-            _settings.HeightPercent = 80 + e.Progress;
-            heightLabel.Text = $"{_settings.HeightPercent} %";
-        };
-        _content.AddView(height);
-
-        Header("Einhandmodus");
-        Text("Schmalere Tastatur am rechten oder linken Rand. Umschalten auch über ✋ in der Werkzeugleiste.");
-        var oneHanded = new RadioGroup(this) { Orientation = Orientation.Vertical };
-        (OneHandedMode Mode, string Label)[] sides =
-        [
-            (OneHandedMode.Off, "Aus"),
-            (OneHandedMode.Right, "Rechts"),
-            (OneHandedMode.Left, "Links"),
-        ];
-        foreach (var (mode, label) in sides)
-        {
-            var radio = new RadioButton(this) { Text = label, Id = View.GenerateViewId() };
-            oneHanded.AddView(radio);
-            if (_settings.OneHanded == mode) radio.Checked = true;
-            radio.CheckedChange += (_, e) =>
-            {
-                if (e.IsChecked) _settings.OneHanded = mode;
-            };
-        }
-
-        _content.AddView(oneHanded);
-    }
-
-    void BuildClipboardVoiceSection()
-    {
-        Header("Zwischenablage");
-        Text("Kopierter Text erscheint eine Stunde lang im Verlauf (📋 in der Werkzeugleiste). Nur Angeheftetes "
-             + "wird gespeichert. Als vertraulich markierte Inhalte, etwa aus Passwort-Managern, übernimmt zBoard nie.");
-        AddSwitch("Zwischenablage-Verlauf", _settings.ClipboardHistory, v => _settings.ClipboardHistory = v);
-        AddButton("Angeheftete Einträge löschen", () =>
-        {
-            _settings.PinnedClips = string.Empty;
-            Toast.MakeText(this, "Gilt ab dem nächsten Start der Tastatur.", ToastLength.Short)!.Show();
-        });
-
-        Header("Spracheingabe");
-        Text("🎤 in der Werkzeugleiste startet die Spracherkennung des Systems. Standardmäßig nur, wenn das Gerät "
-             + "offline erkennen kann (ab Android 12, je nach Hersteller). Sonst würde die Sprache an den Anbieter "
-             + "des Erkennungsdienstes übertragen.");
-        AddSwitch("Nur Offline-Erkennung verwenden", _settings.VoiceOfflineOnly, v => _settings.VoiceOfflineOnly = v);
-        AddButton("Mikrofon freigeben", RequestMicrophone);
-    }
-
-    void BuildTestSection()
-    {
-        Header("Ausprobieren");
         var input = new EditText(this)
         {
             Hint = "Hier tippen, um zBoard zu testen",
             InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagCapSentences
                         | Android.Text.InputTypes.TextFlagMultiLine,
         };
+        input.SetTextColor(_colors.Text);
+        input.SetHintTextColor(_colors.HintText);
         input.SetMinLines(3);
-        _content.AddView(input);
+        var lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        lp.SetMargins(Dp(24), Dp(8), Dp(24), Dp(8));
+        _content.AddView(input, lp);
+        input.RequestFocus();
     }
 
-    void BuildAboutSection()
+    void BuildAbout()
     {
-        Header("Über zBoard");
-        Text("© 2026 World of Bytes, Patrick Zeriadtke – world-of-bytes.de\n"
+        Note("© 2026 World of Bytes, Patrick Zeriadtke – world-of-bytes.de\n"
              + "zBoard ist freie Software unter der BSD 2-Clause License.\n\n"
              + "Wortlisten (CC BY-SA 4.0): FrequencyWords von Hermit Dave auf Basis von OpenSubtitles 2018; "
              + "Großschreibung deutscher Substantive nach german-nouns von Gregor Weichbrodt auf Basis von Wiktionary. "
@@ -262,63 +373,217 @@ public sealed class SettingsActivity : Activity
              + "Wortpaare für die Vorhersage (CC BY 3.0): Google Books Ngram Corpus, aufbereitet von "
              + "orgtre/google-books-ngram-frequency. Lizenz: creativecommons.org/licenses/by/3.0\n\n"
              + "Emoji-Daten: unicode-emoji-json von Mu-An Chiou (MIT); Namen und Suchbegriffe: Unicode CLDR "
-             + "(Unicode License v3), © Unicode, Inc.");
+             + "(Unicode License v3), © Unicode, Inc.\n\n"
+             + "Symbole: Material Symbols von Google (Apache License 2.0).");
     }
 
-    // ---------- Status ----------
+    // ---------- Mikrofon ----------
 
-    void RefreshStatus()
+    void RequestMicrophone()
     {
-        if (_status == null) return;
-        var imm = InputMethods();
-        bool enabled = imm.EnabledInputMethodList?.Any(i => i.PackageName == PackageName) == true;
-        string? current = Android.Provider.Settings.Secure.GetString(ContentResolver, Android.Provider.Settings.Secure.DefaultInputMethod);
-        bool selected = current?.StartsWith(PackageName + "/", StringComparison.Ordinal) == true;
-
-        _status.Text = (enabled, selected) switch
+        if (CheckSelfPermission(Android.Manifest.Permission.RecordAudio) == Android.Content.PM.Permission.Granted)
         {
-            (true, true) => "✓ zBoard ist aktiv und ausgewählt.",
-            (true, false) => "zBoard ist aktiviert, aber noch nicht ausgewählt (Schritt 2).",
-            _ => "zBoard ist noch nicht aktiviert (Schritt 1).",
+            Toast.MakeText(this, "Das Mikrofon ist bereits freigegeben.", ToastLength.Short)!.Show();
+            return;
+        }
+
+        RequestPermissions([Android.Manifest.Permission.RecordAudio], MicRequest);
+    }
+
+    public override void OnRequestPermissionsResult(
+        int requestCode, string[] permissions, Android.Content.PM.Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != MicRequest) return;
+        bool granted = grantResults.Length > 0 && grantResults[0] == Android.Content.PM.Permission.Granted;
+        Toast.MakeText(this,
+            granted ? "Mikrofon freigegeben. Tippe in der Tastatur erneut auf das Mikrofon." : "Ohne Mikrofon ist keine Spracheingabe möglich.",
+            ToastLength.Long)!.Show();
+        if (granted && Intent?.GetBooleanExtra(ZBoardImeService.RequestMicExtra, false) == true) Finish();
+    }
+
+    // ---------- Farben ----------
+
+    KeyboardTheme CurrentColors()
+    {
+        bool systemDark = (Resources!.Configuration!.UiMode & UiMode.NightMask) == UiMode.NightYes;
+        return _settings.Theme switch
+        {
+            ThemeMode.Light => KeyboardTheme.Light,
+            ThemeMode.Dark => KeyboardTheme.Dark,
+            _ when OperatingSystem.IsAndroidVersionAtLeast(31) => KeyboardTheme.FromSystem(this, systemDark),
+            _ => systemDark ? KeyboardTheme.Dark : KeyboardTheme.Light,
         };
     }
 
-    // ---------- UI-Helfer ----------
+    bool IsDark => (0.299 * _colors.Background.R + 0.587 * _colors.Background.G + 0.114 * _colors.Background.B) / 255 < 0.5;
+
+    void ApplySystemBars()
+    {
+        var window = Window!;
+        // Helle Statusleisten-Symbole auf dunklem Hintergrund und umgekehrt
+        if (OperatingSystem.IsAndroidVersionAtLeast(30))
+        {
+            var mask = (int)WindowInsetsControllerAppearance.LightStatusBars | (int)WindowInsetsControllerAppearance.LightNavigationBars;
+            window.InsetsController?.SetSystemBarsAppearance(IsDark ? 0 : mask, mask);
+        }
+
+#pragma warning disable CA1422, CS0618 // bis Android 14 wirksam, danach zeichnet die App hinter den Leisten
+        window.SetStatusBarColor(_colors.Background);
+        window.SetNavigationBarColor(_colors.Background);
+#pragma warning restore CA1422, CS0618
+    }
+
+    /// <summary>Ab Android 15 liegt der Inhalt unter Status- und Navigationsleiste: Abstand halten.</summary>
+    sealed class SystemBarPadding : Java.Lang.Object, View.IOnApplyWindowInsetsListener
+    {
+        public WindowInsets OnApplyWindowInsets(View view, WindowInsets insets)
+        {
+            if (OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                var bars = insets.GetInsets(WindowInsets.Type.SystemBars() | WindowInsets.Type.DisplayCutout());
+                view.SetPadding(bars.Left, bars.Top, bars.Right, bars.Bottom);
+            }
+
+            return insets;
+        }
+    }
+
+    // ---------- Bausteine ----------
 
     InputMethodManager InputMethods() =>
         (InputMethodManager)GetSystemService(Context.InputMethodService)!;
 
-    int Dp(int value) => (int)(value * _dp);
+    int Dp(float value) => (int)(value * _dp);
 
-    void Header(string title)
+    TextView Label(string text, float sp, Color color)
     {
-        var view = new TextView(this) { Text = title, TextSize = 18 };
-        view.SetTypeface(null, Android.Graphics.TypefaceStyle.Bold);
-        view.SetPadding(0, Dp(20), 0, Dp(8));
-        _content.AddView(view);
-    }
-
-    TextView Text(string text)
-    {
-        var view = new TextView(this) { Text = text, TextSize = 14 };
-        view.SetPadding(0, Dp(4), 0, Dp(8));
-        _content.AddView(view);
+        var view = new TextView(this) { Text = text, TextSize = sp };
+        view.SetTextColor(color);
         return view;
     }
 
-    void AddButton(string text, Action onClick)
+    Android.Graphics.Drawables.GradientDrawable Rounded(Color color, float radiusDp)
+    {
+        var shape = new Android.Graphics.Drawables.GradientDrawable();
+        shape.SetColor(color);
+        shape.SetCornerRadius(radiusDp * _dp);
+        return shape;
+    }
+
+    /// <summary>Unterseite: Zurück-Pfeil und großer Titel.</summary>
+    void PageHeader(string title)
+    {
+        var back = new ImageView(this) { ContentDescription = "Zurück" };
+        back.SetImageResource(Resource.Drawable.ms_arrow_back);
+        back.SetColorFilter(_colors.Text);
+        back.SetPadding(Dp(12), Dp(12), Dp(12), Dp(12));
+        back.Click += (_, _) => ShowPage(Main);
+        var lp = new LinearLayout.LayoutParams(Dp(48), Dp(48));
+        lp.SetMargins(Dp(8), Dp(16), 0, 0);
+        _content.AddView(back, lp);
+
+        var heading = Label(title, 32, _colors.Text);
+        heading.SetPadding(Dp(24), Dp(40), Dp(24), Dp(16));
+        _content.AddView(heading);
+    }
+
+    void Section(string title)
+    {
+        var view = Label(title, 14, _colors.Accent);
+        view.SetPadding(Dp(24), Dp(20), Dp(24), Dp(4));
+        _content.AddView(view);
+    }
+
+    void Note(string text)
+    {
+        var view = Label(text, 14, _colors.HintText);
+        view.SetPadding(Dp(24), Dp(12), Dp(24), Dp(12));
+        _content.AddView(view);
+    }
+
+    /// <summary>Eintrag wie in den Gboard-Einstellungen: Symbol, Titel, optional Untertitel.</summary>
+    void Row(int icon, string title, string? subtitle, Action onClick)
+    {
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal, Clickable = true, Focusable = true };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.SetPadding(Dp(24), Dp(18), Dp(24), Dp(18));
+        row.Foreground = Ripple();
+        row.Click += (_, _) => onClick();
+
+        var image = new ImageView(this);
+        image.SetImageResource(icon);
+        image.SetColorFilter(_colors.Text);
+        var iconParams = new LinearLayout.LayoutParams(Dp(26), Dp(26)) { MarginEnd = Dp(28) };
+        row.AddView(image, iconParams);
+
+        var texts = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        texts.AddView(Label(title, 20, _colors.Text));
+        if (!string.IsNullOrEmpty(subtitle)) texts.AddView(Label(subtitle, 14, _colors.HintText));
+        row.AddView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+
+        _content.AddView(row);
+    }
+
+    /// <summary>Schalter rechts, Titel und Untertitel links.</summary>
+    void Toggle(string title, string? subtitle, bool value, Action<Switch, bool> onChange)
+    {
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.SetPadding(Dp(24), Dp(14), Dp(16), Dp(14));
+
+        var texts = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        texts.AddView(Label(title, 18, _colors.Text));
+        if (!string.IsNullOrEmpty(subtitle)) texts.AddView(Label(subtitle, 14, _colors.HintText));
+        row.AddView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+
+        var toggle = new Switch(this) { Checked = value };
+        toggle.CheckedChange += (_, e) => onChange(toggle, e.IsChecked);
+        row.AddView(toggle);
+
+        row.Clickable = true;
+        row.Foreground = Ripple();
+        row.Click += (_, _) => toggle.Toggle();
+        _content.AddView(row);
+    }
+
+    /// <summary>Auswahl aus mehreren Möglichkeiten (Optionsfelder).</summary>
+    void Choice(string title, List<(string Label, bool Selected, Action Select)> options)
+    {
+        Section(title);
+        var group = new RadioGroup(this) { Orientation = Orientation.Vertical };
+        group.SetPadding(Dp(16), 0, Dp(24), 0);
+        foreach (var (label, selected, select) in options)
+        {
+            var radio = new RadioButton(this) { Text = label, Id = View.GenerateViewId(), TextSize = 18 };
+            radio.SetTextColor(_colors.Text);
+            radio.SetPadding(Dp(12), Dp(12), 0, Dp(12));
+            group.AddView(radio);
+            if (selected) radio.Checked = true;
+            radio.CheckedChange += (_, e) =>
+            {
+                if (e.IsChecked) select();
+            };
+        }
+
+        _content.AddView(group);
+    }
+
+    Button TextButton(string text, Action onClick)
     {
         var button = new Button(this) { Text = text };
         button.SetAllCaps(false);
+        button.SetTextColor(_colors.Accent);
+        button.Background = null;
         button.Click += (_, _) => onClick();
-        _content.AddView(button);
+        return button;
     }
 
-    void AddSwitch(string text, bool value, Action<bool> onChange)
+    Android.Graphics.Drawables.Drawable? Ripple()
     {
-        var view = new Switch(this) { Text = text, Checked = value };
-        view.SetPadding(0, Dp(8), 0, Dp(8));
-        view.CheckedChange += (_, e) => onChange(e.IsChecked);
-        _content.AddView(view);
+        var attrs = ObtainStyledAttributes([Android.Resource.Attribute.SelectableItemBackground]);
+        var drawable = attrs.GetDrawable(0);
+        attrs.Recycle();
+        return drawable;
     }
 }

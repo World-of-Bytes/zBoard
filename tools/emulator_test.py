@@ -132,6 +132,25 @@ def field_text():
     raise RuntimeError("Eingabefeld nicht gefunden")
 
 
+def ui_nodes():
+    shell("uiautomator dump /sdcard/zboard-ui.xml")
+    xml = adb("exec-out", "cat", "/sdcard/zboard-ui.xml")
+    return list(ET.fromstring(xml).iter("node"))
+
+
+def ui_texts():
+    return [n.get("text", "") for n in ui_nodes()]
+
+
+def tap_text(text):
+    for node in ui_nodes():
+        if node.get("text") == text:
+            x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+            tap(((x1 + x2) // 2, (y1 + y2) // 2))
+            return
+    raise RuntimeError(f"„{text}“ nicht auf dem Bildschirm")
+
+
 def screenshot(out_dir, name):
     path = os.path.join(out_dir, f"{name}.png")
     with open(path, "wb") as f:
@@ -234,6 +253,21 @@ def main():
               f"→ Feld „{text}“, Leiste „{last}“")
         screenshot(out_dir, "5-suchleiste")
 
+        # Einstellungen öffnen (Startseite und eine Unterseite)
+        shell("input keyevent KEYCODE_BACK", check=False)
+        shell(f"am start -W --activity-clear-task -n {PACKAGE}/{PACKAGE}.SettingsActivity")
+        time.sleep(3)
+        screenshot(out_dir, "6-einstellungen")
+        settings_ui = ui_texts()
+        check("Einstellungen: Startseite", "zBoard-Einstellungen" in settings_ui and "Korrekturen & Vorschläge" in settings_ui)
+        tap_text("Korrekturen & Vorschläge")
+        time.sleep(1.5)
+        screenshot(out_dir, "7-korrekturen")
+        check("Einstellungen: Unterseite", "Autokorrektur" in ui_texts())
+        shell("input keyevent KEYCODE_BACK", check=False)
+        time.sleep(1.5)
+        check("Einstellungen: Zurück zur Startseite", "Glide Typing" in ui_texts())
+
         found = crashes()
         check("Keine Abstürze", not found, "; ".join(found[:3]))
     except Exception as e:  # noqa: BLE001 – jeder Fehler ist ein Testfehler
@@ -243,6 +277,12 @@ def main():
         except Exception:  # noqa: BLE001
             pass
     finally:
+        if os.environ.get("ZBOARD_LOG_SCREENSHOTS"):
+            import base64
+            for name in sorted(os.listdir(out_dir)):
+                if name.endswith(".png"):
+                    with open(os.path.join(out_dir, name), "rb") as f:
+                        print(f"SCREENSHOT {name} {base64.b64encode(f.read()).decode()}")
         with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as f:
             f.write(adb("logcat", "-d", check=False))
         write_summary(out_dir, results)

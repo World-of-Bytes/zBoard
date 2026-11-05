@@ -18,7 +18,7 @@ ICONS = [
     # Leiste
     "mic", "content_paste", "settings", "back_hand",
     # Einstellungen
-    "tune", "palette", "spellcheck", "gesture", "menu_book", "keyboard", "info",
+    "tune", "palette", "spellcheck", "gesture", "menu_book", "keyboard", "info", "arrow_back",
 ]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
