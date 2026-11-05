@@ -78,3 +78,30 @@ jobs:
           name: emulator-test
           path: emulator-test/
           if-no-files-found: warn
+
+  # Neueste getestete Version unter einer festen Adresse:
+  # https://github.com/World-of-Bytes/zBoard/releases/download/testversion/zboard-test.apk
+  testversion:
+    needs: [build, emulator-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: zboard-debug-apk
+          path: apk
+
+      - name: Testversion veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cp "$(ls apk/*.apk | head -n 1)" zboard-test.apk
+          gh release delete testversion --repo "$REPO" --yes --cleanup-tag || true
+          gh release create testversion zboard-test.apk --repo "$REPO" --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Testversion (neuester Stand)" \
+            --notes "Automatisch gebaut aus ${GITHUB_SHA::7}, Emulator-Test bestanden. Debug-Version zum Ausprobieren (ohne AOT, daher etwas langsamer beim Start als die spätere Release-Version)."
