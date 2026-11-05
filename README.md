@@ -42,14 +42,25 @@ Voraussetzungen: .NET 10 SDK, Android-Workload, Android SDK (bringen Visual Stud
 ```bash
 dotnet workload install android
 dotnet build -t:Run -f net10.0-android          # baut und installiert auf dem verbundenen Gerät/Emulator
-dotnet publish -c Release -f net10.0-android    # Release-APK (mit AOT für schnellen Start)
 ```
 
-Danach die App **zBoard** öffnen:
+Danach die App **zBoard** öffnen, auf der Startseite „Aktivieren“ und „Auswählen“ antippen und unter
+„Tastatur ausprobieren“ lostippen. Paketname: `de.World_of_Bytes.zBoard`.
 
-1. „zBoard in den Systemeinstellungen aktivieren“ antippen und zBoard einschalten
-2. „zBoard als Tastatur auswählen“ antippen
-3. Im Testfeld unten tippen
+Die Oberfläche ist zweisprachig: Deutsch, wenn das System auf Deutsch steht, sonst Englisch
+(`Localization/L.cs`, Texte direkt im Code als `L.T("Deutsch", "English")`).
+
+## Testversion und Veröffentlichung
+
+- Jeder Push auf `main` baut eine Debug- und eine Release-Version (AOT), testet beide im Emulator und veröffentlicht
+  die Release-Version mit dem öffentlichen Testschlüssel als
+  [Testversion](https://github.com/World-of-Bytes/zBoard/releases/download/testversion/zboard-test.apk).
+- **Store-Version:** Auf GitHub ein Release veröffentlichen (Tag `v<Version>`). GitHub Actions baut dann mit dem
+  Upload-Schlüssel aus den Repository-Secrets `zboard-<Version>.aab` (für Google Play) und `zboard-<Version>.apk`
+  und hängt beide an das Release. Einrichtung des Schlüssels: [signing/README.md](signing/README.md).
+- Texte, Grafiken und Angaben für den Play-Store-Eintrag: [docs/store](docs/store/listing.md),
+  Datenschutzerklärung: [docs/PRIVACY.md](docs/PRIVACY.md).
+- Version: `ApplicationDisplayVersion` und `ApplicationVersion` (bei jedem Store-Upload um 1 erhöhen) in `ZBoard.csproj`.
 
 ## Tests
 
@@ -175,4 +186,5 @@ Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.
 
 - Test auf echten Geräten: Tippgefühl, Wischerkennung mit echten Spuren, Ladezeit und Speicher der Wörterbücher,
   Spracheingabe auf Geräten mit und ohne Offline-Erkennung
-- Veröffentlichung vorbereiten: Release-Signatur, App-Symbol, F-Droid-Metadaten
+- F-Droid-Metadaten
+- Weitere Sprachen für die Oberfläche (Französisch, Spanisch, Italienisch)

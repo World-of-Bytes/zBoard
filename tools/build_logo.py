@@ -79,7 +79,7 @@ G_START, G_END = (CAP_X, SPACE[1] + SPACE[3]), (CAP_X + CAP_W, CAP_Y)
 
 # ---------- SVG ----------
 
-def svg(px=512):
+def svg(px=512, rounded=True):
     stops = "".join(f'<stop offset="{o}" stop-color="{c}"/>' for o, c in GRADIENT)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{px}" height="{px}" viewBox="18 18 72 72">
   <title>zBoard</title>
@@ -89,8 +89,8 @@ def svg(px=512):
       <stop offset="0" stop-color="#3FA9D9" stop-opacity="0.22"/><stop offset="1" stop-color="#3FA9D9" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect x="18" y="18" width="72" height="72" rx="16" fill="{BG}"/>
-  <rect x="18" y="18" width="72" height="72" rx="16" fill="url(#glow)"/>
+  <rect x="18" y="18" width="72" height="72" rx="{16 if rounded else 0}" fill="{BG}"/>
+  <rect x="18" y="18" width="72" height="72" rx="{16 if rounded else 0}" fill="url(#glow)"/>
   <path d="{CAP_EDGE}" fill="{LINE}"/>
   <path d="{CAP}" fill="{SURFACE}" stroke="url(#wob)" stroke-width="1.6"/>
   <path d="{DOTS}" fill="url(#wob)"/>
@@ -172,6 +172,8 @@ def write(rel, text):
 
 if __name__ == "__main__":
     write("docs/logo/zboard-logo.svg", svg())
+    # Play Store: quadratisch ohne eigene Rundung (Google rundet selbst ab); PNG via tools/render_store_graphics.js
+    write("docs/store/icon-512.svg", svg(512, rounded=False))
     write("Resources/drawable/ic_launcher_foreground.xml", foreground())
     write("Resources/drawable/ic_launcher_background.xml", background())
     write("Resources/drawable/ic_launcher_monochrome.xml", monochrome())
