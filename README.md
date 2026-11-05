@@ -1,33 +1,40 @@
 # zBoard
 
-Quelloffene Android-Tastatur in C# (.NET 10 for Android), funktional an Gboard angelehnt.
-Liefert außerdem anonyme Tipp-Metadaten für **zHeal Meridian**.
+[![Build](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml/badge.svg)](https://github.com/World-of-Bytes/zBoard/actions/workflows/build.yml)
 
-Stand: **Meilenstein M3 – Gesten** (siehe Spezifikation & Roadmap im Claude-Projekt).
+zBoard ist eine freie Android-Tastatur, die sich in Bedienung und Funktionsumfang an Gboard orientiert:
+Wortvorschläge, Autokorrektur, Wischeingabe und Nächstes-Wort-Vorhersage für Deutsch und Englisch.
+Anders als Gboard arbeitet zBoard vollständig offline und ohne Internetberechtigung; was es aus deinen Eingaben
+lernt, bleibt auf dem Gerät. Geschrieben ist zBoard in C# mit .NET 10 for Android.
 
-## Was schon funktioniert
+Für das Projekt **zHeal Meridian** kann zBoard auf Wunsch Tipp-Metadaten erfassen (Zeitpunkte, Druckdauer,
+Pausen, Tastenart), aber nie, welche Zeichen getippt wurden.
 
-- Systemtastatur (InputMethodService) mit Einrichtungs-App
-- Layouts: QWERTZ (Deutsch, mit ü/ö/ä), QWERTY (Englisch), zwei Symbolebenen
-- Umschalt: einmal = ein Großbuchstabe, Doppeltipp = Feststelltaste
-- Langer Druck für Umlaute, Akzente und Ziffern (Zahlenhinweise oben rechts)
-- Löschen mit Wiederholung (ab 0,4 s Halten), Enter-Aktion je nach Feld (Suchen, Senden, Weiter …)
-- Cursor bewegen durch Wischen über die Leertaste
-- **Wischeingabe** (Glide Typing): Wörter über die Buchstaben wischen, mit Spur-Anzeige; Alternativen in der
-  Vorschlagsleiste, ⌫ direkt danach entfernt das ganze Wort
-- **Wort-Löschen per Wischen:** von ⌫ nach links wischen markiert Wort für Wort, Loslassen löscht
-- Tastenvorschau beim Drücken, Tastenton (optional)
-- Wörterbücher mit 120 000 deutschen und 100 000 englischen Wörtern
-- Nächstes-Wort-Vorhersage nach dem Leerzeichen (mitgelieferte Wortpaare plus eigene Wortfolgen)
-- Lernt eigene Wörter und Wortfolgen, nur auf dem Gerät, abschaltbar und löschbar
-- Vorschlagsleiste (3 Vorschläge, Satzkontext berücksichtigt), Autokorrektur mit Tastennachbarschaft,
-  vertauschten Buchstaben („dsa“ → „das“) und Umlaut-Toleranz,
-  automatische Großschreibung deutscher Substantive,
-  Rückgängig durch Löschen direkt nach der Korrektur
-- Automatische Großschreibung am Satzanfang, doppelte Leertaste = Punkt
-- Satzzeichen nach einem Vorschlag rückt ans Wort ("Hallo ." → "Hallo. ")
-- Helles/dunkles Design, Vibration, Ton
-- Statistik für zHeal Meridian: nur Zeiten und Tastenkategorien, standardmäßig aus, Export als JSON Lines
+Stand: **Meilenstein M3 von 5** – in Entwicklung, noch nicht veröffentlicht.
+
+## zBoard im Vergleich zu Gboard
+
+| | Gboard | zBoard |
+| --- | --- | --- |
+| Lizenz | proprietär, Quellcode nicht öffentlich | BSD 2-Clause (Code), Wortlisten CC BY-SA 4.0 / CC BY 3.0 |
+| Internetzugriff | ja (u. a. GIFs, Übersetzen, Synchronisation) | keine Internetberechtigung |
+| Lernen aus Eingaben | ja, Modelle werden per Federated Learning mit Google-Servern verbessert | ja, ausschließlich auf dem Gerät, abschaltbar und löschbar |
+| Sprachen | sehr viele Sprachen und Layouts | Deutsch (QWERTZ), Englisch (QWERTY) |
+| Tippen, Umschalt, Symbole, langer Druck für Sonderzeichen | ✓ | ✓ |
+| Wortvorschläge und Autokorrektur | ✓ | ✓ 120 000 deutsche, 100 000 englische Wörter; Tastennachbarn, Vertauschungen, Umlaute |
+| Großschreibung deutscher Substantive | ✓ | ✓ |
+| Nächstes-Wort-Vorhersage | ✓ | ✓ mitgelieferte Wortpaare plus eigene Wortfolgen |
+| Wischeingabe (Glide Typing) | ✓ | ✓ |
+| Cursor per Leertaste, Wort-Löschen per Wischen | ✓ | ✓ |
+| Tastenvorschau, Vibration, Ton | ✓ | ✓ |
+| Helles/dunkles Design | ✓ | ✓ |
+| Emoji-Tastatur | ✓ | geplant (M4) |
+| Zwischenablage-Verlauf | ✓ | geplant (M4) |
+| GIFs und Sticker | ✓ | GIFs optional geplant (M4) |
+| Spracheingabe | ✓ | geplant (M5, offline) |
+| Einhandmodus, Größe anpassen | ✓ | geplant (M5) |
+| Übersetzen, Google-Dienste | ✓ | nicht geplant |
+| Tipp-Statistik für Forschung (nur Metadaten) | – | ✓ standardmäßig aus |
 
 ## Bauen und installieren
 
