@@ -160,7 +160,14 @@ def main():
         adb("logcat", "-c", check=False)
         shell(f"am start -W -n {TEST_ACTIVITY}")
         kb = KEYBOARD
-        keys = kb.wait_for("de")
+        try:
+            keys = kb.wait_for("de", timeout=60)
+        except RuntimeError:
+            # Android hält manchmal noch die vorherige Tastatur gebunden: zBoard erneut setzen, Testfeld neu öffnen
+            print("Tastatur nicht erschienen, zweiter Versuch")
+            shell(f"ime set {IME}")
+            shell(f"am start -W -S -n {TEST_ACTIVITY}")
+            keys = kb.wait_for("de", timeout=120)
         time.sleep(4)  # Wörterbuch lädt im Hintergrund
         screenshot(out_dir, "1-tastatur")
         check("Tastatur erscheint", True, f"({len(keys)} Tasten)")
