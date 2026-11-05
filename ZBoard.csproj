@@ -20,7 +20,17 @@
     <Compile Remove="tests/**" />
     <None Remove="tests/**" />
     <None Remove="tools/**" />
+    <None Remove="signing/**" />
   </ItemGroup>
+
+  <!-- Debug/Testversionen immer mit demselben Testschlüssel signieren, damit Updates installierbar sind -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>$(MSBuildThisFileDirectory)signing/zboard-test.keystore</AndroidSigningKeyStore>
+    <AndroidSigningStorePass>zboard-test</AndroidSigningStorePass>
+    <AndroidSigningKeyAlias>zboard-test</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>zboard-test</AndroidSigningKeyPass>
+  </PropertyGroup>
 
   <!-- Release: schneller Start der Tastatur beim ersten Öffnen -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
