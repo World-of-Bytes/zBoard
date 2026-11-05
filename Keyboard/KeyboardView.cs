@@ -211,7 +211,7 @@ public sealed class KeyboardView : View
     void LayoutKeys()
     {
 #if DEBUG
-        _keysLogged = false;
+        _loggedOrigin = null;
 #endif
         _keys.Clear();
         _keyCenters.Clear();
@@ -395,19 +395,40 @@ public sealed class KeyboardView : View
     }
 
 #if DEBUG
-    bool _keysLogged;
+    (int X, int Y)? _loggedOrigin;
+    Java.Lang.Runnable? _positionWatch;
+
+    protected override void OnAttachedToWindow()
+    {
+        base.OnAttachedToWindow();
+        // Fenster kann sich verschieben, ohne neu zu zeichnen: Position regelmäßig prüfen
+        _positionWatch = new Java.Lang.Runnable(() =>
+        {
+            LogKeyPositions();
+            if (_positionWatch != null) _handler.PostDelayed(_positionWatch, 500);
+        });
+        _handler.PostDelayed(_positionWatch, 500);
+    }
+
+    protected override void OnDetachedFromWindow()
+    {
+        if (_positionWatch != null) _handler.RemoveCallbacks(_positionWatch);
+        _positionWatch = null;
+        base.OnDetachedFromWindow();
+    }
 
     /// <summary>
     /// Nur Debug: schreibt die Bildschirmposition jeder Taste ins Log (Tag "zBoardTest"),
-    /// damit der Emulator-Test gezielt tippen kann. Format: "KEYS a@540,1700 Space@540,2100 …".
+    /// damit der Emulator-Test gezielt tippen kann. Format: "KEYS de a@540,1700 Space@540,2100 …".
+    /// Neu geschrieben, sobald sich Layout oder Position ändern (z. B. während die Tastatur einblendet).
     /// </summary>
     void LogKeyPositions()
     {
-        if (_keysLogged || _keys.Count == 0) return;
-        _keysLogged = true;
-
+        if (_keys.Count == 0 || !IsLaidOut || Visibility != ViewStates.Visible) return;
         var origin = new int[2];
         GetLocationOnScreen(origin);
+        if (_loggedOrigin == (origin[0], origin[1])) return;
+        _loggedOrigin = (origin[0], origin[1]);
         var line = new System.Text.StringBuilder("KEYS ").Append(_layout?.Id).Append(' ');
         foreach (var pk in _keys)
         {

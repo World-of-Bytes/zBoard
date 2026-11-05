@@ -52,12 +52,18 @@ class Keyboard:
             self.layouts[match.group(1)] = keys  # spätere Zeilen überschreiben frühere
 
     def wait_for(self, layout, timeout=150):
+        """Wartet, bis das Layout gemeldet ist und seine Position 2 s lang unverändert bleibt."""
         end = time.time() + timeout
+        last, stable_since = None, None
         while time.time() < end:
             self.refresh()
-            if layout in self.layouts:
-                return self.layouts[layout]
-            time.sleep(1)
+            current = self.layouts.get(layout)
+            if current is not None:
+                if current != last:
+                    last, stable_since = current, time.time()
+                elif time.time() - stable_since >= 2:
+                    return current
+            time.sleep(0.5)
         print("--- Diagnose ---")
         print(shell("dumpsys input_method | grep -E 'mInputShown|mCurMethodId|mCurId|mShowRequested|mVisibleBound|isShown'", check=False))
         print(shell("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'", check=False))
@@ -82,12 +88,16 @@ def wait_for_ime(timeout=60):
     raise RuntimeError(f"{IME} taucht nicht in der Liste der Tastaturen auf")
 
 
+KEYBOARD = Keyboard()
+
+
 def tap(pos):
     shell(f"input tap {pos[0]} {pos[1]}")
     time.sleep(0.25)
 
 
 def type_text(keys, text):
+    keys = KEYBOARD.wait_for("de")
     for ch in text:
         if ch == " ":
             tap(keys["Space"])
@@ -97,6 +107,7 @@ def type_text(keys, text):
 
 def glide(keys, word, steps=4):
     """Wischgeste über die Buchstaben als eine Folge von Touch-Ereignissen."""
+    keys = KEYBOARD.wait_for("de")
     points = [keys[c] for c in word]
     commands = [f"input motionevent DOWN {points[0][0]} {points[0][1]}"]
     for (x1, y1), (x2, y2) in zip(points, points[1:]):
@@ -148,7 +159,7 @@ def main():
 
         adb("logcat", "-c", check=False)
         shell(f"am start -W -n {TEST_ACTIVITY}")
-        kb = Keyboard()
+        kb = KEYBOARD
         keys = kb.wait_for("de")
         time.sleep(4)  # Wörterbuch lädt im Hintergrund
         screenshot(out_dir, "1-tastatur")
@@ -172,19 +183,19 @@ def main():
         check("Wischeingabe (g-u-t)", text.endswith("gut "), f"→ „{text}“")
         screenshot(out_dir, "2-getippt")
 
-        tap(keys["Delete"])
+        tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
         text = field_text()
         check("Löschen", text.endswith("gut"), f"→ „{text}“")
 
-        tap(keys["ToSymbols"])
+        tap(kb.wait_for("de")["ToSymbols"])
         symbols = kb.wait_for("symbols1", timeout=15)
         screenshot(out_dir, "3-symbole")
         check("Symbolebene", "@" in symbols)
         tap(symbols["ToAlpha"])
         time.sleep(0.5)
 
-        tap(keys["Emoji"])
+        tap(kb.wait_for("de")["Emoji"])
         time.sleep(2)
         screenshot(out_dir, "4-emoji")
         shell("input keyevent KEYCODE_BACK", check=False)
