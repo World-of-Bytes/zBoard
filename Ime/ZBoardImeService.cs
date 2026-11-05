@@ -52,7 +52,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     ShiftState _shift;
     bool _shiftManual;
     long _lastShiftTapMs;
-    int _symbolsPage;           // 0 = Buchstaben, 1/2 = Symbolseiten
+    int _symbolsPage;           // 0 = Buchstaben, 1/2 = Symbolseiten, 3 = Ziffernfeld (Zahlen-, PIN-, Telefonfelder)
+    const int NumpadPage = 3;
     long _lastSpaceMs;
     bool _autoSpaceInserted;    // Leerzeichen kam von einem Vorschlag
     Correction? _lastCorrection;
@@ -125,7 +126,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _selEnd = info?.InitialSelEnd ?? 0;
         _shiftManual = false;
         _shift = ShiftState.Off;
-        _symbolsPage = _profile.IsNumeric ? 1 : 0;
+        // Wie Gboard: Zahlen-, PIN-, Telefon- und Datumsfelder bekommen ein Ziffernfeld statt Buchstaben
+        _symbolsPage = _profile.IsNumeric ? NumpadPage : 0;
 
         StartPanels();
         SetLanguage(_settings.CurrentLanguage);
@@ -778,9 +780,12 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         bool multipleLanguages = _settings.ShowLanguageKey && languages.Count > 1;
         _keyboardView.Languages = [.. languages.Select(l => (l, Layouts.LanguageNames.TryGetValue(l, out var n) ? n : l))];
         bool numberRow = _settings.NumberRow;
-        var layout = _symbolsPage == 0
-            ? Layouts.Alphabet(_language, multipleLanguages, numberRow, _settings.UmlautKeys)
-            : Layouts.Symbols(_symbolsPage, multipleLanguages);
+        var layout = _symbolsPage switch
+        {
+            0 => Layouts.Alphabet(_language, multipleLanguages, numberRow, _settings.UmlautKeys),
+            NumpadPage => Layouts.Numpad(_profile.IsPhone ? NumpadKind.Phone : _profile.IsDatetime ? NumpadKind.Datetime : NumpadKind.Number),
+            _ => Layouts.Symbols(_symbolsPage, multipleLanguages),
+        };
 
         _keyboardView.ShowDigitHints = !numberRow;
         _keyboardView.SetLayout(layout);

@@ -292,6 +292,18 @@ def main():
         check("Passwortfeld: Buchstaben und Ziffern", plain == "ab1", f"→ „{plain}“ (angezeigt „{text}“)")
         screenshot(out_dir, "5b-passwort")
 
+        # PIN-Feld: Ziffernfeld wie bei Gboard
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password number")
+        pad = KEYBOARD.wait_for("numpad", timeout=30)
+        for ch in "12":
+            tap(pad[ch])
+        time.sleep(1)
+        log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+        plain = re.findall(r"FIELD (.*)$", log, re.M)
+        plain = plain[-1].strip() if plain else ""
+        check("PIN-Feld: Ziffernfeld", "a" not in pad and plain == "12", f"→ „{plain}“")
+        screenshot(out_dir, "5c-pin")
+
         # Einstellungen öffnen (Startseite und eine Unterseite)
         shell("input keyevent KEYCODE_BACK", check=False)
         shell(f"am start -W --activity-clear-task -n {PACKAGE}/{PACKAGE}.SettingsActivity")

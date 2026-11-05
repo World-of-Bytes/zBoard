@@ -136,6 +136,17 @@ public class LayoutTests
     }
 
     [Fact]
+    public void Numpad_HasDigitsAndNoLetters()
+    {
+        var pad = Layouts.Numpad(NumpadKind.Number);
+        var labels = pad.Rows.SelectMany(r => r.Keys).Where(k => k.IsCharacter).Select(k => k.Label).ToList();
+        foreach (var digit in "0123456789") Assert.Contains(digit.ToString(), labels);
+        Assert.DoesNotContain(labels, l => l.Any(char.IsLetter));
+        Assert.Equal(4f, pad.Units);
+        Assert.Contains(pad.Rows.SelectMany(r => r.Keys), k => k.Action == KeyAction.Enter);
+    }
+
+    [Fact]
     public void French_IsAzerty() => Assert.Equal("a", Layouts.Alphabet("fr", false).Rows[0].Keys[0].Label);
 
     [Fact]

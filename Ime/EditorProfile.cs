@@ -44,6 +44,8 @@ public sealed class EditorProfile
 
     public bool IsPassword { get; private init; }
     public bool IsNumeric { get; private init; }
+    public bool IsPhone { get; private init; }
+    public bool IsDatetime { get; private init; }
     public bool IsEmailOrUrl { get; private init; }
     public bool NoSuggestions { get; private init; }
     public bool NoPersonalizedLearning { get; private init; }
@@ -83,6 +85,8 @@ public sealed class EditorProfile
         {
             IsPassword = password,
             IsNumeric = cls is TypeClassNumber or TypeClassPhone or TypeClassDatetime,
+            IsPhone = cls == TypeClassPhone,
+            IsDatetime = cls == TypeClassDatetime,
             IsEmailOrUrl = cls == TypeClassText && variation is TextVariationUri or TextVariationEmail or TextVariationWebEmail,
             NoSuggestions = (type & TextFlagNoSuggestions) != 0,
             NoPersonalizedLearning = (options & ImeFlagNoPersonalizedLearning) != 0,

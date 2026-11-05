@@ -50,6 +50,37 @@ public static class Layouts
         return new KeyboardLayout(language, true, all);
     }
 
+    public const string NumpadId = "numpad";
+
+    /// <summary>
+    /// Ziffernfeld wie bei Gboard für Zahlen-, PIN-, Telefon- und Datumsfelder: 1–9 im Raster,
+    /// rechts Minus, Leertaste, Löschen und Enter.
+    /// </summary>
+    public static KeyboardLayout Numpad(NumpadKind kind)
+    {
+        KeyDef left = kind switch
+        {
+            NumpadKind.Phone => Char("*", "#", "(", ")", "/", "N", ",", ";"),
+            NumpadKind.Datetime => Char(":", "/", ".", "-"),
+            _ => Char(",", "."),
+        };
+        KeyDef right = kind switch
+        {
+            NumpadKind.Phone => Char("#", "*"),
+            _ => Char(".", ","),
+        };
+        KeyDef zero = kind == NumpadKind.Phone ? Char("0", "+") : Char("0");
+        KeyDef top = kind == NumpadKind.Phone ? Char("+", "-") : Char("-", "+", "/", "*", "=");
+
+        return new KeyboardLayout(NumpadId, false,
+        [
+            new KeyRow([Char("1"), Char("2"), Char("3"), top]),
+            new KeyRow([Char("4"), Char("5"), Char("6"), Special(KeyAction.Space, 1f)]),
+            new KeyRow([Char("7"), Char("8"), Char("9"), Special(KeyAction.Delete, 1f)]),
+            new KeyRow([left, zero, right, Special(KeyAction.Enter, 1f)]),
+        ]);
+    }
+
     public static KeyboardLayout Symbols(int page, bool showLanguageKey) =>
         page == 2 ? SymbolsPage2(showLanguageKey) : SymbolsPage1(showLanguageKey);
 
@@ -237,4 +268,12 @@ public static class Layouts
         keys.Add(Special(KeyAction.Enter, 1.5f));
         return new KeyRow(keys);
     }
+}
+
+/// <summary>Art des Ziffernfelds.</summary>
+public enum NumpadKind
+{
+    Number,
+    Phone,
+    Datetime,
 }
