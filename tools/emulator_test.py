@@ -151,6 +151,21 @@ def tap_text(text):
     raise RuntimeError(f"„{text}“ nicht auf dem Bildschirm")
 
 
+def dismiss_system_dialogs():
+    """Der Emulator zeigt gelegentlich „… isn't responding“ für System-Apps: mit „Wait“ schließen."""
+    try:
+        for node in ui_nodes():
+            if node.get("text") in ("Wait", "Warten"):
+                x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+                shell(f"input tap {(x1 + x2) // 2} {(y1 + y2) // 2}")
+                print("Systemdialog geschlossen")
+                time.sleep(1)
+                return True
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
 def screenshot(out_dir, name):
     path = os.path.join(out_dir, f"{name}.png")
     with open(path, "wb") as f:
@@ -180,6 +195,7 @@ def main():
         check("zBoard als Tastatur aktiv", IME.split("/")[0] in shell("settings get secure default_input_method"))
 
         adb("logcat", "-c", check=False)
+        dismiss_system_dialogs()
         shell(f"am start -W -n {TEST_ACTIVITY}")
         kb = KEYBOARD
         try:
@@ -187,6 +203,7 @@ def main():
         except RuntimeError:
             # Android hält manchmal noch die vorherige Tastatur gebunden: zBoard erneut setzen, Testfeld neu öffnen
             print("Tastatur nicht erschienen, zweiter Versuch")
+            dismiss_system_dialogs()
             shell(f"ime set {IME}")
             shell(f"am start -W -S -n {TEST_ACTIVITY}")
             keys = kb.wait_for("de", timeout=120)
