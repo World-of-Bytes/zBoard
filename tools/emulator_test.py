@@ -282,7 +282,9 @@ def main():
             for name in sorted(os.listdir(out_dir)):
                 if name.endswith(".png"):
                     with open(os.path.join(out_dir, name), "rb") as f:
-                        print(f"SCREENSHOT {name} {base64.b64encode(f.read()).decode()}")
+                        data = base64.b64encode(f.read()).decode()
+                    for i in range(0, len(data), 3000):  # lange Zeilen kürzt das Log
+                        print(f"SCREENSHOT {name} {i // 3000} {data[i:i + 3000]}")
         with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as f:
             f.write(adb("logcat", "-d", check=False))
         write_summary(out_dir, results)

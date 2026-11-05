@@ -137,13 +137,13 @@ public sealed class SettingsActivity : Activity
         }
     }
 
-#pragma warning disable CS0618, CS0672 // bis Android 12 der klassische Weg
+#pragma warning disable CS0618, CS0672, CA1422 // bis Android 12 der klassische Weg
     public override void OnBackPressed()
     {
         if (_page != Main) ShowPage(Main);
         else base.OnBackPressed();
     }
-#pragma warning restore CS0618, CS0672
+#pragma warning restore CS0618, CS0672, CA1422
 
     sealed class BackCallback(SettingsActivity owner) : Java.Lang.Object, Android.Window.IOnBackInvokedCallback
     {
