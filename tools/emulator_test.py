@@ -61,6 +61,20 @@ class Keyboard:
         raise RuntimeError(f"Tastatur mit Layout '{layout}' erscheint nicht (keine Tastenpositionen im Log)")
 
 
+def wait_for_ime(timeout=60):
+    """Android registriert eine frisch installierte Tastatur mit Verzögerung."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if IME in shell("ime list -a -s", check=False):
+            return
+        time.sleep(2)
+    # Diagnose fürs Log
+    print("Installierte Tastaturen:\n" + shell("ime list -a -s", check=False))
+    print("Paket:\n" + shell(f"pm list packages {PACKAGE}", check=False))
+    print("Dienste im Paket:\n" + shell(f"dumpsys package {PACKAGE} | grep -i -A4 'Service'", check=False)[:3000])
+    raise RuntimeError(f"{IME} taucht nicht in der Liste der Tastaturen auf")
+
+
 def tap(pos):
     shell(f"input tap {pos[0]} {pos[1]}")
     time.sleep(0.25)
@@ -119,7 +133,8 @@ def main():
         print(f"{'OK  ' if condition else 'FEHL'} {name} {detail}")
 
     try:
-        adb("install", "-r", apk, timeout=300)
+        print(adb("install", "-r", apk, timeout=300).strip())
+        wait_for_ime()
         shell(f"ime enable {IME}")
         shell(f"ime set {IME}")
         check("zBoard als Tastatur aktiv", IME.split("/")[0] in shell("settings get secure default_input_method"))
