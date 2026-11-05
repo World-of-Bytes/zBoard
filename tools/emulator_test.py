@@ -164,6 +164,7 @@ def main():
         time.sleep(4)  # Wörterbuch lädt im Hintergrund
         screenshot(out_dir, "1-tastatur")
         check("Tastatur erscheint", True, f"({len(keys)} Tasten)")
+        check("Keine Sprachtaste (Wechsel per langem Druck auf die Leertaste)", "Language" not in keys)
 
         bounds = re.findall(r"BOUNDS de bottom=(\d+) limit=(\d+) nav=(\d+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
         if bounds:

@@ -753,6 +753,15 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         return new SuggestionEngine(dictionary, proximity, bigrams, history);
     }
 
+    public void OnLanguageSelected(string language)
+    {
+        if (language == _language) return;
+        CommitComposing(autocorrect: false, separator: string.Empty);
+        SetLanguage(language);
+        UpdateAutoShift();
+        UpdateSuggestions();
+    }
+
     void SwitchLanguage()
     {
         CommitComposing(autocorrect: false, separator: string.Empty);
@@ -765,7 +774,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     void ApplyLayout()
     {
         if (_keyboardView == null) return;
-        bool multipleLanguages = _settings.Languages.Count > 1;
+        var languages = _settings.Languages;
+        bool multipleLanguages = _settings.ShowLanguageKey && languages.Count > 1;
+        _keyboardView.Languages = [.. languages.Select(l => (l, Layouts.LanguageNames.TryGetValue(l, out var n) ? n : l))];
         bool numberRow = _settings.NumberRow;
         var layout = _symbolsPage == 0
             ? Layouts.Alphabet(_language, multipleLanguages, numberRow)

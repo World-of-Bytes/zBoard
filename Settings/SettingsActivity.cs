@@ -127,7 +127,8 @@ public sealed class SettingsActivity : Activity
     void BuildLanguageSection()
     {
         Header("Sprachen");
-        Text("Mit der 🌐-Taste wechselst du zwischen den aktivierten Sprachen.");
+        Text("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.");
+        AddSwitch("Eigene Taste 🌐 zum Sprachwechsel", _settings.ShowLanguageKey, v => _settings.ShowLanguageKey = v);
 
         foreach (var (code, name) in Layouts.LanguageNames)
         {

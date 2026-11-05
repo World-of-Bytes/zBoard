@@ -37,6 +37,9 @@ public interface IKeyboardActionListener
 
     /// <summary>Wischen von ⌫ beendet; <paramref name="commit"/> = markierte Wörter löschen.</summary>
     void OnDeleteSwipeEnd(bool commit);
+
+    /// <summary>Sprache aus der Auswahl (langer Druck auf die Leertaste) gewählt.</summary>
+    void OnLanguageSelected(string language);
 }
 
 /// <summary>
@@ -73,8 +76,10 @@ public sealed class KeyboardView : View
         public bool RepeatFired { get; set; }
     }
 
-    sealed class Popup(List<string> items, RectF bounds, float cellWidth)
+    sealed class Popup(List<string> items, RectF bounds, float cellWidth, List<string>? values = null)
     {
+        /// <summary>Bei der Sprachauswahl: Sprachcodes zu den angezeigten Namen.</summary>
+        public List<string>? Values { get; } = values;
         public List<string> Items { get; } = items;
         public RectF Bounds { get; } = bounds;
         public float CellWidth { get; } = cellWidth;
@@ -155,6 +160,9 @@ public sealed class KeyboardView : View
             Invalidate();
         }
     } = KeyboardTheme.Light;
+
+    /// <summary>Aktivierte Sprachen (Code, Name) für die Auswahl per langem Druck auf die Leertaste.</summary>
+    public IReadOnlyList<(string Code, string Name)> Languages { get; set; } = [];
 
     /// <summary>Wischeingabe über die Buchstaben.</summary>
     public bool GlideEnabled { get; set; } = true;
@@ -511,7 +519,7 @@ public sealed class KeyboardView : View
             // Löschen erst beim Loslassen oder nach kurzem Halten, damit Wischen nach links möglich ist
             _handler.PostDelayed(_repeatRunnable, RepeatStartMs);
         }
-        else if (pk.Key.Alternates.Count > 0)
+        else if (pk.Key.Alternates.Count > 0 || pk.Key.Action == KeyAction.Space && Languages.Count > 1)
         {
             _handler.PostDelayed(_longPressRunnable, LongPressMs);
         }
@@ -555,6 +563,7 @@ public sealed class KeyboardView : View
         if (!p.CursorMode && Math.Abs(x - p.StartX) > 16 * _dp)
         {
             p.CursorMode = true;
+            _handler.RemoveCallbacks(_longPressRunnable);
             p.CursorAnchorX = x;
             Invalidate();
         }
@@ -642,9 +651,17 @@ public sealed class KeyboardView : View
 
         if (_popup != null)
         {
-            output = _popup.Items[_popup.Selected];
+            var popup = _popup;
             _popup = null;
-            Listener?.OnText(output);
+            if (popup.Values is { } languages)
+            {
+                Listener?.OnLanguageSelected(languages[popup.Selected]);
+            }
+            else
+            {
+                output = popup.Items[popup.Selected];
+                Listener?.OnText(output);
+            }
         }
         else if (p.Gliding)
         {
@@ -698,7 +715,14 @@ public sealed class KeyboardView : View
     void OnLongPress()
     {
         var p = _press;
-        if (p == null || p.Gliding || p.Key.Key.Alternates.Count == 0) return;
+        if (p == null || p.Gliding) return;
+        if (p.Key.Key.Action == KeyAction.Space)
+        {
+            if (!p.CursorMode) ShowLanguagePopup(p);
+            return;
+        }
+
+        if (p.Key.Key.Alternates.Count == 0) return;
 
         var b = p.Key.Bounds;
         var items = p.Key.Key.Alternates.Select(Shifted).ToList();
@@ -710,6 +734,26 @@ public sealed class KeyboardView : View
 
         _popup = new Popup(items, new RectF(left, top, left + total, top + height), cell);
         _popup.Selected = PopupIndexAt(b.CenterX());
+        PerformKeyHaptic();
+        Invalidate();
+    }
+
+    /// <summary>Sprachauswahl über der Leertaste; Finger zur gewünschten Sprache schieben und loslassen.</summary>
+    void ShowLanguagePopup(Press p)
+    {
+        if (Languages.Count < 2) return;
+        var b = p.Key.Bounds;
+        var names = Languages.Select(l => l.Name).ToList();
+        _text.TextSize = 20 * _dp;
+        float cell = Math.Max(64 * _dp, names.Max(n => _text.MeasureText(n)) + 24 * _dp);
+        float total = cell * names.Count;
+        float left = Math.Max(4 * _dp, Math.Min(b.CenterX() - total / 2, Width - 4 * _dp - total));
+        float height = KeyHeight - 4 * _dp;
+        float top = Math.Max(0, b.Top - height - 4 * _dp);
+
+        _popup = new Popup(names, new RectF(left, top, left + total, top + height), cell,
+            [.. Languages.Select(l => l.Code)]);
+        _popup.Selected = Math.Max(0, Languages.ToList().FindIndex(l => l.Name == SpaceLabel));
         PerformKeyHaptic();
         Invalidate();
     }

@@ -109,6 +109,13 @@ public sealed class ZBoardSettings
         set => PutBool("keySound", value);
     }
 
+    /// <summary>Eigene Taste 🌐 zum Sprachwechsel (sonst: langer Druck auf die Leertaste).</summary>
+    public bool ShowLanguageKey
+    {
+        get => _prefs.GetBoolean("showLanguageKey", false);
+        set => PutBool("showLanguageKey", value);
+    }
+
     /// <summary>Ziffernreihe über den Buchstaben.</summary>
     public bool NumberRow
     {
