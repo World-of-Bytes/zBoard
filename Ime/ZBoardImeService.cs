@@ -136,10 +136,12 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _keyboardView?.EnterLabel = _profile.EnterLabel;
         _keyboardView?.GlideEnabled = _settings.GlideTyping && _profile.AllowSuggestions;
         _keyboardView?.ShowKeyPreview = _settings.KeyPreview;
+        StartEmailInput();
         if (_suggestionBar != null)
         {
             _suggestionBar.Visibility = ViewStates.Visible;
             ShowToolbar();
+            if (_profile.IsEmail) UpdateSuggestions(); // wie Gboard: gemerkte Adressen schon im leeren Feld
         }
 
         UpdateAutoShift();
@@ -148,6 +150,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     public override void OnFinishInputView(bool finishingInput)
     {
+        LearnEmailsFromField(); // solange das Feld noch erreichbar ist
         base.OnFinishInputView(finishingInput);
         _composing.Clear();
         _suggestionBar?.Clear();
@@ -157,6 +160,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         try
         {
             SaveLearning();
+            SaveEmails();
         }
         catch (IOException)
         {
@@ -394,6 +398,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         var ic = Ic;
         if (ic == null) return;
         CommitComposing(autocorrect: false, separator: string.Empty);
+        LearnEmailsFromField(); // vor "Weiter"/"Senden", danach ist das Feld oft schon gewechselt
 
         if (_profile.HasEnterAction && !_profile.MultiLine)
         {
@@ -480,6 +485,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     {
         var ic = Ic;
         if (ic == null) return;
+        if (slot.IsEmail)
+        {
+            PickEmail(slot);
+            return;
+        }
 
         if (slot.IsLiteral) Engine?.SuppressCorrection(slot.Word);
 
@@ -612,6 +622,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     void UpdateSuggestions()
     {
         if (_suggestionBar == null || _emojiSearchActive || _voiceActive) return;
+        if (!_glideActive && TryShowEmailSuggestions()) return;
         var engine = Engine;
         if (engine == null || !_profile.AllowSuggestions)
         {
