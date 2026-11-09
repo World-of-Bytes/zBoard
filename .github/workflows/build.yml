@@ -52,6 +52,18 @@ jobs:
           path: bin/Debug/net10.0-android/*-Signed.apk
           if-no-files-found: error
 
+      # Plugin-App "zBoard DeepL" (eigene App mit Internet, siehe docs/PLUGINS.md), wie zBoard mit dem
+      # Testschlüssel signiert, damit zBoard sie als "vom selben Entwickler" anzeigt.
+      - name: Plugin zBoard DeepL bauen (Debug-APK)
+        run: dotnet build plugin-apps/DeepL/ZBoard.DeepL.csproj -c Debug -f net10.0-android -p:EmbedAssembliesIntoApk=true
+
+      - name: Plugin-APK bereitstellen
+        uses: actions/upload-artifact@v5
+        with:
+          name: zboard-deepl-debug-apk
+          path: plugin-apps/DeepL/bin/Debug/net10.0-android/*-Signed.apk
+          if-no-files-found: error
+
   # Release-Build (AOT, getrimmt) mit Testhaken und Testschlüssel: so nah an der Store-Version wie möglich,
   # aber im Emulator prüfbar und über ältere Testversionen installierbar.
   release-test-build:

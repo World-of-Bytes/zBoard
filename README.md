@@ -82,6 +82,8 @@ dotnet test tests/ZBoard.Core.Tests
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
+| `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
+| `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
 | `tools/` | `build_dictionaries.py` (Wortlisten), `build_emoji.py` (Emoji-Daten) |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
@@ -162,6 +164,17 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
 - **Werkzeugleiste:** erscheint, wenn es nichts vorzuschlagen gibt: 📋 Zwischenablage, 🎤 Spracheingabe,
   ✋ Einhandmodus (rechts → links → aus), ⚙ Einstellungen. Eben kopierter Text erscheint dort 90 Sekunden lang
   als Vorschlag.
+- **Plugins:** Funktionen mit Internet als eigene Apps, z. B. **zBoard DeepL** zum Übersetzen
+  (`plugin-apps/DeepL`). zBoard selbst bleibt ohne Internet; einschalten unter Einstellungen → Plugins, benutzen über
+  das Puzzle-Symbol in der Leiste. Schnittstelle für eigene Plugins: [docs/PLUGINS.md](docs/PLUGINS.md).
+- **Wortfolgen:** Was du mehrfach in derselben Reihenfolge schreibst („freundlichen Grüßen“), schlägt die Leiste
+  rechts als Ganzes vor – schon beim Tippen des ersten Worts und nach dem Leerzeichen. Nur aus Gelerntem.
+- **Wort antippen:** Tippst du im Text auf ein Wort, zeigt die Leiste dafür erneut Vorschläge und Korrekturen;
+  Antippen ersetzt das ganze Wort.
+- **E-Mail-Adressen:** In E-Mail-Feldern schlägt die Leiste gemerkte Adressen vor – schon im leeren Feld und passend
+  zum Angefangenen, nach „@“ auch bekannte Anbieter (gmail.com, web.de, gmx.de …). Gemerkt wird, was beim Verlassen
+  des Felds oder bei Enter als gültige Adresse darin steht (nicht inkognito). Langer Druck auf eine Adresse in der
+  Leiste entfernt sie; alle löschen unter Einstellungen → Wörterbuch.
 - **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
   gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
   werden nie übernommen.

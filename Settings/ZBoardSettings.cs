@@ -91,6 +91,21 @@ public sealed class ZBoardSettings
         set => PutBool("learnWords", value);
     }
 
+    /// <summary>In E-Mail-Feldern eingegebene Adressen merken und wieder vorschlagen (nur auf dem Gerät).</summary>
+    public bool RememberEmails
+    {
+        get => _prefs.GetBoolean("rememberEmails", true);
+        set => PutBool("rememberEmails", value);
+    }
+
+    /// <summary>Vom Nutzer freigeschaltete Plugins (Paketnamen). Nur diese bekommen auf Wunsch Text zu sehen.</summary>
+    public IReadOnlySet<string> EnabledPlugins
+    {
+        get => (_prefs.GetString("enabledPlugins", string.Empty) ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.Ordinal);
+        set => PutString("enabledPlugins", string.Join(",", value.Order(StringComparer.Ordinal)));
+    }
+
     public bool GlideTyping
     {
         get => _prefs.GetBoolean("glideTyping", true);

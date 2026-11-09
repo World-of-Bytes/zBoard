@@ -63,6 +63,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _suggestionBar = new SuggestionBarView(this) { ToolbarItems = Toolbar };
         _suggestionBar.SuggestionPicked += OnSuggestionPicked;
         _suggestionBar.ToolbarPicked += OnToolbarPicked;
+        _suggestionBar.SuggestionLongPressed += OnSuggestionLongPressed;
         _suggestionBar.EmojiPicked += InsertEmoji;
 
         _keyboardView = new KeyboardView(this) { Listener = this };
@@ -192,8 +193,28 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
             case SuggestionBarView.SearchPillId:
                 ExitEmojiSearch(backToPanel: true);
                 break;
+            case SuggestionBarView.StatusId when PluginBusy:
+                CancelPlugin();
+                UpdateSuggestions();
+                break;
             case SuggestionBarView.StatusId:
                 StopVoice(cancel: false);
+                break;
+            case "plugins":
+                ShowPluginActions();
+                break;
+            case SuggestionBarView.ChoiceCloseId:
+                CloseChoices();
+                break;
+            case not null when id.StartsWith(SuggestionBarView.ChoicePrefix, StringComparison.Ordinal):
+                if (int.TryParse(id.AsSpan(SuggestionBarView.ChoicePrefix.Length), out int choice)) OnChoicePicked(choice);
+                break;
+            case SuggestionBarView.RemoveId:
+                RemovePendingEmail();
+                break;
+            case SuggestionBarView.RemoveCancelId:
+                _pendingEmailRemoval = null;
+                UpdateSuggestions();
                 break;
         }
     }

@@ -47,6 +47,9 @@ public sealed class EditorProfile
     public bool IsPhone { get; private init; }
     public bool IsDatetime { get; private init; }
     public bool IsEmailOrUrl { get; private init; }
+
+    /// <summary>E-Mail-Feld (InputType oder, bei Web-Formularen ohne type="email", Hinweis/Feldname mit "mail").</summary>
+    public bool IsEmail { get; private init; }
     public bool NoSuggestions { get; private init; }
     public bool NoPersonalizedLearning { get; private init; }
     public bool CapsRequested { get; private init; }
@@ -77,6 +80,16 @@ public sealed class EditorProfile
         int cls = type & TypeMaskClass;
         int variation = type & TypeMaskVariation;
 
+        bool email = cls == TypeClassText && variation is TextVariationEmail or TextVariationWebEmail;
+        // Manche Formulare markieren E-Mail-Felder nicht: einzeiliges, normales Textfeld mit "mail" im Hinweis oder Namen
+        // Suchfelder ("In E-Mails suchen") sind keine E-Mail-Felder – dort soll zBoard normal lernen.
+        if (!email && cls == TypeClassText && variation == 0 && (type & TextFlagMultiLine) == 0 && info != null
+            && (options & ImeMaskAction) != ActionSearch)
+        {
+            string? hint = info.HintText?.ToString();
+            email = (MentionsMail(hint) && !MentionsSearch(hint)) || MentionsMail(info.FieldName);
+        }
+
         bool password =
             (cls == TypeClassText && variation is TextVariationPassword or TextVariationVisiblePassword or TextVariationWebPassword)
             || (cls == TypeClassNumber && variation == NumberVariationPassword);
@@ -87,7 +100,8 @@ public sealed class EditorProfile
             IsNumeric = cls is TypeClassNumber or TypeClassPhone or TypeClassDatetime,
             IsPhone = cls == TypeClassPhone,
             IsDatetime = cls == TypeClassDatetime,
-            IsEmailOrUrl = cls == TypeClassText && variation is TextVariationUri or TextVariationEmail or TextVariationWebEmail,
+            IsEmailOrUrl = email || (cls == TypeClassText && variation == TextVariationUri),
+            IsEmail = email && !password,
             NoSuggestions = (type & TextFlagNoSuggestions) != 0,
             NoPersonalizedLearning = (options & ImeFlagNoPersonalizedLearning) != 0,
             CapsRequested = cls == TypeClassText
@@ -97,6 +111,16 @@ public sealed class EditorProfile
             NoEnterAction = (options & ImeFlagNoEnterAction) != 0,
         };
     }
+
+    static bool MentionsMail(string? text) =>
+        text != null && text.Length <= 60
+        && (text.Contains("mail", StringComparison.OrdinalIgnoreCase) || text.Contains("courriel", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("correo", StringComparison.OrdinalIgnoreCase));
+
+    static bool MentionsSearch(string? text) =>
+        text != null && (text.Contains("such", StringComparison.OrdinalIgnoreCase)
+                         || text.Contains("search", StringComparison.OrdinalIgnoreCase)
+                         || text.Contains("find", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Beschriftung der Enter-Taste je nach Feldaktion.</summary>
     public string EnterLabel => !HasEnterAction ? "⏎" : Action switch

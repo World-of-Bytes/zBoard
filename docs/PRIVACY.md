@@ -15,6 +15,10 @@ Die App hat keine Internet-Berechtigung und kann deshalb selbst nichts ins Inter
   geschützten App-Speicher auf deinem Gerät. In Passwort-, E-Mail-, Adress- und Zahlenfeldern sowie in Feldern, in
   denen die App das Lernen untersagt (Inkognito-Modus), lernt zBoard nichts. Du kannst das Lernen ausschalten und
   alles Gelernte in den Einstellungen unter „Wörterbuch“ löschen.
+- **E-Mail-Adressen**, die du in E-Mail-Feldern eingibst, damit zBoard sie dort wieder vorschlagen kann (höchstens 50,
+  im geschützten App-Speicher). Nicht in Inkognito-Fenstern und Feldern, in denen die App das Lernen untersagt.
+  Einzelne Adressen entfernst du per langem Druck in der Vorschlagsleiste, alle unter „Wörterbuch“; dort lässt sich
+  das Merken auch ausschalten.
 - **Zwischenablage-Verlauf**: Kopierte Texte werden eine Stunde lang nur im Arbeitsspeicher gehalten. Gespeichert
   werden nur Einträge, die du selbst anheftest. Als vertraulich markierte Inhalte (z. B. aus Passwort-Managern)
   übernimmt zBoard nie. Der Verlauf lässt sich in den Einstellungen ausschalten.
@@ -30,6 +34,13 @@ Standardmäßig fordert zBoard eine Erkennung **auf dem Gerät** an. Schaltest d
 Erkennungsdienst die Sprache zur Verarbeitung an seinen Anbieter senden. Dafür gilt dessen Datenschutzerklärung.
 
 Die Berechtigung für das Mikrofon fragt zBoard erst beim ersten Tippen auf das Mikrofon ab.
+
+## Plugins
+
+zBoard kann um Plugins erweitert werden – eigene Apps wie „zBoard DeepL“, die z. B. Internet zum Übersetzen nutzen.
+zBoard selbst bekommt dadurch keinen Internetzugriff. Ein Plugin erhält nur Text, wenn du es in den Einstellungen
+eingeschaltet hast und in der Leiste eine seiner Aktionen antippst (markierter Text oder Inhalt des Felds, nie aus
+Passwortfeldern). Was das Plugin damit macht, regelt dessen eigene Datenschutzerklärung.
 
 ## Berechtigungen
 
@@ -61,6 +72,9 @@ The app has no internet permission, so it cannot send anything to the internet i
   on your device. zBoard learns nothing in password, email, address and number fields, or in fields where the app
   disallows learning (incognito mode). You can turn learning off and delete everything learned under
   "Dictionary" in the settings.
+- **Email addresses** you enter in email fields, so zBoard can suggest them there again (at most 50, in the app's
+  private storage). Not in incognito windows or fields where the app disallows learning. Remove a single address by
+  long-pressing it in the suggestion bar, or all of them under "Dictionary", where you can also turn this off.
 - **Clipboard history**: copied text is kept in memory only, for one hour. Only items you pin are saved.
   zBoard never takes content marked as sensitive (e.g. from password managers). You can turn the history off.
 - **Recently used emoji** and your **settings**.
@@ -75,6 +89,13 @@ recognition. If you turn off "Offline recognition only", the recognition service
 provider for processing; that provider's privacy policy applies.
 
 zBoard asks for the microphone permission only when you first tap the microphone.
+
+## Plugins
+
+zBoard can be extended with plugins – separate apps such as “zBoard DeepL” that use e.g. the internet to translate.
+zBoard itself does not gain internet access. A plugin only receives text when you have turned it on in the settings
+and tap one of its actions in the bar (the selected text or the field's content, never from password fields). What
+the plugin does with it is governed by its own privacy policy.
 
 ## Permissions
 
