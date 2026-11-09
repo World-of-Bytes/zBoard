@@ -75,8 +75,8 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost = new FrameLayout(this);
         // Der runde Zahlen-Popup der oberen Reihe ragt wie bei Gboard über die Vorschlagsleiste:
         // Tastatur darf über ihren eigenen Rand hinaus zeichnen (bis zum oberen Rand von root).
-        _panelHost.ClipChildren = false;
-        root.ClipChildren = false;
+        _panelHost.SetClipChildren(false);
+        root.SetClipChildren(false);
         _panelHost.AddView(_keyboardView);
         _panelHost.AddView(_emojiPanel);
         _panelHost.AddView(_clipboardPanel);
