@@ -338,8 +338,11 @@ def main():
         for y in range(int(top - 200 * density), int(top + 30 * density), int(8 * density)):
             diff = sum(1 for x in range(x_from, x_to, 3)
                        if sum(abs(a - b) for a, b in zip(before[y][x * bpp:x * bpp + 3], during[y][x * bpp:x * bpp + 3])) > 60)
-            profile.append(f"{int((y - top) / density):+d}dp:{diff * 3 * 100 // (x_to - x_from)}%")
-        print("  Popup-Profil (relativ zur Tastatur-Oberkante):", " ".join(profile))
+            profile.append((int((y - top) / density), diff * 3 * 100 // (x_to - x_from)))
+        print("  Popup-Profil (relativ zur Tastatur-Oberkante):", " ".join(f"{d:+d}dp:{p}%" for d, p in profile))
+        # Zweite Zeile des Popups (9 Zeichen auf o) liegt über der Vorschlagsleiste (48 dp)
+        above_bar = max((p for d, p in profile if d < -50), default=0)
+        check("Popup ragt über die Vorschlagsleiste (obere Zeile sichtbar)", above_bar >= 5, f"({above_bar}% Popup-Pixel oberhalb)")
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
