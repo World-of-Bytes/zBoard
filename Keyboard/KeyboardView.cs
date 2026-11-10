@@ -306,7 +306,10 @@ public sealed class KeyboardView : View
     protected override void OnDraw(Canvas canvas)
     {
         base.OnDraw(canvas);
-        canvas.DrawColor(Theme.Background);
+        // Nur die eigene Fläche füllen: Seit der runde Zahlen-Popup über den Rand zeichnen darf (ClipChildren = false
+        // bei den Eltern), reicht der Zeichenbereich bis über die Vorschlagsleiste – DrawColor würde sie übermalen.
+        _fill.Color = Theme.Background;
+        canvas.DrawRect(0, 0, Width, Height, _fill);
 #if DEBUG || ZBOARD_TESTHOOKS
         LogKeyPositions();
 #endif
