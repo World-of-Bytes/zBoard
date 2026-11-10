@@ -5,7 +5,8 @@ namespace ZBoard.Keyboard;
 public readonly record struct PopupCell(int Column, int Row);
 
 /// <summary>
-/// Anordnung der Zusatzzeichen beim langen Druck wie bei Gboard: ein Raster mit höchstens fünf Spalten.
+/// Anordnung der Zusatzzeichen beim langen Druck wie bei Gboard: ein Raster mit höchstens fünf Spalten, die Zeichen
+/// gleichmäßig auf die Zeilen verteilt.
 /// Das erste Zeichen (das häufigste, z. B. „ö“ auf „o“) steht direkt über der Taste und ist vorausgewählt,
 /// die weiteren abwechselnd rechts und links daneben – nur so weit, wie auf der Seite Platz ist. Was nicht in
 /// die unterste Zeile passt, kommt in dieselben Spalten eine Zeile höher.
@@ -23,7 +24,10 @@ public static class PopupGrid
         if (count <= 0) return [];
         leftRoom = Math.Max(0, leftRoom);
         rightRoom = Math.Max(0, rightRoom);
-        int columns = Math.Min(Math.Min(count, maxColumns), leftRoom + rightRoom + 1);
+        // Wie Gboard gleichmäßig auf die Zeilen verteilen: 7 Zeichen → 4 + 3, 9 Zeichen → 5 + 4
+        int room = leftRoom + rightRoom + 1;
+        int rows = (count + maxColumns - 1) / maxColumns;
+        int columns = Math.Min((count + rows - 1) / rows, room);
 
         // Spaltenreihenfolge: 0, dann abwechselnd rechts und links, solange die Seite Platz hat
         var order = new List<int>(columns) { 0 };
