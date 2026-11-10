@@ -338,7 +338,7 @@ def main():
         time.sleep(0.5)
         edit = next(n for n in ui_nodes() if n.get("class") == "android.widget.EditText")
         x1, y1, x2, y2 = map(int, re.findall(r"\d+", edit.get("bounds")))
-        tap((x1 + 8, y1 + min(60, (y2 - y1) // 2)))
+        tap((x1 + 8, y1 + 400))  # unterhalb der Statusleiste (Testfeld reicht bis an den oberen Rand)
         time.sleep(0.8)
         tap(kb.wait_for("de")["x"])
         time.sleep(0.5)
@@ -349,7 +349,7 @@ def main():
             insets = re.findall(r"INSETS .*", log)
             print("  Insets laut zBoard:", insets[-3:] if insets else "keine")
             print("  Cursor laut App (letzte):", re.findall(r"SEL .*", log)[-4:])
-            print("  Antippen bei:", (x1 + 8, y1 + min(60, (y2 - y1) // 2)), "Feld:", (x1, y1, x2, y2))
+            print("  Antippen bei:", (x1 + 8, y1 + 400), "Feld:", (x1, y1, x2, y2))
             windows = shell("dumpsys window windows", check=False)
             for block in windows.split("Window #"):
                 if "ty=INPUT_METHOD" in block:
