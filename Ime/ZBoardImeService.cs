@@ -132,6 +132,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         StartPanels();
         RefreshSystemBarPadding();
+        UpdatePopupSpace(); // Platz für Popups über der Tastatur (falls Android das Fenster neu aufgebaut hat)
         SetLanguage(_settings.CurrentLanguage);
         ApplyTheme();
         _keyboardView?.EnterLabel = _profile.EnterLabel;

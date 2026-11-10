@@ -217,18 +217,33 @@ def read_png(path):
     return width, height, bpp, rows
 
 
+def ink(path, top, bottom):
+    """Anteil der Pixel zwischen top und bottom, die sich deutlich von der häufigsten Farbe abheben."""
+    width, _, bpp, rows = read_png(path)
+    top, bottom = max(0, int(top)), min(len(rows), int(bottom))
+    pixels = [tuple(rows[y][x * bpp:x * bpp + 3]) for y in range(top, bottom, 2) for x in range(0, width, 2)]
+    background = max(set(pixels), key=pixels.count)
+    return sum(1 for p in pixels if sum(abs(u - v) for u, v in zip(p, background)) > 120) / len(pixels)
+
+
+def keyboard_top(keys):
+    density = int(re.findall(r"(\d+)", shell("wm density"))[-1]) / 160
+    q, a = keys.get("q") or keys["Q"], keys.get("a") or keys["A"]
+    return q[1] - (a[1] - q[1]) / 2, density
+
+
+def app_ink(path, keys):
+    """Schrift in der App über der Tastatur (Testfeld mit getipptem Text). Das Tastaturfenster ist so hoch wie der
+    Bildschirm (Platz für Popups); wäre es dort nicht durchsichtig, wäre die App verdeckt → 0."""
+    top, density = keyboard_top(keys)
+    return ink(path, 0, top - 60 * density)
+
+
 def bar_ink(path, keys):
     """Anteil der Pixel im Streifen der Vorschlagsleiste (über der obersten Tastenreihe), die sich deutlich vom
     Hintergrund abheben. Leer gezeichnete oder übermalte Leiste → 0."""
-    density = int(re.findall(r"(\d+)", shell("wm density"))[-1]) / 160
-    q, a = keys.get("q") or keys["Q"], keys.get("a") or keys["A"]
-    keyboard_top = q[1] - (a[1] - q[1]) / 2
-    top, bottom = int(keyboard_top - 44 * density), int(keyboard_top - 10 * density)
-    width, _, bpp, rows = read_png(path)
-    pixels = [tuple(rows[y][x * bpp:x * bpp + 3]) for y in range(top, bottom, 2) for x in range(0, width, 2)]
-    background = max(set(pixels), key=pixels.count)
-    ink = sum(1 for p in pixels if sum(abs(u - v) for u, v in zip(p, background)) > 120)
-    return ink / len(pixels)
+    top, density = keyboard_top(keys)
+    return ink(path, top - 44 * density, top - 10 * density)
 
 
 def crashes():
@@ -295,7 +310,8 @@ def main():
         tap(keys["Space"])
         text = field_text()
         check("Wischeingabe (g-u-t)", text.endswith("gut "), f"→ „{text}“")
-        screenshot(out_dir, "2-getippt")
+        visible = app_ink(screenshot(out_dir, "2-getippt"), keys)
+        check("App über der Tastatur sichtbar (Fenster dort durchsichtig)", visible > 0.002, f"({visible:.2%} Schrift)")
 
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
