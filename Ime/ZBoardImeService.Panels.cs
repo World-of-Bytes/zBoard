@@ -112,6 +112,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost?.SetBackgroundColor(theme.Background);
         _emojiPanel?.Theme = theme;
         _clipboardPanel?.ApplyTheme(theme);
+        ApplyNavigationBarStyle();
     }
 
     void ShowKeyboardPanel()
