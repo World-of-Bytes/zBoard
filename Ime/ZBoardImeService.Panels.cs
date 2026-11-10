@@ -90,6 +90,10 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         frame.SetClipChildren(false);
         frame.AddView(root, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent,
             ViewGroup.LayoutParams.WrapContent, GravityFlags.Bottom));
+        // Darüber eine durchsichtige Ebene, auf der die Popups gezeichnet werden (fängt keine Berührungen ab)
+        var layer = new PopupLayerView(this, _keyboardView);
+        frame.AddView(layer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        _keyboardView.PopupLayer = layer;
         return frame;
     }
 

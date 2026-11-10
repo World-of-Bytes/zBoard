@@ -349,8 +349,15 @@ public sealed class KeyboardView : View
             DrawKeyLabel(canvas, pk);
         }
 
+        bool showsPopup = _popup != null;
+        if (PopupLayer != null && (showsPopup || _layerShowsPopup)) PopupLayer.Invalidate();
+        _layerShowsPopup = showsPopup;
+
         if (_press is { Gliding: true }) DrawTrail(canvas, _press.Trail);
-        else if (_popup != null) DrawPopup(canvas, radius);
+        else if (_popup != null)
+        {
+            if (PopupLayer == null) DrawPopup(canvas, radius);
+        }
         else if (ShowKeyPreview && _press is { CursorMode: false, DeleteSwipe: false } p && p.Key.Key.IsCharacter)
         {
             DrawPreview(canvas, p.Key, radius);
@@ -578,12 +585,44 @@ public sealed class KeyboardView : View
     }
 
     /// <summary>
+    /// Eigene durchsichtige Zeichenebene in voller Höhe über der Tastatur (wie AOSP DrawingPreviewPlacerView).
+    /// Ist sie gesetzt, zeichnet die Tastatur ihre Popups dort statt über den eigenen Rand hinaus – Android
+    /// aktualisiert Bereiche außerhalb eines Views nicht zuverlässig (der obere Teil des Popups fehlte).
+    /// </summary>
+    public View? PopupLayer { get; set; }
+
+    bool _layerShowsPopup;
+
+    /// <summary>Lage dieser Tastatur in der Zeichenebene.</summary>
+    PointF OffsetInPopupLayer()
+    {
+        var mine = new int[2];
+        var layer = new int[2];
+        GetLocationInWindow(mine);
+        PopupLayer!.GetLocationInWindow(layer);
+        return new PointF(mine[0] - layer[0], mine[1] - layer[1]);
+    }
+
+    /// <summary>Von der Zeichenebene aufgerufen: aktuellen Popup in deren Koordinaten zeichnen.</summary>
+    public void DrawPopupLayer(Canvas canvas)
+    {
+        if (_popup == null || PopupLayer == null) return;
+        var offset = OffsetInPopupLayer();
+        canvas.Save();
+        canvas.Translate(offset.X, offset.Y);
+        DrawPopup(canvas, 7 * _dp);
+        canvas.Restore();
+    }
+
+    /// <summary>
     /// Obergrenze (in eigenen Koordinaten), bis zu der Popups über den View hinaus zeichnen dürfen:
     /// Die Eltern schneiden ihre Kinder nicht ab (ClipChildren = false), also reicht der Platz bis zum
     /// oberen Rand des äußersten solchen Elternteils – bei zBoard über die Vorschlagsleiste.
     /// </summary>
     float OverflowTop()
     {
+        if (PopupLayer != null) return -OffsetInPopupLayer().Y;
+
         View v = this;
         float offset = 0;
         while (v.Parent is ViewGroup { ClipChildren: false } parent)
@@ -599,6 +638,7 @@ public sealed class KeyboardView : View
     void InvalidateWithOverflow()
     {
         Invalidate();
+        PopupLayer?.Invalidate();
         View v = this;
         while (v.Parent is ViewGroup { ClipChildren: false } parent) v = parent;
         if (v != this) v.Invalidate();

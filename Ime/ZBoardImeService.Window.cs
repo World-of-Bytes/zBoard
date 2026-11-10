@@ -97,6 +97,12 @@ public partial class ZBoardImeService
         }
     }
 
+    /// <summary>Durchsichtige Ebene in voller Höhe für die Popups der Tastatur; nimmt keine Berührungen an.</summary>
+    sealed class PopupLayerView(ZBoardImeService service, ZBoard.Keyboard.KeyboardView keyboard) : View(service)
+    {
+        protected override void OnDraw(Android.Graphics.Canvas canvas) => keyboard.DrawPopupLayer(canvas);
+    }
+
     /// <summary>Durchsichtiger Rahmen in voller Höhe, die Tastatur unten darin.</summary>
     sealed class PopupSpaceFrame(ZBoardImeService service) : FrameLayout(service)
     {
