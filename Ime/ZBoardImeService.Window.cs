@@ -4,14 +4,17 @@ using Android.Widget;
 namespace ZBoard.Ime;
 
 /// <summary>
-/// Platz für Popups über der Tastatur, wie bei Gboard und der Android-Open-Source-Tastatur (AOSP LatinIME):
-/// Das Tastaturfenster ist so hoch wie der Bildschirm, der Eingabebereich sitzt unten, und die Eltern-Views
-/// schneiden nicht ab. So darf der Zusatzzeichen-Popup mit zwei Zeilen über die App reichen, statt nach unten
-/// auf die Tasten zu rutschen. Android hält weiterhin nur den Eingabebereich für sichtbar und berührbar
-/// (Standard von OnComputeInsets): Die App darüber bleibt bedienbar und wird nicht verkleinert.
+/// Platz für Popups über der Tastatur, wie bei Gboard: Das Tastaturfenster ist so hoch wie der Bildschirm. Darin
+/// liegt ein durchsichtiger Rahmen (<see cref="PopupSpaceFrame"/>), der immer die volle Höhe beansprucht; die
+/// Tastatur sitzt an seiner Unterkante. So darf der Zusatzzeichen-Popup mit zwei Zeilen über die App reichen, statt
+/// nach unten auf die Tasten zu rutschen. In <see cref="OnComputeInsets"/> erfährt Android, dass nur die Tastatur
+/// selbst sichtbar und berührbar ist: Die App darüber bleibt bedienbar und wird nicht verkleinert.
 /// </summary>
 public partial class ZBoardImeService
 {
+    /// <summary>Volle Höhe nur ohne Vollbildmodus (Querformat mit eigenem Textfeld der Tastatur).</summary>
+    bool UsePopupSpace => !IsFullscreenMode;
+
     public override void SetInputView(View? view)
     {
         base.SetInputView(view);
@@ -24,44 +27,88 @@ public partial class ZBoardImeService
         UpdatePopupSpace();
     }
 
-    /// <summary>Fenster auf volle Höhe, Eingabebereich unten (wie AOSP updateSoftInputWindowLayoutParameters).</summary>
     void UpdatePopupSpace()
     {
         var window = Window?.Window;
         if (window == null) return;
 
         var attributes = window.Attributes;
-        if (attributes != null && attributes.Height != ViewGroup.LayoutParams.MatchParent)
+        int height = UsePopupSpace ? ViewGroup.LayoutParams.MatchParent : ViewGroup.LayoutParams.WrapContent;
+        if (attributes != null && attributes.Height != height)
         {
-            attributes.Height = ViewGroup.LayoutParams.MatchParent;
+            attributes.Height = height;
             window.Attributes = attributes;
         }
 
-        // Im Vollbildmodus (Querformat mit Textfeld der Tastatur) füllt der Eingabebereich das Fenster wie gewohnt
-        int height = IsFullscreenMode ? ViewGroup.LayoutParams.MatchParent : ViewGroup.LayoutParams.WrapContent;
-        if (window.FindViewById(Android.Resource.Id.InputArea) is { } inputArea)
-        {
-            switch (inputArea.LayoutParameters)
-            {
-                case LinearLayout.LayoutParams lp:
-                    lp.Height = height;
-                    lp.Gravity = GravityFlags.Bottom;
-                    inputArea.LayoutParameters = lp;
-                    break;
-                case FrameLayout.LayoutParams lp:
-                    lp.Height = height;
-                    lp.Gravity = GravityFlags.Bottom;
-                    inputArea.LayoutParameters = lp;
-                    break;
-                case { } lp:
-                    lp.Height = height;
-                    inputArea.LayoutParameters = lp;
-                    break;
-            }
-        }
-
+        _inputRoot?.Parent?.RequestLayout();
         AllowDrawingAboveKeyboard();
         ApplyNavigationBarStyle();
+    }
+
+    /// <summary>Sichtbar und berührbar ist nur die Tastatur, nicht der durchsichtige Platz darüber.</summary>
+    public override void OnComputeInsets(Insets? outInsets)
+    {
+        base.OnComputeInsets(outInsets);
+        if (outInsets == null || !UsePopupSpace || _inputRoot is not { IsShown: true } root || root.Height == 0) return;
+
+        var location = new int[2];
+        root.GetLocationInWindow(location);
+        int top = location[1];
+        outInsets.ContentTopInsets = top;
+        outInsets.VisibleTopInsets = top;
+
+        // Berührbar nur die Tastatur selbst (wie AOSP LatinIME: TOUCHABLE_INSETS_REGION). Den Wert 3 direkt ins
+        // Java-Feld schreiben: Je nach .NET-Version ist das Feld als int oder als Aufzählung gebunden.
+        var region = outInsets.TouchableRegion;
+        if (region != null)
+        {
+            region.Set(location[0], top, location[0] + root.Width, top + root.Height);
+            var cls = Android.Runtime.JNIEnv.GetObjectClass(outInsets.Handle);
+            var field = Android.Runtime.JNIEnv.GetFieldID(cls, "touchableInsets", "I");
+            Android.Runtime.JNIEnv.SetField(outInsets.Handle, field, 3);
+            Android.Runtime.JNIEnv.DeleteLocalRef(cls);
+        }
+
+#if DEBUG || ZBOARD_TESTHOOKS
+        if (top != _loggedInsetsTop)
+        {
+            _loggedInsetsTop = top;
+            Android.Util.Log.Info("zBoardTest", $"INSETS top={top} height={root.Height} region={region != null}");
+        }
+#endif
+    }
+
+#if DEBUG || ZBOARD_TESTHOOKS
+    int _loggedInsetsTop = -1;
+#endif
+
+    /// <summary>
+    /// Alle Eltern bis zum Fenster schneiden nicht ab: Die Tastatur darf darüber zeichnen
+    /// (KeyboardView.OverflowTop rechnet den Platz bis zum obersten solchen Elternteil).
+    /// </summary>
+    void AllowDrawingAboveKeyboard()
+    {
+        var parent = _inputRoot?.Parent;
+        while (parent is ViewGroup group)
+        {
+            group.SetClipChildren(false);
+            group.SetClipToPadding(false);
+            parent = group.Parent;
+        }
+    }
+
+    /// <summary>Durchsichtiger Rahmen in voller Höhe, die Tastatur unten darin.</summary>
+    sealed class PopupSpaceFrame(ZBoardImeService service) : FrameLayout(service)
+    {
+        protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+        {
+            if (service.UsePopupSpace && MeasureSpec.GetMode(heightMeasureSpec) != MeasureSpecMode.Unspecified)
+            {
+                heightMeasureSpec = MeasureSpec.MakeMeasureSpec(MeasureSpec.GetSize(heightMeasureSpec), MeasureSpecMode.Exactly);
+            }
+
+            base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
     }
 
     /// <summary>
@@ -94,20 +141,5 @@ public partial class ZBoardImeService
 #pragma warning disable CA1422, CS0618 // bis Android 14 wirksam, danach liegt die Tastatur selbst unter der Leiste
         window.SetNavigationBarColor(bg);
 #pragma warning restore CA1422, CS0618
-    }
-
-    /// <summary>
-    /// Alle Eltern bis zum Fenster schneiden nicht ab: Die Tastatur darf darüber zeichnen
-    /// (KeyboardView.OverflowTop rechnet den Platz bis zum obersten solchen Elternteil).
-    /// </summary>
-    void AllowDrawingAboveKeyboard()
-    {
-        var parent = _inputRoot?.Parent;
-        while (parent is ViewGroup group)
-        {
-            group.SetClipChildren(false);
-            group.SetClipToPadding(false);
-            parent = group.Parent;
-        }
     }
 }

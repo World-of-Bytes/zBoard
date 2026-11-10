@@ -291,6 +291,8 @@ def main():
             bottom, limit, nav = map(int, bounds[-1])
             check("Tastatur über der Navigationsleiste", bottom <= limit,
                   f"(Unterkante {bottom}, erlaubt bis {limit}, Leiste {nav} px)")
+            # Fenster in voller Höhe (Platz für Popups): die Tastatur muss trotzdem unten sitzen
+            check("Tastatur sitzt unten am Bildschirm", bottom >= limit - 150, f"(Unterkante {bottom}, unten {limit})")
         else:
             check("Tastatur über der Navigationsleiste", False, "(keine Lageangabe im Log)")
 
@@ -327,6 +329,35 @@ def main():
         time.sleep(0.5)
         text = field_text()
         check("Langer Druck auf o → ö (vorausgewählt)", text.endswith("gutö"), f"→ „{text}“")
+        tap(kb.wait_for("de")["Delete"])
+        time.sleep(0.5)
+
+        # Über der Tastatur ist das Fenster durchsichtig und darf Berührungen nicht schlucken: Antippen des
+        # Feldanfangs in der App setzt den Cursor dorthin, der nächste Buchstabe landet vorne.
+        tap(kb.wait_for("de")["Space"])  # Wort abschließen, damit nichts mehr „in Arbeit“ ist
+        time.sleep(0.5)
+        edit = next(n for n in ui_nodes() if n.get("class") == "android.widget.EditText")
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", edit.get("bounds")))
+        tap((x1 + 8, y1 + 400))  # unterhalb der Statusleiste (Testfeld reicht bis an den oberen Rand)
+        time.sleep(0.8)
+        tap(kb.wait_for("de")["x"])
+        time.sleep(0.5)
+        text = field_text()
+        check("App über der Tastatur antippbar (Cursor an den Anfang)", text[:1].lower() == "x", f"→ „{text}“")
+        if text[:1].lower() != "x":
+            log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+            insets = re.findall(r"INSETS .*", log)
+            print("  Insets laut zBoard:", insets[-3:] if insets else "keine")
+            print("  Cursor laut App (letzte):", re.findall(r"SEL .*", log)[-4:])
+            print("  Antippen bei:", (x1 + 8, y1 + 400), "Feld:", (x1, y1, x2, y2))
+            windows = shell("dumpsys window windows", check=False)
+            for block in windows.split("Window #"):
+                if "ty=INPUT_METHOD" in block:
+                    print("  IME-Fenster:", " | ".join(l.strip() for l in block.splitlines()
+                          if re.search(r"(?i)touchable|givencontent|givenvisible|mFrame|mAttrs|fl=|pfl=", l))[:2500])
+            touch = shell("dumpsys input", check=False)
+            print("  Input:", " | ".join(l.strip() for l in touch.splitlines()
+                  if re.search(r"(?i)InputMethod|zboard|testfeld|TypingTest", l))[:2500])
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
