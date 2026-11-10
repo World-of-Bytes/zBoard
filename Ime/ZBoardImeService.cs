@@ -176,6 +176,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     public override void OnUpdateSelection(
         int oldSelStart, int oldSelEnd, int newSelStart, int newSelEnd, int candidatesStart, int candidatesEnd)
     {
+#if DEBUG || ZBOARD_TESTHOOKS
+        Android.Util.Log.Info("zBoardTest", $"SEL {newSelStart} {newSelEnd} composing {candidatesStart} {candidatesEnd}");
+#endif
         base.OnUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd);
         _selStart = newSelStart;
         _selEnd = newSelEnd;

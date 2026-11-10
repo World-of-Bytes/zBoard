@@ -345,13 +345,19 @@ def main():
         text = field_text()
         check("App über der Tastatur antippbar (Cursor an den Anfang)", text[:1].lower() == "x", f"→ „{text}“")
         if text[:1].lower() != "x":
-            insets = re.findall(r"INSETS .*", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
+            log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+            insets = re.findall(r"INSETS .*", log)
             print("  Insets laut zBoard:", insets[-3:] if insets else "keine")
+            print("  Cursor laut App (letzte):", re.findall(r"SEL .*", log)[-4:])
+            print("  Antippen bei:", (x1 + 8, y1 + min(60, (y2 - y1) // 2)), "Feld:", (x1, y1, x2, y2))
             windows = shell("dumpsys window windows", check=False)
             for block in windows.split("Window #"):
-                if "InputMethod" in block and "zboard" in block.lower():
+                if "ty=INPUT_METHOD" in block:
                     print("  IME-Fenster:", " | ".join(l.strip() for l in block.splitlines()
-                          if re.search(r"(?i)touchable|givencontent|givenvisible|mFrame|mAttrs", l))[:1500])
+                          if re.search(r"(?i)touchable|givencontent|givenvisible|mFrame|mAttrs|fl=|pfl=", l))[:2500])
+            touch = shell("dumpsys input", check=False)
+            print("  Input:", " | ".join(l.strip() for l in touch.splitlines()
+                  if re.search(r"(?i)InputMethod|zboard|testfeld|TypingTest", l))[:2500])
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
