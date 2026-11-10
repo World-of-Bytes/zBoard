@@ -291,6 +291,8 @@ def main():
             bottom, limit, nav = map(int, bounds[-1])
             check("Tastatur über der Navigationsleiste", bottom <= limit,
                   f"(Unterkante {bottom}, erlaubt bis {limit}, Leiste {nav} px)")
+            # Fenster in voller Höhe (Platz für Popups): die Tastatur muss trotzdem unten sitzen
+            check("Tastatur sitzt unten am Bildschirm", bottom >= limit - 150, f"(Unterkante {bottom}, unten {limit})")
         else:
             check("Tastatur über der Navigationsleiste", False, "(keine Lageangabe im Log)")
 
