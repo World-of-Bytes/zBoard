@@ -117,19 +117,4 @@ public partial class ZBoardImeService
         window.SetNavigationBarColor(bg);
 #pragma warning restore CA1422, CS0618
     }
-
-    /// <summary>
-    /// Alle Eltern bis zum Fenster schneiden nicht ab: Die Tastatur darf darüber zeichnen
-    /// (KeyboardView.OverflowTop rechnet den Platz bis zum obersten solchen Elternteil).
-    /// </summary>
-    void AllowDrawingAboveKeyboard()
-    {
-        var parent = _inputRoot?.Parent;
-        while (parent is ViewGroup group)
-        {
-            group.SetClipChildren(false);
-            group.SetClipToPadding(false);
-            parent = group.Parent;
-        }
-    }
 }
