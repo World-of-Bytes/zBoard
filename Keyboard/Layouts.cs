@@ -98,7 +98,7 @@ public static class Layouts
     {
         List<KeyDef> top =
         [
-            Char("q", "1"), Char("w", "2"), Char("e", "3", "é", "è", "ê", "ë", "ė"), Char("r", "4"), Char("t", "5"),
+            Char("q", "1"), Char("w", "2"), Char("e", "3", "é", "è", "ê", "ë", "ė", "ē"), Char("r", "4"), Char("t", "5"),
             Char("z", "6"), Char("u", "ü", "7", "û", "ù", "ú", "ū"), Char("i", "8"),
             Char("o", "ö", "9", "ô", "ò", "ó", "õ", "œ", "ø", "ō"), Char("p", "0"),
         ];
