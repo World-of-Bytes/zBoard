@@ -56,6 +56,21 @@ public class PopupGridTests
         Assert.Equal(0, PopupGrid.IndexAt(cells, 3f, 0f));          // rechts daneben → nächstes Zeichen
     }
 
+    [Theory]
+    [InlineData("de", 1, "a", "ä â à á æ ã å ā")]
+    [InlineData("de", 0, "i", "8")]
+    [InlineData("de", 0, "e", "3 é è ê ë ė")]
+    [InlineData("en", 0, "o", "9 ó ô ö ò œ ø ō õ")]
+    [InlineData("fr", 0, "e", "é è ê ë 3 ę ė ē")]
+    [InlineData("fr", 0, "a", "à â 1 æ á ä ã å ā ª")]
+    [InlineData("es", 2, "n", "ñ ń")]
+    [InlineData("it", 0, "o", "9 ò ó ô ö õ œ ø ō º")]
+    public void Alternates_InGboardOrder(string language, int row, string key, string expected)
+    {
+        var k = Layouts.Alphabet(language, false).Rows[row].Keys.Single(k => k.Label == key);
+        Assert.Equal(expected, string.Join(" ", k.Alternates));
+    }
+
     [Fact]
     public void German_O_PrefersUmlaut_InGboardOrder()
     {
