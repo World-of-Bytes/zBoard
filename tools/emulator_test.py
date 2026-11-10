@@ -324,11 +324,22 @@ def main():
         o = kb.wait_for("de")["o"]
         holding = subprocess.Popen(["adb", "shell", f"input swipe {o[0]} {o[1]} {o[0]} {o[1]} 2500"])
         time.sleep(1.4)
-        screenshot(out_dir, "2b-popup-o")  # Popup sichtbar, solange der Finger liegt
+        popup_shot = screenshot(out_dir, "2b-popup-o")  # Popup sichtbar, solange der Finger liegt
         holding.wait(timeout=30)
         time.sleep(0.5)
         text = field_text()
         check("Langer Druck auf o → ö (vorausgewählt)", text.endswith("gutö"), f"→ „{text}“")
+        # Wo liegt der Popup? Pro Streifen (8 dp) Anteil der Pixel, die sich vom Bild ohne Popup unterscheiden
+        top, density = keyboard_top(keys)
+        width, _, bpp, before = read_png(os.path.join(out_dir, "2-getippt.png"))
+        _, _, _, during = read_png(popup_shot)
+        x_from, x_to = max(0, int(o[0] - 5 * 40 * density)), min(width, int(o[0] + 40 * density))
+        profile = []
+        for y in range(int(top - 200 * density), int(top + 30 * density), int(8 * density)):
+            diff = sum(1 for x in range(x_from, x_to, 3)
+                       if sum(abs(a - b) for a, b in zip(before[y][x * bpp:x * bpp + 3], during[y][x * bpp:x * bpp + 3])) > 60)
+            profile.append(f"{int((y - top) / density):+d}dp:{diff * 3 * 100 // (x_to - x_from)}%")
+        print("  Popup-Profil (relativ zur Tastatur-Oberkante):", " ".join(profile))
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
