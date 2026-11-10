@@ -332,6 +332,19 @@ def main():
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
+        # Über der Tastatur ist das Fenster durchsichtig und darf Berührungen nicht schlucken: Antippen des
+        # Feldanfangs in der App setzt den Cursor dorthin, der nächste Buchstabe landet vorne.
+        edit = next(n for n in ui_nodes() if n.get("class") == "android.widget.EditText")
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", edit.get("bounds")))
+        tap((x1 + 8, y1 + min(60, (y2 - y1) // 2)))
+        time.sleep(0.8)
+        tap(kb.wait_for("de")["x"])
+        time.sleep(0.5)
+        text = field_text()
+        check("App über der Tastatur antippbar (Cursor an den Anfang)", text[:1].lower() == "x", f"→ „{text}“")
+        tap(kb.wait_for("de")["Delete"])
+        time.sleep(0.5)
+
         tap(kb.wait_for("de")["ToSymbols"])
         symbols = kb.wait_for("symbols1", timeout=15)
         screenshot(out_dir, "3-symbole")
