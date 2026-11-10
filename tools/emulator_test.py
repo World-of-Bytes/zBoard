@@ -334,6 +334,8 @@ def main():
 
         # Über der Tastatur ist das Fenster durchsichtig und darf Berührungen nicht schlucken: Antippen des
         # Feldanfangs in der App setzt den Cursor dorthin, der nächste Buchstabe landet vorne.
+        tap(kb.wait_for("de")["Space"])  # Wort abschließen, damit nichts mehr „in Arbeit“ ist
+        time.sleep(0.5)
         edit = next(n for n in ui_nodes() if n.get("class") == "android.widget.EditText")
         x1, y1, x2, y2 = map(int, re.findall(r"\d+", edit.get("bounds")))
         tap((x1 + 8, y1 + min(60, (y2 - y1) // 2)))
