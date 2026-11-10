@@ -53,9 +53,34 @@ public partial class ZBoardImeService
 
         var location = new int[2];
         root.GetLocationInWindow(location);
-        outInsets.ContentTopInsets = location[1];
-        outInsets.VisibleTopInsets = location[1]; // berührbar: alles ab hier (TOUCHABLE_INSETS_VISIBLE)
+        int top = location[1];
+        outInsets.ContentTopInsets = top;
+        outInsets.VisibleTopInsets = top;
+
+        // Berührbar nur die Tastatur selbst (wie AOSP LatinIME: TOUCHABLE_INSETS_REGION). Den Wert 3 direkt ins
+        // Java-Feld schreiben: Je nach .NET-Version ist das Feld als int oder als Aufzählung gebunden.
+        var region = outInsets.TouchableRegion;
+        if (region != null)
+        {
+            region.Set(location[0], top, location[0] + root.Width, top + root.Height);
+            var cls = Android.Runtime.JNIEnv.GetObjectClass(outInsets.Handle);
+            var field = Android.Runtime.JNIEnv.GetFieldID(cls, "touchableInsets", "I");
+            Android.Runtime.JNIEnv.SetField(outInsets.Handle, field, 3);
+            Android.Runtime.JNIEnv.DeleteLocalRef(cls);
+        }
+
+#if DEBUG || ZBOARD_TESTHOOKS
+        if (top != _loggedInsetsTop)
+        {
+            _loggedInsetsTop = top;
+            Android.Util.Log.Info("zBoardTest", $"INSETS top={top} height={root.Height} region={region != null}");
+        }
+#endif
     }
+
+#if DEBUG || ZBOARD_TESTHOOKS
+    int _loggedInsetsTop = -1;
+#endif
 
     /// <summary>
     /// Alle Eltern bis zum Fenster schneiden nicht ab: Die Tastatur darf darüber zeichnen

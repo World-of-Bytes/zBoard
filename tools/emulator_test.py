@@ -342,6 +342,14 @@ def main():
         time.sleep(0.5)
         text = field_text()
         check("App über der Tastatur antippbar (Cursor an den Anfang)", text[:1].lower() == "x", f"→ „{text}“")
+        if text[:1].lower() != "x":
+            insets = re.findall(r"INSETS .*", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
+            print("  Insets laut zBoard:", insets[-3:] if insets else "keine")
+            windows = shell("dumpsys window windows", check=False)
+            for block in windows.split("Window #"):
+                if "InputMethod" in block and "zboard" in block.lower():
+                    print("  IME-Fenster:", " | ".join(l.strip() for l in block.splitlines()
+                          if re.search(r"(?i)touchable|givencontent|givenvisible|mFrame|mAttrs", l))[:1500])
         tap(kb.wait_for("de")["Delete"])
         time.sleep(0.5)
 
