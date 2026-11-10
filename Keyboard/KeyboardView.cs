@@ -218,9 +218,14 @@ public sealed class KeyboardView : View
     /// </summary>
     float _rowHeight;
     bool _relayoutPosted;
-    float VerticalPadding => 4 * _dp;
+    // Abstände wie Gboard (aus Screenshots gemessen): Tasten ~46 dp hoch bei 58 dp Reihenabstand, 2 dp Rand
+    // links und rechts, oben kein Abstand zur Leiste, unten 8 dp.
+    float TopPadding => 0;
+    float BottomPadding => 8 * _dp;
+    float VerticalPadding => (TopPadding + BottomPadding) / 2;
+    float HorizontalPadding => 2 * _dp;
     float GapX => 3 * _dp;
-    float GapY => 4.5f * _dp;
+    float GapY => 6.25f * _dp;
 
     public void SetLayout(KeyboardLayout layout)
     {
@@ -277,10 +282,10 @@ public sealed class KeyboardView : View
         _keyCenters.Clear();
         if (_layout == null || Width == 0) return;
 
-        _unit = Width / _layout.Units;
-        _rowHeight = Math.Min(KeyHeight, (Height - 2 * VerticalPadding) / _layout.Rows.Count);
+        _unit = (Width - 2 * HorizontalPadding) / _layout.Units;
+        _rowHeight = Math.Min(KeyHeight, (Height - TopPadding - BottomPadding) / _layout.Rows.Count);
         if (_rowHeight <= 0) _rowHeight = KeyHeight;
-        float y = VerticalPadding;
+        float y = TopPadding;
         var lastRow = _layout.Rows[^1];
         foreach (var row in _layout.Rows)
         {
@@ -290,7 +295,7 @@ public sealed class KeyboardView : View
                 ? Math.Max(1f, (_layout.Units - fixedUnits - 2 * row.Indent) / fillCount)
                 : 0f;
 
-            float x = row.Indent * _unit;
+            float x = HorizontalPadding + row.Indent * _unit;
             foreach (var key in row.Keys)
             {
                 float w = (key.Width > 0 ? key.Width : fillUnits) * _unit;
