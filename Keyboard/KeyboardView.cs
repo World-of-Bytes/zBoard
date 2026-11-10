@@ -86,7 +86,17 @@ public sealed class KeyboardView : View
         /// Kreis über der Taste statt einer Leiste; die Taste selbst wird währenddessen ausgegraut.
         /// </summary>
         public bool Round { get; init; }
+
+        /// <summary>Gedrückte Taste: Unter Gboard-Popups verschwindet ihre Fläche, die Beschriftung bleibt blass.</summary>
         public PlacedKey? Source { get; init; }
+
+        /// <summary>Raster wie bei Gboard (Zusatzzeichen); null bei der Sprachauswahl (eine Zeile).</summary>
+        public IReadOnlyList<PopupCell>? Grid { get; init; }
+
+        /// <summary>Mitte der Spalte 0 (über der Taste) und Unterkante der untersten Zeile.</summary>
+        public float AnchorX { get; init; }
+        public float GridBottom { get; init; }
+        public float CellHeight { get; init; }
 
         /// <summary>Bei der Sprachauswahl: Sprachcodes zu den angezeigten Namen.</summary>
         public List<string>? Values { get; } = values;
@@ -317,9 +327,9 @@ public sealed class KeyboardView : View
         float radius = 7 * _dp;
         foreach (var pk in _keys)
         {
-            if (_popup is { Round: true } round && round.Source == pk)
+            if (_popup != null && _popup.Source == pk)
             {
-                // Wie Gboard: Unter dem runden Popup verschwindet die Tastenfläche, die Beschriftung bleibt blass stehen.
+                // Wie Gboard: Unter dem Popup verschwindet die Tastenfläche, die Beschriftung bleibt blass stehen.
                 DrawKeyLabel(canvas, pk, faded: true);
                 continue;
             }
@@ -474,6 +484,12 @@ public sealed class KeyboardView : View
             return;
         }
 
+        if (popup.Grid != null)
+        {
+            DrawGridPopup(canvas, popup);
+            return;
+        }
+
         _fill.Color = Theme.Popup;
         canvas.DrawRoundRect(popup.Bounds, radius, radius, _fill);
 
@@ -498,6 +514,39 @@ public sealed class KeyboardView : View
             canvas.DrawText(popup.Items[i], cell.CenterX(), baseline, _text);
         }
     }
+
+    /// <summary>
+    /// Zusatzzeichen wie bei Gboard: helle Karte mit stark gerundeten Ecken und leichtem Schatten, die Zeichen im
+    /// Raster, das ausgewählte als Kreis in der Akzentfarbe.
+    /// </summary>
+    void DrawGridPopup(Canvas canvas, Popup popup)
+    {
+        var b = popup.Bounds;
+        float corner = Math.Min(popup.CellHeight / 2 + PopupPad, b.Height() / 2);
+        _shadow.Color = Theme.Popup;
+        _shadow.SetShadowLayer(4 * _dp, 0, 1.5f * _dp, Color.Argb(70, 0, 0, 0));
+        canvas.DrawRoundRect(b, corner, corner, _shadow);
+
+        float circle = Math.Min(popup.CellWidth, popup.CellHeight) / 2 - 1 * _dp;
+        _text.TextSize = popup.CellHeight * 0.46f;
+        for (int i = 0; i < popup.Items.Count; i++)
+        {
+            var cell = popup.Grid![i];
+            float cx = popup.AnchorX + cell.Column * popup.CellWidth;
+            float cy = popup.GridBottom - (cell.Row + 0.5f) * popup.CellHeight;
+            bool selected = i == popup.Selected;
+            if (selected)
+            {
+                _fill.Color = Theme.Accent;
+                canvas.DrawCircle(cx, cy, circle, _fill);
+            }
+
+            _text.Color = selected ? Theme.AccentText : Theme.Text;
+            canvas.DrawText(popup.Items[i], cx, cy - (_text.Descent() + _text.Ascent()) / 2, _text);
+        }
+    }
+
+    float PopupPad => 6 * _dp;
 
     /// <summary>
     /// Gboard-Kreis für ein einzelnes Zusatzzeichen: heller Kreis mit leichtem Schatten,
@@ -681,11 +730,11 @@ public sealed class KeyboardView : View
 
         if (_popup != null)
         {
-            int sel = PopupIndexAt(x);
+            int sel = PopupIndexAt(x, y);
             if (sel != _popup.Selected)
             {
                 _popup.Selected = sel;
-                Invalidate();
+                InvalidateWithOverflow();
             }
 
             return;
@@ -872,7 +921,6 @@ public sealed class KeyboardView : View
 
         if (p.Key.Key.Alternates.Count == 0) return;
 
-        var b = p.Key.Bounds;
         var items = p.Key.Key.Alternates.Select(Shifted).ToList();
 
         if (items.Count == 1)
@@ -881,16 +929,53 @@ public sealed class KeyboardView : View
             return;
         }
 
-        float cell = Math.Max(b.Width(), 36 * _dp);
-        float total = cell * items.Count;
-        float left = Math.Max(4 * _dp, Math.Min(b.CenterX() - cell / 2, Width - 4 * _dp - total));
-        float height = (_rowHeight > 0 ? _rowHeight : KeyHeight) - 4 * _dp;
-        float top = Math.Max(0, b.Top - height - 4 * _dp);
+        ShowGridPopup(p, items);
+    }
 
-        _popup = new Popup(items, new RectF(left, top, left + total, top + height), cell);
-        _popup.Selected = PopupIndexAt(b.CenterX());
+    /// <summary>
+    /// Mehrere Zusatzzeichen wie bei Gboard: Raster mit bis zu fünf Spalten (<see cref="PopupGrid"/>), das erste
+    /// und häufigste Zeichen direkt über der Taste und vorausgewählt, weitere Zeilen darüber.
+    /// </summary>
+    void ShowGridPopup(Press p, List<string> items)
+    {
+        var b = p.Key.Bounds;
+        float margin = 2 * _dp, pad = PopupPad;
+        float cellW = Math.Max(b.Width() + 2 * GapX, 36 * _dp);
+        float cellH = Math.Max(cellW, 42 * _dp);
+        int leftRoom = (int)MathF.Floor((b.CenterX() - cellW / 2 - pad - margin) / cellW);
+        int rightRoom = (int)MathF.Floor((Width - margin - pad - b.CenterX() - cellW / 2) / cellW);
+        var grid = PopupGrid.Place(items.Count, leftRoom, rightRoom);
+        int minCol = grid.Min(c => c.Column), maxCol = grid.Max(c => c.Column), rows = grid.Max(c => c.Row) + 1;
+
+        // Waagerecht: an der Taste ausrichten, nur bei zu wenig Platz (z. B. Einhandmodus) verschieben
+        float anchorX = b.CenterX();
+        float left = anchorX + (minCol - 0.5f) * cellW - pad;
+        float right = anchorX + (maxCol + 0.5f) * cellW + pad;
+        anchorX += Math.Max(0, margin - left) - Math.Max(0, right - (Width - margin));
+
+        // Senkrecht: knapp über der Taste, notfalls (wenig Platz nach oben) über die Tasten hinein
+        float bottom = b.Top - 4 * _dp;
+        float top = bottom - rows * cellH - 2 * pad;
+        float minTop = OverflowTop() + margin;
+        if (top < minTop)
+        {
+            bottom += minTop - top;
+            top = minTop;
+        }
+
+        float boundsLeft = anchorX + (minCol - 0.5f) * cellW - pad;
+        float boundsRight = anchorX + (maxCol + 0.5f) * cellW + pad;
+        _popup = new Popup(items, new RectF(boundsLeft, top, boundsRight, bottom), cellW)
+        {
+            Grid = grid,
+            AnchorX = anchorX,
+            GridBottom = bottom - pad,
+            CellHeight = cellH,
+            Source = p.Key,
+        };
+        _popup.Selected = 0;
         PerformKeyHaptic();
-        Invalidate();
+        InvalidateWithOverflow();
     }
 
     /// <summary>Runder Popup wie bei Gboard, mittig über der Taste und knapp darüber.</summary>
@@ -938,9 +1023,15 @@ public sealed class KeyboardView : View
         _handler.PostDelayed(_repeatRunnable, RepeatIntervalMs);
     }
 
-    int PopupIndexAt(float x)
+    int PopupIndexAt(float x, float y)
     {
         var popup = _popup!;
+        if (popup.Grid != null)
+        {
+            return PopupGrid.IndexAt(popup.Grid, (x - popup.AnchorX) / popup.CellWidth,
+                (popup.GridBottom - y) / popup.CellHeight);
+        }
+
         int i = (int)((x - popup.Bounds.Left) / popup.CellWidth);
         return Math.Clamp(i, 0, popup.Items.Count - 1);
     }

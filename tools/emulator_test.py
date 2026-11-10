@@ -302,6 +302,18 @@ def main():
         text = field_text()
         check("Löschen", text.endswith("gut"), f"→ „{text}“")
 
+        # Wie Gboard: Das häufigste Zusatzzeichen ist vorausgewählt – langer Druck auf o ohne Bewegung ergibt ö
+        o = kb.wait_for("de")["o"]
+        holding = subprocess.Popen(["adb", "shell", f"input swipe {o[0]} {o[1]} {o[0]} {o[1]} 2500"])
+        time.sleep(1.4)
+        screenshot(out_dir, "2b-popup-o")  # Popup sichtbar, solange der Finger liegt
+        holding.wait(timeout=30)
+        time.sleep(0.5)
+        text = field_text()
+        check("Langer Druck auf o → ö (vorausgewählt)", text.endswith("gutö"), f"→ „{text}“")
+        tap(kb.wait_for("de")["Delete"])
+        time.sleep(0.5)
+
         tap(kb.wait_for("de")["ToSymbols"])
         symbols = kb.wait_for("symbols1", timeout=15)
         screenshot(out_dir, "3-symbole")
