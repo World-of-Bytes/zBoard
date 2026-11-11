@@ -6,7 +6,9 @@ zBoard deliberately has **no internet permission**. Features that need the inter
 online dictionaries …) come as **separate plugin apps**, e.g. from the Play Store. Only installing the plugin asks for
 internet access – without a plugin, you have a keyboard without internet.
 
-First plugin: **zBoard DeepL** (`plugin-apps/DeepL`) – translates the selected text or the content of the field.
+Plugins: **zBoard DeepL** (`plugin-apps/DeepL`) – translates the selected text or the content of the field;
+**zBoard Sync** (`plugin-apps/Sync`) – syncs settings and learned data between devices via Google Drive, OneDrive,
+Dropbox or WebDAV (HiDrive, Nextcloud …).
 
 ## For users
 
@@ -42,6 +44,21 @@ in plugin projects).
 | `2` run action | `requestId`, `apiVersion`, `action`, `text`, `language` (e.g. `de`) | `text` (new text) **or** `error` (message for the user) |
 
 Time limits in zBoard: 5 s for connecting and the action list, 20 s for an action. At most 8 actions per plugin.
+
+### Sync plugins
+
+A plugin with the additional meta-data `de.World_of_Bytes.zBoard.plugin.SYNC` = `true` is only a transport to a cloud
+storage. It does not appear in the bar; users pick it under Settings → Backup & restore. zBoard provides the file (ZIP,
+backup format) through its non-exported content provider `content://de.World_of_Bytes.zBoard.sync/…` and grants the
+plugin access only for the duration of one request (`grantUriPermission`). zBoard does the merging itself.
+
+| `what` | Request (`data`) | Reply |
+| --- | --- | --- |
+| `10` Status | `requestId`, `apiVersion` | `syncReady` (bool), `syncTarget` (label, e.g. "Dropbox") |
+| `11` Download | `uri` (write access) | `syncFound` (bool: a file already existed) **or** `error` |
+| `12` Upload | `uri` (read access) | empty **or** `error` |
+
+Time limit 90 s per transfer, at most 64 MB. Example: `plugin-apps/Sync` (its README explains the provider setup).
 
 ### Security
 
