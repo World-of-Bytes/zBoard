@@ -6,7 +6,9 @@ zBoard hat bewusst **keine Internet-Berechtigung**. Funktionen, die Internet bra
 Online-Wörterbücher …), kommen als **eigene Plugin-Apps**, z. B. aus dem Play Store. Nur die Installation des Plugins
 fragt nach Internet – wer kein Plugin installiert, hat eine Tastatur ohne Internet.
 
-Erstes Plugin: **zBoard DeepL** (`plugin-apps/DeepL`) – übersetzt den markierten Text oder den Inhalt des Felds.
+Plugins: **zBoard DeepL** (`plugin-apps/DeepL`) – übersetzt den markierten Text oder den Inhalt des Felds;
+**zBoard Sync** (`plugin-apps/Sync`) – gleicht Einstellungen und Gelerntes über Google Drive, OneDrive, Dropbox oder
+WebDAV (HiDrive, Nextcloud …) zwischen Geräten ab.
 
 ## Für Nutzer
 
@@ -42,6 +44,23 @@ lässt sich direkt in Plugin-Projekte einbinden).
 | `2` Aktion ausführen | `requestId`, `apiVersion`, `action`, `text`, `language` (z. B. `de`) | `text` (neuer Text) **oder** `error` (Meldung für den Nutzer) |
 
 Zeitlimits in zBoard: 5 s für die Verbindung und die Aktionsliste, 20 s für eine Aktion. Höchstens 8 Aktionen je Plugin.
+
+### Synchronisations-Plugins
+
+Ein Plugin mit zusätzlicher Meta-Angabe `de.World_of_Bytes.zBoard.plugin.SYNC` = `true` ist nur Transport zu einem
+Cloud-Speicher. Es erscheint nicht in der Leiste; der Nutzer wählt es unter Einstellungen → Sichern & wiederherstellen.
+zBoard stellt die Datei (ZIP, Format der Sicherung) über seinen nicht exportierten Content-Provider
+`content://de.World_of_Bytes.zBoard.sync/…` bereit und gibt sie dem Plugin nur für die Dauer einer Anfrage frei
+(`grantUriPermission`). Das Zusammenführen macht zBoard.
+
+| `what` | Anfrage (`data`) | Antwort |
+| --- | --- | --- |
+| `10` Zustand | `requestId`, `apiVersion` | `syncReady` (bool), `syncTarget` (Anzeige, z. B. „Dropbox“) |
+| `11` Herunterladen | `uri` (Schreibrecht) | `syncFound` (bool: es gab schon eine Datei) **oder** `error` |
+| `12` Hochladen | `uri` (Leserecht) | leer **oder** `error` |
+
+Zeitlimit 90 s je Übertragung, höchstens 64 MB. Beispiel: `plugin-apps/Sync` (README dort mit der Einrichtung der
+Anbieter).
 
 ### Sicherheit
 

@@ -43,6 +43,7 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Voice typing | ✓ | ✓ via the system's speech recognition, offline only by default |
 | One-handed mode, height, number row | ✓ | ✓ |
 | Translation | ✓ | ✓ via the plugin app "zBoard DeepL" (your own DeepL API key) |
+| Sync between devices | learned words via the Google account | ✓ via the plugin app "zBoard Sync": settings, learned words, email addresses via Google Drive, OneDrive, Dropbox or WebDAV (HiDrive, Nextcloud …) |
 | Google services | ✓ | not planned |
 
 ## Build and install
@@ -99,6 +100,8 @@ popups, the suggestion bar and the layout on a real Android system, partly by me
 | `Assets/emoji/` | emoji by category, names and search terms per language |
 | `Plugins/` | `PluginContract` (interface), `PluginRegistry` (installed plugins), `PluginClient` (messenger) |
 | `plugin-apps/DeepL/` | plugin app "zBoard DeepL" (a separate app with internet permission) |
+| `Sync/` | `SyncManager` (sync through a plugin), `SyncFileProvider` (hands the file to the plugin) |
+| `plugin-apps/Sync/` | plugin app "zBoard Sync" (Google Drive, OneDrive, Dropbox, WebDAV); provider setup in its README |
 | `tools/` | `build_dictionaries.py` (word lists), `build_emoji.py` (emoji data), `emulator_test.py` |
 | `tests/` | unit tests for the platform-independent logic |
 
@@ -202,6 +205,11 @@ used. zBoard has no internet permission (release build).
   addresses and pinned clipboard items (each optional) to a ZIP file; the system file picker decides where it goes
   (Downloads, a cloud storage app …). Restoring shows what the backup contains and replaces exactly those parts – on
   the same or a new device. The file is not encrypted; zBoard itself still needs no internet permission.
+- **Sync:** with the plugin app **zBoard Sync** (`plugin-apps/Sync`) zBoard keeps settings, learned words and email
+  addresses in sync between devices – via Google Drive, OneDrive, Dropbox or WebDAV (HiDrive, Nextcloud …). Turn it on
+  under Settings → Backup & restore. Learned data is united, for settings the most recently changed side wins;
+  device-specific things (current language, emoji history, clipboard, plugins) stay on the device. Syncing happens when
+  the keyboard opens and closes, at most every 15 minutes.
 - **Multilingual typing:** Like Gboard, zBoard uses the dictionaries of all active languages at once (up to three); the
   space bar then shows e.g. “DE · EN”. An English word in a German sentence is not “corrected”, typos are corrected into
   the matching language, and what you write is learned in the language the word belongs to. If the previous word clearly

@@ -119,6 +119,45 @@ public sealed partial class EmailMemory
         }
     }
 
+    /// <summary>Synchronisation: übernimmt Adressen von <paramref name="other"/> (höhere Anzahl, spätere Verwendung).</summary>
+    /// <returns>true, wenn sich etwas geändert hat.</returns>
+    public bool MergeFrom(EmailMemory other)
+    {
+        if (ReferenceEquals(other, this)) return false;
+        lock (other._lock)
+        lock (_lock)
+        {
+            bool changed = false;
+            foreach (var theirs in other._entries)
+            {
+                var mine = _entries.Find(e => string.Equals(e.Address, theirs.Address, StringComparison.OrdinalIgnoreCase));
+                if (mine == null)
+                {
+                    _entries.Add(new Entry(theirs.Address, theirs.Count, theirs.LastUsed));
+                    changed = true;
+                    continue;
+                }
+
+                if (theirs.Count > mine.Count)
+                {
+                    mine.Count = theirs.Count;
+                    changed = true;
+                }
+
+                if (theirs.LastUsed > mine.LastUsed)
+                {
+                    mine.LastUsed = theirs.LastUsed;
+                    mine.Address = theirs.Address; // zuletzt verwendete Schreibweise
+                    changed = true;
+                }
+            }
+
+            while (_entries.Count > MaxAddresses) _entries.Remove(_entries.MinBy(Score)!);
+            IsDirty |= changed;
+            return changed;
+        }
+    }
+
     public void Clear()
     {
         lock (_lock)

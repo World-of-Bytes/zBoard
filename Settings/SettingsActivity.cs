@@ -10,6 +10,8 @@ using ZBoard.Backup;
 using ZBoard.Ime;
 using ZBoard.Keyboard;
 using ZBoard.Localization;
+using ZBoard.Plugins;
+using ZBoard.Sync;
 using Color = Android.Graphics.Color;
 using Orientation = Android.Widget.Orientation;
 
@@ -412,6 +414,126 @@ public sealed class SettingsActivity : Activity
             "The backup is an unencrypted ZIP file and contains personal data (learned words, email addresses, pinned "
             + "text). zBoard itself has no internet access: you choose where the file goes in the file picker – e.g. "
             + "your Downloads folder or a cloud storage app."));
+
+        BuildSync();
+    }
+
+    // ---------- Synchronisation ----------
+
+    void BuildSync()
+    {
+        Section(L.T("Synchronisation", "Sync"));
+        var plugins = PluginRegistry.Installed(this).Where(p => p.CanSync).ToList();
+        if (plugins.Count == 0)
+        {
+            Note(L.T("Mit dem Plugin „zBoard Sync“ gleicht zBoard Einstellungen, gelernte Wörter und E-Mail-Adressen "
+                   + "automatisch zwischen deinen Geräten ab – über Google Drive, OneDrive, Dropbox oder WebDAV (z. B. "
+                   + "HiDrive, Nextcloud). zBoard selbst bleibt dabei ohne Internet.",
+                "With the plugin \"zBoard Sync\" zBoard keeps settings, learned words and email addresses in sync "
+                + "between your devices – via Google Drive, OneDrive, Dropbox or WebDAV (e.g. HiDrive, Nextcloud). zBoard "
+                + "itself stays offline."));
+            Row(Resource.Drawable.ms_search, L.T("zBoard Sync im Play Store", "zBoard Sync on the Play Store"), null,
+                () => OpenStore("de.World_of_Bytes.zBoard.Sync"));
+            return;
+        }
+
+        var chosen = SyncManager.ChosenPlugin(this, _settings);
+        Toggle(L.T("Automatisch synchronisieren", "Sync automatically"), SyncManager.StatusLine(_settings),
+            _settings.SyncEnabled && chosen != null, (toggle, on) =>
+            {
+                if (!on)
+                {
+                    _settings.SyncEnabled = false;
+                    return;
+                }
+
+                if (_settings.SyncEnabled && SyncManager.ChosenPlugin(this, _settings) != null) return;
+                ChooseSyncPlugin(plugins, toggle);
+            });
+
+        Row(Resource.Drawable.ms_settings_backup_restore, L.T("Jetzt synchronisieren", "Sync now"), null, () =>
+        {
+            if (!_settings.SyncEnabled || SyncManager.ChosenPlugin(this, _settings) == null)
+            {
+                Toast.MakeText(this, L.T("Schalte zuerst „Automatisch synchronisieren“ ein.", "Turn on \"Sync automatically\" first."), ToastLength.Short)!.Show();
+                return;
+            }
+
+            SyncNow();
+        });
+
+        foreach (var plugin in plugins)
+        {
+            if (PackageManager!.GetLaunchIntentForPackage(plugin.Package) is { } launch)
+            {
+                Row(Resource.Drawable.ms_settings, L.T($"Speicher wählen ({plugin.Label})", $"Choose storage ({plugin.Label})"),
+                    L.T("Google Drive, OneDrive, Dropbox oder WebDAV", "Google Drive, OneDrive, Dropbox or WebDAV"), () => StartActivity(launch));
+            }
+        }
+
+        Note(L.T("Abgeglichen werden Einstellungen, gelernte Wörter und Wortfolgen sowie E-Mail-Adressen – beim Öffnen und "
+               + "Schließen der Tastatur, höchstens alle 15 Minuten. Gerätebezogenes (aktuelle Sprache, zuletzt verwendete "
+               + "Emoji, angeheftete Zwischenablage, Plugins) bleibt auf dem Gerät. Wörter, die du löschst, kommen zurück, "
+               + "solange ein anderes Gerät sie noch kennt.",
+            "Synced are settings, learned words and phrases and email addresses – when the keyboard opens and closes, at "
+            + "most every 15 minutes. Device-specific things (current language, recent emoji, pinned clipboard, plugins) "
+            + "stay on the device. Words you delete come back as long as another device still knows them."));
+    }
+
+    void ChooseSyncPlugin(List<PluginInfo> plugins, Switch toggle)
+    {
+        if (plugins.Count == 1)
+        {
+            ConfirmSyncPlugin(plugins[0], toggle);
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+            .SetTitle(L.T("Synchronisieren mit", "Sync with"))!
+            .SetItems(plugins.Select(p => p.Label).ToArray(), (_, e) => ConfirmSyncPlugin(plugins[e.Which], toggle))!
+            .SetOnCancelListener(new CancelListener(() => toggle.Checked = false))!
+            .Show();
+    }
+
+    void ConfirmSyncPlugin(PluginInfo plugin, Switch toggle)
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(L.T($"Mit {plugin.Label} synchronisieren?", $"Sync with {plugin.Label}?"))!
+            .SetMessage(L.T($"{plugin.Label} bekommt deine Einstellungen, gelernten Wörter und E-Mail-Adressen und speichert sie "
+                            + "in dem Cloud-Speicher, den du dort einrichtest. Schalte nur Plugins ein, denen du vertraust.",
+                $"{plugin.Label} receives your settings, learned words and email addresses and stores them in the cloud "
+                + "storage you set up there. Only turn on plugins you trust."))!
+            .SetPositiveButton(L.T("Einschalten", "Turn on"), (_, _) =>
+            {
+                SetPluginEnabled(plugin.Package, true);
+                _settings.SyncPlugin = plugin.Package;
+                _settings.SyncEnabled = true;
+                SyncNow();
+            })!
+            .SetNegativeButton(L.T("Abbrechen", "Cancel"), (_, _) => toggle.Checked = false)!
+            .SetOnCancelListener(new CancelListener(() => toggle.Checked = false))!
+            .Show();
+    }
+
+    async void SyncNow()
+    {
+        Toast.MakeText(this, L.T("Gleiche ab …", "Syncing …"), ToastLength.Short)!.Show();
+        var outcome = await SyncManager.SyncAsync(this);
+        if (IsFinishing || IsDestroyed) return;
+        Toast.MakeText(this, outcome.Message, ToastLength.Long)!.Show();
+        if (_page == "backup") ShowPage("backup"); // Zustandszeile und ggf. übernommene Einstellungen anzeigen
+    }
+
+    void OpenStore(string package)
+    {
+        try
+        {
+            StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse($"market://details?id={package}")));
+        }
+        catch (ActivityNotFoundException)
+        {
+            StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse($"https://play.google.com/store/apps/details?id={package}")));
+        }
     }
 
     static readonly (BackupParts Part, string Label)[] BackupChoices =
@@ -630,7 +752,12 @@ public sealed class SettingsActivity : Activity
                 if (_settings.EnabledPlugins.Contains(plugin.Package)) return;
                 new AlertDialog.Builder(this)
                     .SetTitle(L.T($"{plugin.Label} einschalten?", $"Turn on {plugin.Label}?"))!
-                    .SetMessage(plugin.HasInternet
+                    .SetMessage(plugin.CanSync
+                        ? L.T("Das Plugin bekommt deine Einstellungen, gelernten Wörter und E-Mail-Adressen, sobald du unter "
+                              + "„Sichern & wiederherstellen“ die Synchronisation einschaltest, und speichert sie in deinem Cloud-Speicher.",
+                            "The plugin receives your settings, learned words and email addresses once you turn on sync under "
+                            + "\"Backup & restore\", and stores them in your cloud storage.")
+                        : plugin.HasInternet
                         ? L.T("Text, den du an dieses Plugin schickst, kann es ins Internet senden (z. B. an den Übersetzungsdienst). "
                               + "Schalte nur Plugins ein, denen du vertraust.",
                             "Text you send to this plugin may be sent to the internet (e.g. to the translation service). "

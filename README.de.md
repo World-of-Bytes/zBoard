@@ -43,6 +43,7 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
 | Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
 | Übersetzen | ✓ | ✓ über die Plugin-App „zBoard DeepL“ (eigener DeepL-API-Schlüssel) |
+| Synchronisation zwischen Geräten | gelernte Wörter über das Google-Konto | ✓ über die Plugin-App „zBoard Sync“: Einstellungen, gelernte Wörter, E-Mail-Adressen via Google Drive, OneDrive, Dropbox oder WebDAV (HiDrive, Nextcloud …) |
 | Google-Dienste | ✓ | nicht geplant |
 
 ## Bauen und installieren
@@ -99,6 +100,8 @@ Popups, Vorschlagsleiste und Lage der Tastatur auf einem echten Android-System, 
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
 | `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
 | `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
+| `Sync/` | `SyncManager` (Abgleich über ein Plugin), `SyncFileProvider` (Datei-Übergabe an das Plugin) |
+| `plugin-apps/Sync/` | Plugin-App „zBoard Sync“ (Google Drive, OneDrive, Dropbox, WebDAV); Einrichtung der Anbieter in der README dort |
 | `tools/` | `build_dictionaries.py` (Wortlisten), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
@@ -203,6 +206,11 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   abwählbar) in eine ZIP-Datei; wohin, bestimmst du in der Dateiauswahl des Systems (Downloads, Cloud-Speicher …).
   Beim Wiederherstellen zeigt zBoard, was die Sicherung enthält, und ersetzt genau diese Teile – auf demselben oder
   einem neuen Gerät. Die Datei ist unverschlüsselt; zBoard selbst braucht weiterhin keine Internet-Berechtigung.
+- **Synchronisation:** Mit der Plugin-App **zBoard Sync** (`plugin-apps/Sync`) gleicht zBoard Einstellungen,
+  gelernte Wörter und E-Mail-Adressen zwischen Geräten ab – über Google Drive, OneDrive, Dropbox oder WebDAV (HiDrive,
+  Nextcloud …). Einschalten unter Einstellungen → Sichern & wiederherstellen. Gelerntes wird vereint, bei Einstellungen
+  gewinnt die zuletzt geänderte Seite; Gerätebezogenes (aktuelle Sprache, Emoji-Verlauf, Zwischenablage, Plugins) bleibt
+  auf dem Gerät. Abgeglichen wird beim Öffnen und Schließen der Tastatur, höchstens alle 15 Minuten.
 - **Mehrsprachige Eingabe:** Wie bei Gboard gelten die Wörterbücher aller aktiven Sprachen gleichzeitig (bis zu drei),
   auf der Leertaste steht dann z. B. „DE · EN“. Ein englisches Wort wird in einem deutschen Satz nicht „korrigiert“,
   Tippfehler werden in die passende Sprache korrigiert, und was du schreibst, lernt zBoard in der Sprache, zu der das Wort
