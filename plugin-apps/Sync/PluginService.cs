@@ -91,7 +91,7 @@ public sealed class PluginService : Service
                     {
                         reply.PutString(PluginContract.KeyError, e.Message);
                     }
-                    catch (OperationCanceledException)
+                    catch (System.OperationCanceledException)
                     {
                         reply.PutString(PluginContract.KeyError, L.T("Zeitüberschreitung beim Cloud-Speicher.", "The cloud storage timed out."));
                     }
