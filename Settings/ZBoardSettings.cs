@@ -181,14 +181,76 @@ public sealed class ZBoardSettings
     /// <summary>Angeheftete Einträge der Zwischenablage.</summary>
     public string PinnedClips
     {
-        get => _prefs.GetString("pinnedClips", string.Empty) ?? string.Empty;
-        set => PutString("pinnedClips", value);
+        get => _prefs.GetString(PinnedClipsKey, string.Empty) ?? string.Empty;
+        set => PutString(PinnedClipsKey, value);
     }
 
     public ThemeMode Theme
     {
         get => (ThemeMode)_prefs.GetInt("theme", (int)ThemeMode.System);
         set => PutInt("theme", (int)value);
+    }
+
+    // ---------- Sichern und Wiederherstellen ----------
+
+    /// <summary>Schlüssel der angehefteten Zwischenablage; wird in Sicherungen getrennt behandelt.</summary>
+    public const string PinnedClipsKey = "pinnedClips";
+
+    static readonly IDictionary<string, object> Empty = new Dictionary<string, object>();
+
+    /// <summary>Alle gespeicherten Einstellungen außer der Zwischenablage (Werte als bool, int, long, float, string).</summary>
+    public Dictionary<string, object> Export()
+    {
+        var result = new Dictionary<string, object>(StringComparer.Ordinal);
+        foreach (var (key, raw) in _prefs.All ?? Empty)
+        {
+            if (key == PinnedClipsKey) continue;
+            object? value = raw switch
+            {
+                bool or int or long or float or string => raw,
+                Java.Lang.Boolean b => b.BooleanValue(),
+                Java.Lang.Integer i => i.IntValue(),
+                Java.Lang.Long l => l.LongValue(),
+                Java.Lang.Float f => f.FloatValue(),
+                Java.Lang.String s => s.ToString(),
+                _ => null, // String-Sets nutzt zBoard nicht
+            };
+            if (value != null) result[key] = value;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Ersetzt die Einstellungen (nicht angegebene fallen auf den Standard zurück) und/oder die angeheftete
+    /// Zwischenablage. <c>null</c> lässt den jeweiligen Teil unverändert. Schreibt sofort (Commit).
+    /// </summary>
+    public void Import(IReadOnlyDictionary<string, object>? settings, string? pinnedClips)
+    {
+        var edit = _prefs.Edit()!;
+        if (settings != null)
+        {
+            foreach (var key in (_prefs.All ?? Empty).Keys)
+            {
+                if (key != PinnedClipsKey) edit.Remove(key);
+            }
+
+            foreach (var (key, value) in settings)
+            {
+                if (key == PinnedClipsKey) continue;
+                switch (value)
+                {
+                    case bool b: edit.PutBoolean(key, b); break;
+                    case int i: edit.PutInt(key, i); break;
+                    case long l: edit.PutLong(key, l); break;
+                    case float f: edit.PutFloat(key, f); break;
+                    case string s: edit.PutString(key, s); break;
+                }
+            }
+        }
+
+        if (pinnedClips != null) edit.PutString(PinnedClipsKey, pinnedClips);
+        edit.Commit();
     }
 
     void PutBool(string key, bool value) => _prefs.Edit()!.PutBoolean(key, value)!.Apply();
