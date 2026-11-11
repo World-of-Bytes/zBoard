@@ -241,7 +241,15 @@ public sealed class SettingsActivity : Activity
             });
         }
 
-        Note(L.T("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen.", "To switch, long-press the space bar and pick a language."));
+        Toggle(L.T("Mehrsprachige Eingabe", "Multilingual typing"),
+            L.T("Vorschläge und Autokorrektur in allen aktiven Sprachen gleichzeitig (bis zu drei), auf der Leertaste z. B. „DE · EN“",
+                "Suggestions and autocorrect in all active languages at once (up to three), e.g. “DE · EN” on the space bar"),
+            _settings.MultilingualTyping, (_, v) => _settings.MultilingualTyping = v);
+
+        Note(L.T("Zum Wechseln lange auf die Leertaste drücken und die Sprache wählen. Bei mehrsprachiger Eingabe wechselt das nur "
+                 + "das Layout und welche Sprache zuerst kommt; die Wörterbücher aller aktiven Sprachen gelten weiter.",
+            "To switch, long-press the space bar and pick a language. With multilingual typing this only changes the layout and "
+            + "which language comes first; the dictionaries of all active languages stay in use."));
 
         Section("Deutsch");
         Toggle(L.T("Eigene Tasten für ü, ö, ä", "Separate keys for ü, ö, ä"),

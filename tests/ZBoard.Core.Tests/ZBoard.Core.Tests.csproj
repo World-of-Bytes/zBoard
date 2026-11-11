@@ -18,6 +18,7 @@
     <Compile Include="../../Suggestions/BigramModel.cs" Link="Core/BigramModel.cs" />
     <Compile Include="../../Suggestions/UserHistory.cs" Link="Core/UserHistory.cs" />
     <Compile Include="../../Suggestions/GlideDecoder.cs" Link="Core/GlideDecoder.cs" />
+    <Compile Include="../../Suggestions/MultilingualEngine.cs" Link="Core/MultilingualEngine.cs" />
     <Compile Include="../../Ime/TextBoundaries.cs" Link="Core/TextBoundaries.cs" />
     <Compile Include="../../Emoji/EmojiCatalog.cs" Link="Core/EmojiCatalog.cs" />
     <Compile Include="../../Clipboard/ClipboardHistory.cs" Link="Core/ClipboardHistory.cs" />
