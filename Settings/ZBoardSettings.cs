@@ -54,6 +54,16 @@ public sealed class ZBoardSettings
         set => PutString("currentLanguage", value);
     }
 
+    /// <summary>
+    /// Mehrsprachige Eingabe wie bei Gboard: Vorschläge und Autokorrektur aus allen aktiven Sprachen gleichzeitig
+    /// (höchstens drei), auf der Leertaste z. B. „DE · EN“. Der Sprachwechsel wählt dann nur noch das Layout.
+    /// </summary>
+    public bool MultilingualTyping
+    {
+        get => _prefs.GetBoolean("multilingualTyping", true);
+        set => PutBool("multilingualTyping", value);
+    }
+
     public bool Haptics
     {
         get => _prefs.GetBoolean("haptics", true);

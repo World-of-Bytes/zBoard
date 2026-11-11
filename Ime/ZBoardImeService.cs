@@ -48,7 +48,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     EditorProfile _profile = EditorProfile.From(null);
 
     string _language = "de";
-    Task<SuggestionEngine>? _engineTask;
+    Task<MultilingualEngine>? _engineTask;  // alle Sprachen der Eingabe, Layoutsprache zuerst
     ShiftState _shift;
     bool _shiftManual;
     long _lastShiftTapMs;
@@ -69,7 +69,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     int _swipeChars;
     Android.Media.AudioManager? _audio;
 
-    SuggestionEngine? Engine => _engineTask is { IsCompletedSuccessfully: true } t ? t.Result : null;
+    MultilingualEngine? Engine => _engineTask is { IsCompletedSuccessfully: true } t ? t.Result : null;
 
     IInputConnection? Ic => CurrentInputConnection;
 
@@ -565,7 +565,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     void Learn(string? previous, string word, bool accepted = false)
     {
-        if (_settings.LearnWords && _profile.AllowLearning) Engine?.History.Learn(previous, word, accepted);
+        if (_settings.LearnWords && _profile.AllowLearning) Engine?.Learn(previous, word, accepted);
     }
 
     /// <summary>
@@ -741,7 +741,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     /// Wie Gboard: Ganze Wortfolgen vorschlagen, die man oft so schreibt ("freundlichen Grüßen"). Nur aus Gelerntem und
     /// nur, wenn Lernen und Nächstes-Wort-Vorhersage an sind.
     /// </summary>
-    SuggestionSlot? PhraseSlot(SuggestionEngine engine, string word)
+    SuggestionSlot? PhraseSlot(MultilingualEngine engine, string word)
     {
         if (!_settings.NextWordPrediction || !_settings.LearnWords || !_profile.AllowLearning) return null;
         var continuation = engine.ContinuePhrase(word, maxWords: 2);
@@ -751,7 +751,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     }
 
     /// <summary>Nächstes-Wort-Vorhersage nach einem Leerzeichen.</summary>
-    void ShowPredictions(SuggestionEngine engine)
+    void ShowPredictions(MultilingualEngine engine)
     {
         string? previous = _settings.NextWordPrediction ? PreviousWord() : null;
         IReadOnlyList<string> predictions = previous == null ? [] : engine.Predict(previous);
@@ -784,14 +784,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             return;
         }
 
-        string before = TextBeforeCursor(3);
-        bool capitalize = before.Length == 0 || before.EndsWith('\n');
-        if (!capitalize && before.Length >= 2 && char.IsWhiteSpace(before[^1]))
-        {
-            string trimmed = before.TrimEnd();
-            capitalize = trimmed.Length == 0 || trimmed[^1] is '.' or '!' or '?';
-        }
-
+        bool capitalize = TextBoundaries.IsSentenceStart(TextBeforeCursor(8));
         SetShift(capitalize ? ShiftState.OneShot : ShiftState.Off, manual: false);
     }
 
@@ -807,11 +800,40 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     {
         _language = language;
         _settings.CurrentLanguage = language;
-        _engineTask = Engines.GetOrAdd(language, lang => Task.Run(() => LoadEngine(lang)));
+        var languages = InputLanguages();
+        var tasks = languages.Select(l => Engines.GetOrAdd(l, lang => Task.Run(() => LoadEngine(lang)))).ToArray();
+        _engineTask = CombineEngines(languages, tasks);
         _engineTask.ContinueWith(
             _ => new Handler(Looper.MainLooper!).Post(UpdateSuggestions),
             TaskContinuationOptions.OnlyOnRanToCompletion);
         ApplyLayout();
+    }
+
+    /// <summary>
+    /// Sprachen, deren Wörterbücher gerade gelten: wie bei Gboard bei mehrsprachiger Eingabe alle aktiven (höchstens drei),
+    /// die des Layouts zuerst; sonst nur diese.
+    /// </summary>
+    IReadOnlyList<string> InputLanguages() =>
+        MultilingualEngine.ActiveLanguages(_language, _settings.Languages, _settings.MultilingualTyping);
+
+    /// <summary>Fasst die geladenen Sprachen zusammen; fehlt ein Wörterbuch, geht es ohne diese Sprache weiter.</summary>
+    static async Task<MultilingualEngine> CombineEngines(IReadOnlyList<string> languages, Task<SuggestionEngine>[] tasks)
+    {
+        var loaded = new List<(string Language, SuggestionEngine Engine)>(tasks.Length);
+        for (int i = 0; i < tasks.Length; i++)
+        {
+            try
+            {
+                loaded.Add((languages[i], await tasks[i].ConfigureAwait(false)));
+            }
+            catch (Exception e) when (i > 0)
+            {
+                Android.Util.Log.Warn("zBoard", $"Wörterbuch {languages[i]} nicht geladen: {e.Message}");
+                Engines.TryRemove(languages[i], out _);
+            }
+        }
+
+        return new MultilingualEngine(loaded);
     }
 
     SuggestionEngine LoadEngine(string language)
@@ -819,7 +841,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         WordDictionary dictionary;
         using (var stream = Assets!.Open($"dict/{language}.txt"))
         {
-            dictionary = WordDictionary.Load(stream);
+            // Gemeinsamer Maßstab, damit sich die Sprachen bei mehrsprachiger Eingabe vergleichen lassen
+            dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal);
         }
 
         var bigrams = BigramModel.Empty;
@@ -879,7 +902,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         _keyboardView.ShowDigitHints = !numberRow;
         _keyboardView.SetLayout(layout);
-        _keyboardView.SpaceLabel = Layouts.LanguageNames.TryGetValue(_language, out var name) ? name : _language;
+        var inputLanguages = InputLanguages();
+        _keyboardView.CurrentLanguage = _language;
+        _keyboardView.SpaceLabel = inputLanguages.Count > 1
+            ? MultilingualEngine.SpaceLabel(inputLanguages) // wie Gboard: "DE · EN"
+            : Layouts.LanguageNames.TryGetValue(_language, out var name) ? name : _language;
         _keyboardView.Shift = _symbolsPage == 0 ? _shift : ShiftState.Off;
     }
 

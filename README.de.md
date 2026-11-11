@@ -26,6 +26,8 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Tippen, Umschalt, Symbole, langer Druck für Sonderzeichen | ✓ | ✓ in Gboard-Reihenfolge, häufigstes Zeichen vorausgewählt |
 | Wortvorschläge und Autokorrektur | ✓ | ✓ 120 000 deutsche, 100 000 englische Wörter; Tastennachbarn, Vertauschungen, Umlaute |
 | Großschreibung deutscher Substantive | ✓ | ✓ |
+| Mehrsprachige Eingabe (mehrere Wörterbücher gleichzeitig, „DE · EN“ auf der Leertaste) | ✓ | ✓ bis zu drei Sprachen, Sprache des vorherigen Worts bevorzugt |
+| Großschreibung am Satzanfang | ✓ | ✓ auch in Apps, die sie nicht anfordern |
 | Nächstes-Wort-Vorhersage | ✓ | ✓ mitgelieferte Wortpaare plus eigene Wortfolgen |
 | Ganze Wortfolgen vorschlagen („freundlichen Grüßen“) | ✓ | ✓ aus Gelerntem |
 | Vorschläge für ein angetipptes Wort im Text | ✓ | ✓ Antippen ersetzt das ganze Wort |
@@ -192,7 +194,10 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
 - **E-Mail-Adressen:** In E-Mail-Feldern schlägt die Leiste gemerkte Adressen vor – schon im leeren Feld und passend
   zum Angefangenen, nach „@“ auch bekannte Anbieter (gmail.com, web.de, gmx.de …). Gemerkt wird, was beim Verlassen
   des Felds oder bei Enter als gültige Adresse darin steht (nicht inkognito). Langer Druck auf eine Adresse in der
-  Leiste entfernt sie; alle löschen unter Einstellungen → Wörterbuch.
+  Leiste entfernt sie; alle löschen unter Einstellungen → Wörterbuch. Viele Apps kennzeichnen ihr E-Mail-Feld nicht
+  (nur eine Beschriftung „E-Mail-Adresse“ darüber): In einzeiligen Formularfeldern schlägt zBoard deshalb gemerkte
+  Adressen auch vor, sobald das Feld nur ein Wort von mindestens drei Buchstaben enthält, mit dem eine gemerkte Adresse
+  beginnt, und merkt sich Adressen, wenn am Ende genau eine gültige Adresse im Feld steht.
 - **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
   gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
   werden nie übernommen.
@@ -206,6 +211,14 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   Nextcloud …). Einschalten unter Einstellungen → Sichern & wiederherstellen. Gelerntes wird vereint, bei Einstellungen
   gewinnt die zuletzt geänderte Seite; Gerätebezogenes (aktuelle Sprache, Emoji-Verlauf, Zwischenablage, Plugins) bleibt
   auf dem Gerät. Abgeglichen wird beim Öffnen und Schließen der Tastatur, höchstens alle 15 Minuten.
+- **Mehrsprachige Eingabe:** Wie bei Gboard gelten die Wörterbücher aller aktiven Sprachen gleichzeitig (bis zu drei),
+  auf der Leertaste steht dann z. B. „DE · EN“. Ein englisches Wort wird in einem deutschen Satz nicht „korrigiert“,
+  Tippfehler werden in die passende Sprache korrigiert, und was du schreibst, lernt zBoard in der Sprache, zu der das Wort
+  gehört. Gehört das vorherige Wort eindeutig zu einer Sprache, kommen deren Vorschläge zuerst. Der Sprachwechsel (langer
+  Druck auf die Leertaste) wählt dann nur das Layout. Abschaltbar unter Einstellungen → Sprachen. Damit die Sprachen
+  vergleichbar sind, bringt zBoard die Häufigkeiten aller Wortlisten auf denselben Maßstab
+  (`WordDictionary.ReferenceTotal`); seltene Einträge einer weiteren Sprache (Tippfehler aus den Untertiteln wie „teh“)
+  verhindern keine Korrektur.
 - **Spracheingabe:** nutzt die Spracherkennung des Systems. Standardmäßig nur, wenn das Gerät offline erkennen kann
   (ab Android 12, je nach Hersteller); sonst ginge die Sprache an den Anbieter des Erkennungsdienstes. Die
   Mikrofon-Berechtigung fragt die zBoard-App beim ersten Tippen auf 🎤 ab.

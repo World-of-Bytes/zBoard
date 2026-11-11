@@ -25,6 +25,8 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Languages | a great many languages and layouts | German (QWERTZ), English, Spanish, Italian (QWERTY), French (AZERTY) |
 | Typing, shift, symbols, long press for accented characters | ✓ | ✓ in Gboard's order, most frequent character preselected |
 | Word suggestions and autocorrect | ✓ | ✓ 120,000 German, 100,000 English words; neighbouring keys, swapped letters, umlauts |
+| Multilingual typing (several dictionaries at once, “DE · EN” on the space bar) | ✓ | ✓ up to three languages, language of the previous word preferred |
+| Capitalisation at the start of a sentence | ✓ | ✓ also in apps that don't ask for it |
 | Capitalising German nouns | ✓ | ✓ |
 | Next-word prediction | ✓ | ✓ bundled word pairs plus your own word sequences |
 | Suggesting whole phrases ("freundlichen Grüßen") | ✓ | ✓ from what it has learned |
@@ -193,7 +195,10 @@ used. zBoard has no internet permission (release build).
 - **Email addresses:** in email fields the bar suggests remembered addresses – even in an empty field and matching what
   you have started, and after "@" also common providers (gmail.com, web.de, gmx.de …). zBoard remembers what is in the
   field as a valid address when you leave it or press Enter (not in incognito mode). Long-pressing an address in the
-  bar removes it; delete all of them under Settings → Dictionary.
+  bar removes it; delete all of them under Settings → Dictionary. Many apps don't mark their email field (only a
+  “Email address” label above it): in single-line form fields zBoard therefore also suggests remembered addresses as soon
+  as the field holds a single word of at least three letters that starts one of them, and remembers an address when the
+  field ends up containing exactly one valid address.
 - **Clipboard:** history of the last hour, pinning (📌) keeps items permanently. Only pinned items are saved;
   content marked as sensitive (e.g. from password managers) and copies from password fields are never taken.
 - **Backup & restore:** Settings → Backup & restore saves your settings, learned words and phrases, remembered email
@@ -205,6 +210,13 @@ used. zBoard has no internet permission (release build).
   under Settings → Backup & restore. Learned data is united, for settings the most recently changed side wins;
   device-specific things (current language, emoji history, clipboard, plugins) stay on the device. Syncing happens when
   the keyboard opens and closes, at most every 15 minutes.
+- **Multilingual typing:** Like Gboard, zBoard uses the dictionaries of all active languages at once (up to three); the
+  space bar then shows e.g. “DE · EN”. An English word in a German sentence is not “corrected”, typos are corrected into
+  the matching language, and what you write is learned in the language the word belongs to. If the previous word clearly
+  belongs to one language, its suggestions come first. Switching languages (long-press the space bar) then only picks the
+  layout. Can be turned off under Settings → Languages. To make languages comparable, zBoard scales the frequencies of all
+  word lists to the same total (`WordDictionary.ReferenceTotal`); rare entries of another language (typos from the
+  subtitles such as “teh”) don't prevent a correction.
 - **Voice typing:** uses the system's speech recognition. By default only if the device can recognise speech offline
   (Android 12 and later, depending on the manufacturer); otherwise your speech would go to the provider of the
   recognition service. The zBoard app asks for the microphone permission the first time you tap 🎤.
