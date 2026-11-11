@@ -36,6 +36,7 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Designs | ✓ | hell, dunkel, Material You (Farben aus dem Hintergrundbild) |
 | Emoji-Tastatur | ✓ | ✓ mit Kategorien, Hauttönen, „Zuletzt verwendet“ und Suche in allen fünf Sprachen |
 | Zwischenablage-Verlauf | ✓ | ✓ eine Stunde, Anheften, vertrauliche Inhalte ausgenommen |
+| Sichern & wiederherstellen (Einstellungen, gelernte Wörter, E-Mail-Adressen, angeheftete Zwischenablage) | teilweise: gelernte Wörter nur per Synchronisation mit dem Google-Konto, Export des persönlichen Wörterbuchs; keine Sicherung der Einstellungen | ✓ als ZIP-Datei, die du ablegst, wo du willst – ohne Konto |
 | GIFs und Sticker | ✓ | bewusst nicht (bräuchte Internetzugriff) |
 | Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
 | Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
@@ -72,7 +73,7 @@ Die Oberfläche ist zweisprachig: Deutsch, wenn das System auf Deutsch steht, so
 ## Tests
 
 Die Logik ohne Android (Wörterbuch, Autokorrektur, Vorhersage, Wortfolgen, Lernen, E-Mail-Adressen, Wischeingabe,
-Emoji, Zwischenablage, Layouts, Sonderzeichen-Popup) hat eigene Unit-Tests:
+Emoji, Zwischenablage, Layouts, Sonderzeichen-Popup, Sicherungen) hat eigene Unit-Tests:
 
 ```bash
 dotnet test tests/ZBoard.Core.Tests
@@ -91,6 +92,7 @@ Popups, Vorschlagsleiste und Lage der Tastatur auf einem echten Android-System, 
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
+| `Backup/` | `BackupArchive` (Sicherungsdatei: Schreiben, Lesen, Prüfen) |
 | `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
 | `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
@@ -191,6 +193,11 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
 - **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
   gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
   werden nie übernommen.
+- **Sichern & wiederherstellen:** Unter Einstellungen → Sichern & wiederherstellen speichert zBoard Einstellungen,
+  gelernte Wörter und Wortfolgen, gemerkte E-Mail-Adressen und angeheftete Zwischenablage-Einträge (jeweils
+  abwählbar) in eine ZIP-Datei; wohin, bestimmst du in der Dateiauswahl des Systems (Downloads, Cloud-Speicher …).
+  Beim Wiederherstellen zeigt zBoard, was die Sicherung enthält, und ersetzt genau diese Teile – auf demselben oder
+  einem neuen Gerät. Die Datei ist unverschlüsselt; zBoard selbst braucht weiterhin keine Internet-Berechtigung.
 - **Spracheingabe:** nutzt die Spracherkennung des Systems. Standardmäßig nur, wenn das Gerät offline erkennen kann
   (ab Android 12, je nach Hersteller); sonst ginge die Sprache an den Anbieter des Erkennungsdienstes. Die
   Mikrofon-Berechtigung fragt die zBoard-App beim ersten Tippen auf 🎤 ab.

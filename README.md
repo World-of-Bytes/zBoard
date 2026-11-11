@@ -36,6 +36,7 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Themes | ✓ | light, dark, Material You (colours from the wallpaper) |
 | Emoji keyboard | ✓ | ✓ with categories, skin tones, "recently used" and search in all five languages |
 | Clipboard history | ✓ | ✓ one hour, pinning, sensitive content excluded |
+| Backup & restore (settings, learned words, email addresses, pinned clips) | partly: learned words only via sync with the Google account, personal dictionary export; no settings backup | ✓ as a ZIP file you store wherever you like, no account needed |
 | GIFs and stickers | ✓ | deliberately not (would need internet access) |
 | Voice typing | ✓ | ✓ via the system's speech recognition, offline only by default |
 | One-handed mode, height, number row | ✓ | ✓ |
@@ -72,7 +73,7 @@ The user interface is bilingual: German if the system language is German, Englis
 ## Tests
 
 The logic that does not depend on Android (dictionary, autocorrect, prediction, phrases, learning, email addresses,
-glide typing, emoji, clipboard, layouts, accented-character popup) has its own unit tests:
+glide typing, emoji, clipboard, layouts, accented-character popup, backups) has its own unit tests:
 
 ```bash
 dotnet test tests/ZBoard.Core.Tests
@@ -91,6 +92,7 @@ popups, the suggestion bar and the layout on a real Android system, partly by me
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (start screen), `ZBoardSettings` |
+| `Backup/` | `BackupArchive` (backup file: writing, reading, validation) |
 | `Assets/dict/` | word lists and word pairs per language |
 | `Assets/emoji/` | emoji by category, names and search terms per language |
 | `Plugins/` | `PluginContract` (interface), `PluginRegistry` (installed plugins), `PluginClient` (messenger) |
@@ -191,6 +193,10 @@ used. zBoard has no internet permission (release build).
   bar removes it; delete all of them under Settings → Dictionary.
 - **Clipboard:** history of the last hour, pinning (📌) keeps items permanently. Only pinned items are saved;
   content marked as sensitive (e.g. from password managers) and copies from password fields are never taken.
+- **Backup & restore:** Settings → Backup & restore saves your settings, learned words and phrases, remembered email
+  addresses and pinned clipboard items (each optional) to a ZIP file; the system file picker decides where it goes
+  (Downloads, a cloud storage app …). Restoring shows what the backup contains and replaces exactly those parts – on
+  the same or a new device. The file is not encrypted; zBoard itself still needs no internet permission.
 - **Voice typing:** uses the system's speech recognition. By default only if the device can recognise speech offline
   (Android 12 and later, depending on the manufacturer); otherwise your speech would go to the provider of the
   recognition service. The zBoard app asks for the microphone permission the first time you tap 🎤.

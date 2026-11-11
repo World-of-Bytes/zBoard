@@ -5,7 +5,7 @@ namespace ZBoard.Suggestions;
 
 /// <summary>
 /// Was zBoard aus den eigenen Eingaben lernt: eigene Wörter und Wortfolgen.
-/// Bleibt ausschließlich auf dem Gerät und wird nie exportiert.
+/// Bleibt auf dem Gerät; verlässt es nur in einer Sicherung, die der Nutzer selbst erstellt.
 /// Plattformunabhängig.
 /// </summary>
 public sealed class UserHistory
@@ -125,23 +125,49 @@ public sealed class UserHistory
     {
         lock (_lock)
         {
-            using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
-            foreach (var (_, (form, count)) in _words)
+            WriteTo(stream);
+            IsDirty = false;
+        }
+    }
+
+    /// <summary>Schreibt wie <see cref="Save"/>, lässt aber <see cref="IsDirty"/> unverändert (für Sicherungen).</summary>
+    public void SaveCopy(Stream stream)
+    {
+        lock (_lock) WriteTo(stream);
+    }
+
+    /// <summary>Übernimmt den Inhalt von <paramref name="other"/> (Wiederherstellen einer Sicherung, Datei ist schon geschrieben).</summary>
+    public void ReplaceWith(UserHistory other)
+    {
+        if (ReferenceEquals(other, this)) return;
+        lock (other._lock)
+        lock (_lock)
+        {
+            _words.Clear();
+            foreach (var (key, value) in other._words) _words[key] = value;
+            _bigrams.Clear();
+            foreach (var (prev, followers) in other._bigrams) _bigrams[prev] = new Dictionary<string, int>(followers, StringComparer.Ordinal);
+            _bigramCount = other._bigramCount;
+            IsDirty = false;
+        }
+    }
+
+    void WriteTo(Stream stream)
+    {
+        using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
+        foreach (var (_, (form, count)) in _words)
+        {
+            writer.Write("w\t"); writer.Write(form); writer.Write('\t');
+            writer.WriteLine(count.ToString(CultureInfo.InvariantCulture));
+        }
+
+        foreach (var (prev, followers) in _bigrams)
+        {
+            foreach (var (next, count) in followers)
             {
-                writer.Write("w\t"); writer.Write(form); writer.Write('\t');
+                writer.Write("b\t"); writer.Write(prev); writer.Write('\t'); writer.Write(next); writer.Write('\t');
                 writer.WriteLine(count.ToString(CultureInfo.InvariantCulture));
             }
-
-            foreach (var (prev, followers) in _bigrams)
-            {
-                foreach (var (next, count) in followers)
-                {
-                    writer.Write("b\t"); writer.Write(prev); writer.Write('\t'); writer.Write(next); writer.Write('\t');
-                    writer.WriteLine(count.ToString(CultureInfo.InvariantCulture));
-                }
-            }
-
-            IsDirty = false;
         }
     }
 

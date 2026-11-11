@@ -26,6 +26,13 @@ Die App hat keine Internet-Berechtigung und kann deshalb selbst nichts ins Inter
 
 Beim Deinstallieren der App löscht Android alle diese Daten.
 
+## Sichern und wiederherstellen
+
+Unter „Sichern & wiederherstellen“ kannst du selbst eine Sicherungsdatei erstellen (Einstellungen, gelernte Wörter,
+E-Mail-Adressen, angeheftete Zwischenablage – jeweils abwählbar). Den Speicherort wählst du in der Dateiauswahl des
+Systems; landet die Datei in einem Cloud-Speicher, gelten dessen Bedingungen. zBoard überträgt dabei nichts an World
+of Bytes oder Dritte. Die Datei ist nicht verschlüsselt – bewahre sie entsprechend sorgfältig auf.
+
 ## Spracheingabe
 
 Wenn du auf das Mikrofon tippst, nutzt zBoard die Spracherkennung, die auf deinem Gerät installiert ist
@@ -80,6 +87,13 @@ The app has no internet permission, so it cannot send anything to the internet i
 - **Recently used emoji** and your **settings**.
 
 Android deletes all of this data when you uninstall the app.
+
+## Backup and restore
+
+Under "Backup & restore" you can create a backup file yourself (settings, learned words, email addresses, pinned
+clipboard items – each optional). You choose where it is saved in the system file picker; if it ends up in a cloud
+storage service, that service's terms apply. zBoard sends nothing to World of Bytes or third parties. The file is not
+encrypted, so keep it somewhere safe.
 
 ## Voice typing
 

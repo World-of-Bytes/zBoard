@@ -209,17 +209,27 @@ public sealed partial class EmailMemory
     {
         lock (_lock)
         {
-            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
-            foreach (var e in _entries)
-            {
-                writer.Write(e.Address);
-                writer.Write('\t');
-                writer.Write(e.Count.ToString(CultureInfo.InvariantCulture));
-                writer.Write('\t');
-                writer.WriteLine(e.LastUsed.ToString(CultureInfo.InvariantCulture));
-            }
-
+            WriteTo(stream);
             IsDirty = false;
+        }
+    }
+
+    /// <summary>Schreibt wie <see cref="Save"/>, lässt aber <see cref="IsDirty"/> unverändert (für Sicherungen).</summary>
+    public void SaveCopy(Stream stream)
+    {
+        lock (_lock) WriteTo(stream);
+    }
+
+    void WriteTo(Stream stream)
+    {
+        using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
+        foreach (var e in _entries)
+        {
+            writer.Write(e.Address);
+            writer.Write('\t');
+            writer.Write(e.Count.ToString(CultureInfo.InvariantCulture));
+            writer.Write('\t');
+            writer.WriteLine(e.LastUsed.ToString(CultureInfo.InvariantCulture));
         }
     }
 }

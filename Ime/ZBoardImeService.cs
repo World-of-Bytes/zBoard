@@ -132,6 +132,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         // Wie Gboard: Zahlen-, PIN-, Telefon- und Datumsfelder bekommen ein Ziffernfeld statt Buchstaben
         _symbolsPage = _profile.IsNumeric ? NumpadPage : 0;
 
+        ReloadRestoredData();
         StartPanels();
         RefreshSystemBarPadding();
         UpdatePopupSpace(); // Platz für Popups über der Tastatur (falls Android das Fenster neu aufgebaut hat)
