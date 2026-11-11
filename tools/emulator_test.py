@@ -304,6 +304,16 @@ def main():
         text = field_text()
         check("Autokorrektur (dsa → das)", text.endswith("das "), f"→ „{text}“")
 
+        # Wie Gboard: Rücktaste direkt danach stellt das Getippte wieder her, Leerzeichen übernimmt es unverändert
+        tap(keys["Delete"])
+        time.sleep(0.5)
+        text = field_text()
+        check("Autokorrektur rückgängig (Rücktaste → dsa)", text.endswith("dsa"), f"→ „{text}“")
+        tap(keys["Space"])
+        time.sleep(0.5)
+        text = field_text()
+        check("Wiederhergestelltes Wort bleibt beim Leerzeichen", text.endswith("dsa "), f"→ „{text}“")
+
         type_text(keys, "haus ")
         text = field_text()
         check("Substantiv großschreiben (haus → Haus)", text.endswith("Haus "), f"→ „{text}“")

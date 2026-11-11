@@ -57,6 +57,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     long _lastSpaceMs;
     bool _autoSpaceInserted;    // Leerzeichen kam von einem Vorschlag
     Correction? _lastCorrection;
+    string? _restoredWord;      // per Rücktaste wiederhergestelltes Original; das nächste Leerzeichen übernimmt und lernt es
     SuggestionResult _currentSuggestions = SuggestionResult.Empty;
 
     bool _glideActive;                          // das Wort in Bearbeitung kam aus der Wischeingabe
@@ -119,6 +120,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _profile = EditorProfile.From(info);
         _composing.Clear();
         _lastCorrection = null;
+        _restoredWord = null;
         _autoSpaceInserted = false;
         _glideActive = false;
         _swipeAnchor = -1;
@@ -191,11 +193,17 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         {
             _composing.Clear();
             _glideActive = false;
+            _restoredWord = null;
             Ic?.FinishComposingText();
             UpdateSuggestions();
         }
 
-        if (newSelStart != oldSelStart && _composing.Length == 0) _lastCorrection = null;
+        // Die eigene Autokorrektur bewegt den Cursor auch; nur wenn er danach woanders steht, ist "Rückgängig" vorbei.
+        if (newSelStart != oldSelStart && _composing.Length == 0 && _lastCorrection is { } c
+            && (newSelStart != newSelEnd || !CursorFollows(c)))
+        {
+            _lastCorrection = null;
+        }
         if (_composing.Length == 0) UpdateAutoShift();
 
         // Wie Gboard: Antippen eines Worts im Text zeigt dessen Vorschläge erneut
@@ -377,15 +385,18 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             return;
         }
 
-        // Löschen direkt nach einer Autokorrektur stellt das ursprüngliche Wort wieder her.
-        if (_lastCorrection is { } c && _composing.Length == 0
-            && TextBeforeCursor(c.Corrected.Length + c.Separator.Length) == c.Corrected + c.Separator)
+        // Wie Gboard: Löschen direkt nach einer Autokorrektur stellt das getippte Wort wieder her ("brechen " → "umbrechen").
+        // Es bleibt in Bearbeitung; erst das nächste Leerzeichen übernimmt es unverändert und merkt es sich.
+        if (_lastCorrection is { } c && _composing.Length == 0 && CursorFollows(c))
         {
             ic.DeleteSurroundingText(c.Corrected.Length + c.Separator.Length, 0);
-            ic.CommitText(J(c.Original), 1);
+            _composing.Append(c.Original);
+            ic.SetComposingText(J(c.Original), 1);
             Engine?.SuppressCorrection(c.Original);
-            Learn(null, c.Original, accepted: true);
+            _restoredWord = c.Original;
             _lastCorrection = null;
+            UpdateSuggestions();
+            UpdateAutoShift();
             return;
         }
 
@@ -396,7 +407,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             int remove = _composing.Length >= 2 && char.IsSurrogatePair(_composing[^2], _composing[^1]) ? 2 : 1;
             _composing.Length -= remove;
             ic.SetComposingText(J(_composing.ToString()), 1);
-            if (_composing.Length == 0) ic.FinishComposingText();
+            if (_composing.Length == 0)
+            {
+                ic.FinishComposingText();
+                _restoredWord = null;
+            }
             UpdateSuggestions();
         }
         else
@@ -477,8 +492,10 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         string typed = _composing.ToString();
         string final = typed;
+        bool restored = typed == _restoredWord; // wiederhergestelltes Original: nicht korrigieren, sondern lernen
+        _restoredWord = null;
 
-        if (autocorrect && _settings.AutoCorrect && _profile.AllowAutocorrect)
+        if (autocorrect && !restored && _settings.AutoCorrect && _profile.AllowAutocorrect)
         {
             var result = Engine?.Suggest(typed);
             if (result?.AutoCorrection is { } corrected && corrected != typed)
@@ -493,8 +510,12 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _composing.Clear();
         _glideActive = false;
         _currentSuggestions = SuggestionResult.Empty;
-        Learn(previous, final);
+        Learn(previous, final, accepted: restored);
     }
+
+    /// <summary>Steht der Cursor direkt hinter dem autokorrigierten Wort samt Trennzeichen?</summary>
+    bool CursorFollows(Correction c) =>
+        TextBeforeCursor(c.Corrected.Length + c.Separator.Length) == c.Corrected + c.Separator;
 
     void OnSuggestionPicked(SuggestionSlot slot, long downUptime, long upUptime)
     {
