@@ -18,6 +18,9 @@ public sealed class BackupData
     /// <summary>Einstellungen: Schlüssel → <see cref="bool"/>, <see cref="int"/>, <see cref="long"/>, <see cref="float"/> oder <see cref="string"/>.</summary>
     public IReadOnlyDictionary<string, object>? Settings { get; init; }
 
+    /// <summary>Letzte Änderung der Einstellungen (Unix-ms, 0 = unbekannt); entscheidet bei der Synchronisation.</summary>
+    public long SettingsModified { get; init; }
+
     /// <summary>Angeheftete Einträge der Zwischenablage (Format von <c>ClipboardHistory.SerializePinned</c>).</summary>
     public string? PinnedClips { get; init; }
 
@@ -156,6 +159,7 @@ public static partial class BackupArchive
         json.WriteNumber("version", FormatVersion);
         json.WriteString("app", data.AppVersion);
         json.WriteString("created", data.Created.ToString("o", CultureInfo.InvariantCulture));
+        if (data.SettingsModified > 0) json.WriteNumber("settingsModified", data.SettingsModified);
         json.WriteStartArray("contents");
         foreach (var part in parts) json.WriteStringValue(part);
         json.WriteEndArray();
@@ -226,6 +230,7 @@ public static partial class BackupArchive
         HashSet<string> parts;
         string appVersion;
         DateTimeOffset created;
+        long settingsModified;
         using (var manifest = JsonDocument.Parse(ReadBytes(manifestEntry)))
         {
             var root = manifest.RootElement;
@@ -246,6 +251,7 @@ public static partial class BackupArchive
                       && DateTimeOffset.TryParse(c.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
                 ? parsed
                 : DateTimeOffset.MinValue;
+            settingsModified = root.TryGetProperty("settingsModified", out var sm) && sm.TryGetInt64(out long ms) && ms > 0 ? ms : 0;
             parts = root.TryGetProperty("contents", out var contents) && contents.ValueKind == JsonValueKind.Array
                 ? contents.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString()!).ToHashSet(StringComparer.Ordinal)
                 : [];
@@ -290,6 +296,7 @@ public static partial class BackupArchive
             AppVersion = appVersion,
             Created = created,
             Settings = settings,
+            SettingsModified = settingsModified,
             PinnedClips = pinned,
             Learned = learned,
             Emails = emails,

@@ -72,6 +72,7 @@ public sealed partial class ZBoardImeService
                 AppVersion = appVersion,
                 Created = DateTimeOffset.Now,
                 Settings = parts.HasFlag(BackupParts.Settings) ? settings.Export() : null,
+                SettingsModified = settings.SettingsModifiedMs,
                 PinnedClips = parts.HasFlag(BackupParts.PinnedClips) ? settings.PinnedClips : null,
                 Learned = learned,
                 Emails = parts.HasFlag(BackupParts.Emails) ? Emails(context) : null,
@@ -137,6 +138,95 @@ public sealed partial class ZBoardImeService
                 Engines.TryRemove(language, out _);
             }
         }
+    }
+
+    // ---------- Synchronisation ----------
+
+    /// <summary>Was in die Cloud geht: synchronisierte Einstellungen, Gelerntes, E-Mail-Adressen (keine Zwischenablage).</summary>
+    public static BackupData CreateSyncData(Context context, string appVersion)
+    {
+        var all = CreateBackup(context, BackupParts.Settings | BackupParts.Learned | BackupParts.Emails, appVersion);
+        return new BackupData
+        {
+            AppVersion = all.AppVersion,
+            Created = all.Created,
+            Settings = BackupMerge.SyncedSettings(all.Settings!),
+            SettingsModified = new ZBoardSettings(context).SettingsModifiedMs,
+            Learned = all.Learned,
+            Emails = all.Emails,
+        };
+    }
+
+    /// <summary>
+    /// Führt den Stand aus der Cloud mit dem eigenen zusammen: Gelerntes und E-Mail-Adressen werden vereint (nichts
+    /// Eigenes geht verloren, auch nicht, was während des Abgleichs getippt wurde), Einstellungen gewinnen, wenn sie
+    /// neuer sind. Auf dem Hauptthread aufrufen.
+    /// </summary>
+    public static void ApplySync(Context context, BackupData remote, bool firstSync)
+    {
+        lock (BackupLock)
+        {
+            if (remote.Learned != null)
+            {
+                foreach (var (language, theirs) in remote.Learned)
+                {
+                    if (BackupArchive.IsLanguageCode(language)) MergeLearned(context, language, theirs);
+                }
+            }
+
+            if (remote.Emails != null)
+            {
+                var emails = Emails(context);
+                if (emails.MergeFrom(remote.Emails))
+                {
+                    lock (EmailLock)
+                    {
+                        var path = EmailFile(context);
+                        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                        using var stream = File.Create(path);
+                        emails.Save(stream);
+                    }
+                }
+            }
+
+            var settings = new ZBoardSettings(context);
+            if (BackupMerge.TakeRemoteSettings(settings.SettingsModifiedMs, firstSync, remote))
+            {
+                settings.Import(BackupMerge.CombineSettings(settings.Export(), remote), pinnedClips: null, markModifiedNow: false);
+            }
+        }
+    }
+
+    static void MergeLearned(Context context, string language, UserHistory theirs)
+    {
+        var path = LearningFile(context, language);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        if (Engines.TryGetValue(language, out var task))
+        {
+            if (task.IsCompletedSuccessfully)
+            {
+                var live = task.Result.History;
+                if (!live.MergeFrom(theirs)) return;
+                using var stream = File.Create(path);
+                live.Save(stream);
+                return;
+            }
+
+            // Lädt gerade (vielleicht noch den alten Stand): verwerfen, das nächste Öffnen lädt die zusammengeführte Datei.
+            Engines.TryRemove(language, out _);
+        }
+
+        var history = new UserHistory();
+        if (File.Exists(path))
+        {
+            using var input = File.OpenRead(path);
+            history = UserHistory.Load(input);
+        }
+
+        if (!history.MergeFrom(theirs)) return;
+        using var output = File.Create(path);
+        history.Save(output);
     }
 
     /// <summary>Löscht die angeheftete Zwischenablage (aus den Einstellungen); gilt ab dem nächsten Öffnen der Tastatur.</summary>

@@ -23,6 +23,7 @@
     <Compile Include="../../Clipboard/ClipboardHistory.cs" Link="Core/ClipboardHistory.cs" />
     <Compile Include="../../Suggestions/EmailMemory.cs" Link="Core/EmailMemory.cs" />
     <Compile Include="../../Backup/BackupArchive.cs" Link="Core/BackupArchive.cs" />
+    <Compile Include="../../Backup/BackupMerge.cs" Link="Core/BackupMerge.cs" />
   </ItemGroup>
 
   <ItemGroup>

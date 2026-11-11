@@ -152,6 +152,67 @@ public sealed class UserHistory
         }
     }
 
+    /// <summary>
+    /// Synchronisation: übernimmt Wörter und Wortfolgen von <paramref name="other"/>, ohne eigene zu verlieren
+    /// (je Eintrag die höhere Anzahl). Gelöschtes kommt dadurch wieder, wenn ein anderes Gerät es noch kennt.
+    /// </summary>
+    /// <returns>true, wenn sich etwas geändert hat.</returns>
+    public bool MergeFrom(UserHistory other)
+    {
+        if (ReferenceEquals(other, this)) return false;
+        lock (other._lock)
+        lock (_lock)
+        {
+            bool changed = false;
+            foreach (var (key, (form, count)) in other._words)
+            {
+                if (_words.TryGetValue(key, out var mine))
+                {
+                    if (count <= mine.Count) continue;
+                    _words[key] = (mine.Form, count);
+                }
+                else
+                {
+                    _words[key] = (form, count);
+                }
+
+                changed = true;
+            }
+
+            foreach (var (prev, theirs) in other._bigrams)
+            {
+                if (!_bigrams.TryGetValue(prev, out var followers))
+                {
+                    followers = new Dictionary<string, int>(StringComparer.Ordinal);
+                    _bigrams[prev] = followers;
+                }
+
+                foreach (var (next, count) in theirs)
+                {
+                    if (followers.TryGetValue(next, out int mine))
+                    {
+                        if (count <= mine) continue;
+                    }
+                    else
+                    {
+                        _bigramCount++;
+                    }
+
+                    followers[next] = count;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                Prune();
+                IsDirty = true;
+            }
+
+            return changed;
+        }
+    }
+
     void WriteTo(Stream stream)
     {
         using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);

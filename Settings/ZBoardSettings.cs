@@ -1,4 +1,5 @@
 using Android.Content;
+using ZBoard.Backup;
 
 namespace ZBoard.Settings;
 
@@ -185,6 +186,45 @@ public sealed class ZBoardSettings
         set => PutString(PinnedClipsKey, value);
     }
 
+    // ---------- Synchronisation (gerätebezogen, wird selbst nicht synchronisiert) ----------
+
+    /// <summary>Automatisch über ein Plugin mit einem Cloud-Speicher abgleichen.</summary>
+    public bool SyncEnabled
+    {
+        get => _prefs.GetBoolean("syncEnabled", false);
+        set => PutBool("syncEnabled", value);
+    }
+
+    /// <summary>Paketname des Synchronisations-Plugins.</summary>
+    public string SyncPlugin
+    {
+        get => _prefs.GetString("syncPlugin", string.Empty) ?? string.Empty;
+        set => PutString("syncPlugin", value);
+    }
+
+    public long SyncLastAttemptMs
+    {
+        get => _prefs.GetLong("syncLastAttemptMs", 0);
+        set => PutLong("syncLastAttemptMs", value);
+    }
+
+    /// <summary>Letzter erfolgreicher Abgleich (0 = noch nie: dann übernimmt das Gerät die Einstellungen aus der Cloud).</summary>
+    public long SyncLastSuccessMs
+    {
+        get => _prefs.GetLong("syncLastSuccessMs", 0);
+        set => PutLong("syncLastSuccessMs", value);
+    }
+
+    /// <summary>Fehlermeldung des letzten Versuchs, leer bei Erfolg.</summary>
+    public string SyncLastError
+    {
+        get => _prefs.GetString("syncLastError", string.Empty) ?? string.Empty;
+        set => PutString("syncLastError", value);
+    }
+
+    /// <summary>Letzte Änderung an Einstellungen, die synchronisiert werden (Unix-ms).</summary>
+    public long SettingsModifiedMs => _prefs.GetLong(BackupMerge.SettingsModifiedKey, 0);
+
     public ThemeMode Theme
     {
         get => (ThemeMode)_prefs.GetInt("theme", (int)ThemeMode.System);
@@ -225,7 +265,11 @@ public sealed class ZBoardSettings
     /// Ersetzt die Einstellungen (nicht angegebene fallen auf den Standard zurück) und/oder die angeheftete
     /// Zwischenablage. <c>null</c> lässt den jeweiligen Teil unverändert. Schreibt sofort (Commit).
     /// </summary>
-    public void Import(IReadOnlyDictionary<string, object>? settings, string? pinnedClips)
+    /// <param name="markModifiedNow">
+    /// Zeitpunkt der letzten Änderung auf jetzt setzen (Wiederherstellen einer Sicherung: soll sich auf andere Geräte
+    /// verteilen). Bei der Synchronisation false: der Zeitpunkt kommt mit den Einstellungen.
+    /// </param>
+    public void Import(IReadOnlyDictionary<string, object>? settings, string? pinnedClips, bool markModifiedNow = true)
     {
         var edit = _prefs.Edit()!;
         if (settings != null)
@@ -249,13 +293,27 @@ public sealed class ZBoardSettings
             }
         }
 
+        if (settings != null && markModifiedNow) edit.PutLong(BackupMerge.SettingsModifiedKey, NowMs());
         if (pinnedClips != null) edit.PutString(PinnedClipsKey, pinnedClips);
         edit.Commit();
     }
 
-    void PutBool(string key, bool value) => _prefs.Edit()!.PutBoolean(key, value)!.Apply();
+    static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-    void PutInt(string key, int value) => _prefs.Edit()!.PutInt(key, value)!.Apply();
+    void PutBool(string key, bool value) => Apply(key, e => e.PutBoolean(key, value));
 
-    void PutString(string key, string value) => _prefs.Edit()!.PutString(key, value)!.Apply();
+    void PutInt(string key, int value) => Apply(key, e => e.PutInt(key, value));
+
+    void PutLong(string key, long value) => Apply(key, e => e.PutLong(key, value));
+
+    void PutString(string key, string value) => Apply(key, e => e.PutString(key, value));
+
+    /// <summary>Schreibt und merkt sich bei synchronisierten Einstellungen den Zeitpunkt der Änderung.</summary>
+    void Apply(string key, Action<ISharedPreferencesEditor> put)
+    {
+        var edit = _prefs.Edit()!;
+        put(edit);
+        if (!BackupMerge.IsDeviceKey(key)) edit.PutLong(BackupMerge.SettingsModifiedKey, NowMs());
+        edit.Apply();
+    }
 }

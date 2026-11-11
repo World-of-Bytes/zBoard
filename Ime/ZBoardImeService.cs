@@ -151,7 +151,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         UpdateAutoShift();
-
+        Sync.SyncManager.SyncIfDue(this); // holt Neues von anderen Geräten (höchstens alle 15 Minuten)
     }
 
     public override void OnFinishInputView(bool finishingInput)
@@ -174,6 +174,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         {
             // Gelerntes geht schlimmstenfalls seit dem letzten Speichern verloren; Tippen bleibt unbeeinträchtigt.
         }
+
+        Sync.SyncManager.SyncIfDue(this);
     }
 
     public override void OnUpdateSelection(
