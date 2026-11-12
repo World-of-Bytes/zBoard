@@ -75,14 +75,18 @@ public sealed class MultilingualEngine
     }
 
     /// <summary>Vorschläge für das gerade getippte Wort aus allen Sprachen.</summary>
-    public SuggestionResult Suggest(string typed, string? previousWord = null, int max = 3)
+    public SuggestionResult Suggest(string typed, string? previousWord = null, int max = 3) =>
+        Suggest(typed, new WordContext(previousWord), max);
+
+    /// <inheritdoc cref="Suggest(string, string?, int)"/>
+    public SuggestionResult Suggest(string typed, WordContext sentence, int max = 3)
     {
-        if (!IsMultilingual) return Primary.Suggest(typed, previousWord, max);
+        if (!IsMultilingual) return Primary.Suggest(typed, sentence, max);
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionResult.Empty;
 
-        int context = ContextLanguage(previousWord);
+        int context = ContextLanguage(sentence.PreviousWord);
         var proximity = Primary.Proximity;
-        var analyses = _engines.Select(e => e.Engine.Analyze(typed, previousWord, proximity, max)).ToArray();
+        var analyses = _engines.Select(e => e.Engine.Analyze(typed, sentence, proximity, max)).ToArray();
 
         var ranked = analyses
             .SelectMany((a, i) => a.Candidates.Select(c => (c.Word, Language: i, Score: c.Score * Weight(i, context))))
@@ -147,13 +151,21 @@ public sealed class MultilingualEngine
         IReadOnlyList<Vector2> path,
         IReadOnlyDictionary<char, Vector2> keys,
         string? previousWord = null,
+        int max = 4) =>
+        Glide(path, keys, new WordContext(previousWord), max);
+
+    /// <inheritdoc cref="Glide(IReadOnlyList{Vector2}, IReadOnlyDictionary{char, Vector2}, string?, int)"/>
+    public IReadOnlyList<string> Glide(
+        IReadOnlyList<Vector2> path,
+        IReadOnlyDictionary<char, Vector2> keys,
+        WordContext sentence,
         int max = 4)
     {
-        if (!IsMultilingual) return Primary.Glide(path, keys, previousWord, max);
+        if (!IsMultilingual) return [.. Primary.GlideScored(path, keys, sentence, max).Select(r => r.Word)];
 
-        int context = ContextLanguage(previousWord);
+        int context = ContextLanguage(sentence.PreviousWord);
         return _engines
-            .SelectMany((e, i) => e.Engine.GlideScored(path, keys, previousWord, max)
+            .SelectMany((e, i) => e.Engine.GlideScored(path, keys, sentence, max)
                 .Select(r => (r.Word, Score: r.Score + Math.Log(Weight(i, context)))))
             .OrderByDescending(r => r.Score)
             .Select(r => r.Word)
@@ -163,13 +175,18 @@ public sealed class MultilingualEngine
     }
 
     /// <summary>Nächstes Wort nach <paramref name="previousWord"/> aus allen Sprachen.</summary>
-    public IReadOnlyList<string> Predict(string previousWord, int max = 3)
-    {
-        if (!IsMultilingual) return Primary.Predict(previousWord, max);
+    public IReadOnlyList<string> Predict(string previousWord, int max = 3) =>
+        Predict(new WordContext(previousWord), max);
 
-        int context = ContextLanguage(previousWord);
+    /// <summary>Nächstes Wort an dieser Stelle im Satz aus allen Sprachen.</summary>
+    public IReadOnlyList<string> Predict(WordContext sentence, int max = 3)
+    {
+        if (!IsMultilingual) return Primary.Predict(sentence, max);
+
+        // Am Satzanfang und nach einem Komma verrät kein Wort die Sprache: die des Layouts zuerst.
+        int context = sentence.PreviousWord == null ? 0 : ContextLanguage(sentence.PreviousWord);
         return _engines
-            .SelectMany((e, i) => e.Engine.PredictScored(previousWord, max)
+            .SelectMany((e, i) => e.Engine.PredictScored(sentence, max)
                 .Select(p => (p.Word, Score: p.Score * Weight(i, context))))
             .OrderByDescending(p => p.Score)
             .Select(p => p.Word)

@@ -9,13 +9,14 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang en --verbose     
 dotnet run -c Release --project tools/SuggestionEval -- --lang de --text mein.txt  # eigener Text, ein Satz pro Zeile
 ```
 
-Weitere Optionen: `--runs`, `--sigma`, `--lazy`, `--seed`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
+Weitere Optionen: `--runs`, `--sigma`, `--lazy`, `--seed`, `--model`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
 dieselben Zahlen.
 
 ## Was gemessen wird
 
 **Vorschläge (fehlerfrei getippt):** Für jedes Wort wird geprüft, ob es vor dem ersten Buchstaben vorhergesagt wird
-und ab welchem Buchstaben es in der Leiste steht. „Gesparte Tastendrücke“ rechnet mit einem Nutzer, der einen
+und ab welchem Buchstaben es in der Leiste steht. Den Satzkontext liest die Messung wie der Tastaturdienst
+(`WordContext.FromText`). „Gesparte Tastendrücke“ rechnet mit einem Nutzer, der einen
 Vorschlag antippt, sobald er sichtbar ist.
 
 **Autokorrektur (ungenau getippt):** Jeder Tastendruck landet normalverteilt um die Tastenmitte (`--sigma`, in
@@ -30,16 +31,22 @@ Gelerntes gibt es nicht (frisch installierte Tastatur).
 
 | | Deutsch 0.11.1 | Deutsch jetzt | Englisch 0.11.1 | Englisch jetzt |
 | --- | --- | --- | --- | --- |
-| Nächstes Wort vorhergesagt, unter den ersten 3 | 15,6 % | 15,6 % | 18,2 % | 18,2 % |
-| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 59,0 % | 71,0 % | 72,5 % |
-| Gesparte Tastendrücke | 42,1 % | 41,9 % | 39,3 % | 40,0 % |
-| Tippfehler richtig korrigiert | 66,3 % | 73,4 % | 60,1 % | 72,1 % |
+| Nächstes Wort vorhergesagt, unter den ersten 3 | – | 31,0 % | – | 35,0 % |
+| … nur nach einem Wort (ohne Satzanfang und Komma) | 15,6 % | 28,2 % | 18,2 % | 33,6 % |
+| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 75,4 % | 71,0 % | 82,8 % |
+| Gesparte Tastendrücke | 42,1 % | 50,9 % | 39,3 % | 49,7 % |
+| Tippfehler richtig korrigiert | 66,3 % | 76,9 % | 60,1 % | 72,7 % |
 | Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 1,4 % | 0,0 % |
-| Falsche Wörter im Text nach der Korrektur | 8,8 % | 7,3 % | 8,5 % | 5,4 % |
+| Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | 2,0 % | 1,2 % | 1,0 % | 1,0 % |
+| Falsche Wörter im Text nach der Korrektur | 8,8 % | 5,8 % | 8,5 % | 5,3 % |
 
-„Jetzt“ enthält die englischen Kurzformen in der Wortliste („don't“, „I'm“) und die Korrektur seltener
-Wörterbucheinträge („fur“ → „für“, „dont“ → „don't“, „yiu“ → „you“; `LazySpellingRatio` und `RareWordRatio` in
-`SuggestionEngine`). Ohne bequem getippte Umlaute (`--lazy 0`) steigt die deutsche Korrekturquote von 71,7 % auf 75,1 %.
+Seit 0.11.1 dazugekommen:
+
+1. Englische Kurzformen in der Wortliste („don't“, „I'm“) und die Korrektur seltener Wörterbucheinträge („fur“ →
+   „für“, „dont“ → „don't“, „yiu“ → „you“; `LazySpellingRatio` und `RareWordRatio` in `SuggestionEngine`).
+2. Das Sprachmodell (`NgramModel`, erzeugt mit `tools/NgramBuilder`) statt der 5 000 Wortpaare: Vorhersage aus zwei
+   Wörtern Kontext, auch am Satzanfang und nach Komma; Vorschläge und Korrekturen nach dem Satz geordnet
+   (`MaxContextFactor`); Großschreibung mehrdeutiger Wörter aus dem Satz („eine frage“ → „Frage“, `NounContextRatio`).
 
 ## Grenzen
 

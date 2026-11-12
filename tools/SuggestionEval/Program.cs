@@ -24,16 +24,16 @@ using (var stream = File.OpenRead(Path.Combine(dictDir, $"{options.Language}.txt
     dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal);
 }
 
-var bigrams = BigramModel.Empty;
-string bigramPath = Path.Combine(dictDir, $"{options.Language}.bigrams.txt");
-if (File.Exists(bigramPath))
+var model = NgramModel.Empty;
+string modelPath = options.Model ?? Path.Combine(dictDir, $"{options.Language}.ngrams.bin");
+if (File.Exists(modelPath))
 {
-    using var stream = File.OpenRead(bigramPath);
-    bigrams = BigramModel.Load(stream);
+    using var stream = File.OpenRead(modelPath);
+    model = NgramModel.Load(stream);
 }
 
 var layout = Layouts.Alphabet(options.Language, showLanguageKey: false);
-var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), bigrams, new UserHistory());
+var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), model, new UserHistory());
 var words = Corpus.Load(textPath);
 if (words.Count == 0)
 {
@@ -41,11 +41,12 @@ if (words.Count == 0)
     return 1;
 }
 
-string? Context(TestWord word) => options.UseContext ? word.Previous : null;
+WordContext Context(TestWord word) => options.UseContext ? word.Context : WordContext.None;
 
 // ---------- 1. Vorschläge bei fehlerfreiem Tippen ----------
 
-int withContext = 0, predictedTop1 = 0, predictedTop3 = 0;
+int predictedTop1 = 0, predictedTop3 = 0;
+int afterWord = 0, afterWordTop3 = 0; // nur Stellen mit einem Wort davor (ohne Satzanfang und Komma)
 int halfWords = 0, halfTop1 = 0, halfTop3 = 0;
 long keysNeeded = 0, keysBaseline = 0;
 int unknown = 0;
@@ -56,15 +57,23 @@ foreach (var word in words)
     if (!engine.InDictionary(target)) unknown++;
 
     int cost = intended.Length + 1; // ausschreiben und Leertaste
-    if (word.Previous != null && options.UseContext)
+    if (options.UseContext)
     {
-        withContext++;
-        var predictions = engine.Predict(word.Previous, 3);
+        // Am Satzanfang ist die Umschalttaste aktiv: Die Leiste zeigt die Vorhersagen großgeschrieben.
+        var predictions = engine.Predict(word.Context, 3)
+            .Select(p => word.SentenceStart ? char.ToUpperInvariant(p[0]) + p[1..] : p).ToList();
+        bool hit = predictions.Contains(target);
         if (predictions.Count > 0 && predictions[0] == target) predictedTop1++;
-        if (predictions.Contains(target))
+        if (hit)
         {
             predictedTop3++;
             cost = 1; // antippen; das Leerzeichen kommt von selbst
+        }
+
+        if (word.Context.PreviousWord != null)
+        {
+            afterWord++;
+            if (hit) afterWordTop3++;
         }
     }
 
@@ -121,7 +130,7 @@ for (int run = 0; run < options.Runs; run++)
 
         if (options.Verbose && examples.Count < 400)
         {
-            examples.Add($"{(typo ? "Tippfehler" : "richtig"),-10}  {kind,-14}  {word.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {target})");
+            examples.Add($"{(typo ? "Tippfehler" : "richtig"),-10}  {kind,-14}  {word.Context.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {target})");
         }
     }
 }
@@ -142,8 +151,9 @@ Console.WriteLine($"Wörterbuch {dictionary.Count} Einträge, davon unbekannt im
 Console.WriteLine();
 Console.WriteLine("| Vorschläge (fehlerfrei getippt) | Wert |");
 Console.WriteLine("| --- | --- |");
-Console.WriteLine($"| Nächstes Wort vorhergesagt, Platz 1 | {Pct(predictedTop1, withContext)} |");
-Console.WriteLine($"| Nächstes Wort vorhergesagt, unter den ersten 3 | {Pct(predictedTop3, withContext)} |");
+Console.WriteLine($"| Nächstes Wort vorhergesagt, Platz 1 | {Pct(predictedTop1, words.Count)} |");
+Console.WriteLine($"| Nächstes Wort vorhergesagt, unter den ersten 3 | {Pct(predictedTop3, words.Count)} |");
+Console.WriteLine($"| … nur nach einem Wort (ohne Satzanfang und Komma) | {Pct(afterWordTop3, afterWord)} |");
 Console.WriteLine($"| Wort nach der Hälfte der Buchstaben in der Mitte der Leiste | {Pct(halfTop1, halfWords)} |");
 Console.WriteLine($"| Wort nach der Hälfte der Buchstaben in der Leiste | {Pct(halfTop3, halfWords)} |");
 Console.WriteLine($"| Gesparte Tastendrücke | {Pct(keysBaseline - keysNeeded, keysBaseline)} |");
@@ -216,11 +226,11 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool Verbose)
+        string Language, string? Text, string? Root, string? Model, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool Verbose)
     {
         public static Options? Parse(string[] args)
         {
-            var options = new Options("de", null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, Verbose: false);
+            var options = new Options("de", null, null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, Verbose: false);
             for (int i = 0; i < args.Length; i++)
             {
                 string? Value() => i + 1 < args.Length ? args[++i] : null;
@@ -228,6 +238,7 @@ namespace ZBoard.Tools.SuggestionEval
                 {
                     case "--lang" when Value() is { } v: options = options with { Language = v }; break;
                     case "--text" when Value() is { } v: options = options with { Text = v }; break;
+                    case "--model" when Value() is { } v: options = options with { Model = v }; break;
                     case "--root" when Value() is { } v: options = options with { Root = v }; break;
                     case "--seed" when Value() is { } v && int.TryParse(v, out var n): options = options with { Seed = n }; break;
                     case "--runs" when Value() is { } v && int.TryParse(v, out var n) && n > 0: options = options with { Runs = n }; break;
@@ -245,7 +256,7 @@ namespace ZBoard.Tools.SuggestionEval
                         Console.Error.WriteLine(
                             """
                             Aufruf: dotnet run -c Release --project tools/SuggestionEval -- [Optionen]
-                              --lang de|en|fr|es|it   Sprache (Wörterbuch, Wortpaare, Layout); Vorgabe de
+                              --lang de|en|fr|es|it   Sprache (Wörterbuch, Sprachmodell, Layout); Vorgabe de
                               --text <Datei>          eigener Testtext, ein Satz pro Zeile (Vorgabe: samples/<Sprache>.txt)
                               --runs <n>              Durchläufe mit unterschiedlichen Tippfehlern; Vorgabe 5
                               --sigma <x>             Streuung der Fingerposition in Tastenbreiten; Vorgabe 0.24
@@ -253,6 +264,7 @@ namespace ZBoard.Tools.SuggestionEval
                               --seed <n>              Startwert des Zufallsgenerators; Vorgabe 1
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben
+                              --model <Datei>         anderes Sprachmodell (Vorgabe: Assets/dict/<Sprache>.ngrams.bin)
                               --root <Ordner>         zBoard-Ordner, falls nicht von dort gestartet
                             """);
                         return null;

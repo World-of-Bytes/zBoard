@@ -43,7 +43,7 @@ public sealed record SuggestionAnalysis(
 
 /// <summary>
 /// Vorschläge, Autokorrektur und Nächstes-Wort-Vorhersage.
-/// Quellen: Wörterbuch, mitgelieferte Wortpaare und das, was zBoard aus den eigenen Eingaben gelernt hat.
+/// Quellen: Wörterbuch, Sprachmodell und das, was zBoard aus den eigenen Eingaben gelernt hat.
 /// </summary>
 public sealed class SuggestionEngine
 {
@@ -51,8 +51,23 @@ public sealed class SuggestionEngine
     const double CompletionWeight = 0.6;
     const double DistancePenaltyBase = 12.0;
     const double UserWordWeight = 5000.0;   // eine gelernte Verwendung zählt wie ein mittelhäufiges Wort
-    const double ContextBoost = 4.0;        // Vorschlag passt zum vorherigen Wort
-    const double UserBigramWeight = 0.5;    // je gelernte Wortfolge, gegenüber 0..1 aus den Wortpaaren
+    const double ContextBoost = 4.0;        // Vorschlag folgt in den eigenen Texten auf das vorherige Wort
+    const double UserBigramWeight = 0.5;    // je gelernte Wortfolge, gegenüber 0..1 aus dem Sprachmodell
+    const int GlideFollowers = 24;          // so viele typische Folgewörter bekommen beim Wischen einen Bonus
+
+    /// <summary>
+    /// Ein Wort, das an dieser Stelle im Satz x-mal wahrscheinlicher ist als sonst, zählt x-fach – höchstens so viel,
+    /// damit ein einzelner Kontext die Worthäufigkeit und den Tippabstand nicht überstimmt.
+    /// Abgestimmt mit tools/SuggestionEval.
+    /// </summary>
+    public const double MaxContextFactor = 100.0;
+
+    /// <summary>
+    /// So viel wahrscheinlicher muss die großgeschriebene Form eines mehrdeutigen Worts im Satz sein, damit zBoard sie
+    /// von selbst einsetzt ("eine frage" → "Frage"). Bei kleineren Werten wird zu oft fälschlich großgeschrieben
+    /// ("und liebe" → "Liebe").
+    /// </summary>
+    public const double NounContextRatio = 10.0;
 
     /// <summary>
     /// Die Wortlisten enthalten seltene Einträge, die fast immer bequeme Schreibweisen oder Tippfehler sind ("fur",
@@ -72,7 +87,7 @@ public sealed class SuggestionEngine
 
     readonly WordDictionary _dictionary;
     readonly KeyProximity _proximity;
-    readonly BigramModel _bigrams;
+    readonly NgramModel _model;
     readonly UserHistory _history;
     readonly HashSet<string> _noCorrection = new(StringComparer.OrdinalIgnoreCase);
     GlideDecoder? _glide;
@@ -80,12 +95,12 @@ public sealed class SuggestionEngine
     public SuggestionEngine(
         WordDictionary dictionary,
         KeyProximity proximity,
-        BigramModel? bigrams = null,
+        NgramModel? model = null,
         UserHistory? history = null)
     {
         _dictionary = dictionary;
         _proximity = proximity;
-        _bigrams = bigrams ?? BigramModel.Empty;
+        _model = model ?? NgramModel.Empty;
         _history = history ?? new UserHistory();
     }
 
@@ -95,11 +110,15 @@ public sealed class SuggestionEngine
     public void SuppressCorrection(string word) => _noCorrection.Add(word);
 
     /// <summary>Vorschläge für das gerade getippte Wort; <paramref name="previousWord"/> verbessert die Reihenfolge.</summary>
-    public SuggestionResult Suggest(string typed, string? previousWord = null, int max = 3)
+    public SuggestionResult Suggest(string typed, string? previousWord = null, int max = 3) =>
+        Suggest(typed, new WordContext(previousWord), max);
+
+    /// <summary>Vorschläge für das gerade getippte Wort; der Satzkontext verbessert die Reihenfolge.</summary>
+    public SuggestionResult Suggest(string typed, WordContext context, int max = 3)
     {
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionResult.Empty;
 
-        var analysis = Analyze(typed, previousWord, max: max);
+        var analysis = Analyze(typed, context, max: max);
         var candidates = analysis.Candidates.Take(max).Select(c => c.Word).ToList();
 
         string? autoCorrection = null;
@@ -124,7 +143,11 @@ public sealed class SuggestionEngine
     /// <see cref="Suggest"/> und für die mehrsprachige Eingabe, die mehrere Sprachen gegeneinander abwägt.
     /// </summary>
     /// <param name="proximity">Tastennachbarn des tatsächlich angezeigten Layouts (sonst das eigene der Sprache).</param>
-    public SuggestionAnalysis Analyze(string typed, string? previousWord = null, KeyProximity? proximity = null, int max = 8)
+    public SuggestionAnalysis Analyze(string typed, string? previousWord = null, KeyProximity? proximity = null, int max = 8) =>
+        Analyze(typed, new WordContext(previousWord), proximity, max);
+
+    /// <inheritdoc cref="Analyze(string, string?, KeyProximity?, int)"/>
+    public SuggestionAnalysis Analyze(string typed, WordContext context, KeyProximity? proximity = null, int max = 8)
     {
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionAnalysis.Empty;
         proximity ??= _proximity;
@@ -162,8 +185,7 @@ public sealed class SuggestionEngine
             _ => 2f,
         };
 
-        string? bestCorrection = null, bestLazy = null;
-        double bestCorrectionScore = 0, bestLazyScore = 0;
+        var corrections = new List<(string Word, double Score, double InContext)>(); // Bewertung ohne und mit Satzkontext
         if (maxDistance > 0 && !lower.Any(char.IsDigit))
         {
             foreach (var (word, freq, distance) in _dictionary.FindSimilar(lower, maxDistance, proximity.SubstitutionCost))
@@ -171,30 +193,41 @@ public sealed class SuggestionEngine
                 if (distance <= 0) continue;
                 double score = freq / Math.Pow(DistancePenaltyBase, distance);
                 Offer(word, score);
-                if (score > bestCorrectionScore)
-                {
-                    bestCorrectionScore = score;
-                    bestCorrection = word;
-                }
-
-                if (score > bestLazyScore && KeyProximity.IsLazySpelling(lower, word))
-                {
-                    bestLazyScore = score;
-                    bestLazy = word;
-                }
+                corrections.Add((word, score, score));
             }
         }
 
-        // 3. Satzkontext: Wörter, die typischerweise auf das vorherige folgen, nach vorn
-        if (previousWord != null)
+        // 3. Satzkontext: Wörter, die an dieser Stelle typisch sind, nach vorn
+        if (context.Previous != null)
         {
-            var followers = new HashSet<string>(
-                _bigrams.Followers(previousWord).Select(f => f.Next)
-                    .Concat(_history.Followers(previousWord).Select(f => f.Next)),
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var word in scores.Keys.ToList())
+            HashSet<string>? ownFollowers = context.PreviousWord is { } previousWord
+                ? new HashSet<string>(_history.Followers(previousWord).Select(f => f.Next), StringComparer.OrdinalIgnoreCase)
+                : null;
+            double Factor(string word)
             {
-                if (followers.Contains(word)) scores[word] *= ContextBoost;
+                double factor = Math.Min(MaxContextFactor, _model.ContextFactor(context, word));
+                return ownFollowers?.Contains(word) == true ? Math.Max(factor, ContextBoost) : factor;
+            }
+
+            foreach (var word in scores.Keys.ToList()) scores[word] *= Factor(word);
+
+            // Auch die Korrektur richtet sich nach dem Satz ("ich hae" → "habe", nicht das häufigere "hat").
+            for (int i = 0; i < corrections.Count; i++)
+            {
+                corrections[i] = corrections[i] with { InContext = corrections[i].Score * Factor(corrections[i].Word) };
+            }
+        }
+
+        // Welche Korrektur es wird, entscheidet der Satz mit; ob ein Wort aus dem Wörterbuch überhaupt korrigiert
+        // wird (weiter unten), entscheidet allein die Bewertung ohne Kontext.
+        (string Word, double Score, double InContext)? best = null, bestLazySpelling = null;
+        foreach (var correction in corrections)
+        {
+            if (best == null || correction.InContext > best.Value.InContext) best = correction;
+            if ((bestLazySpelling == null || correction.InContext > bestLazySpelling.Value.InContext)
+                && KeyProximity.IsLazySpelling(lower, correction.Word))
+            {
+                bestLazySpelling = correction;
             }
         }
 
@@ -207,7 +240,8 @@ public sealed class SuggestionEngine
             .ToList();
 
         string? nounForm = null;
-        if (_dictionary.Contains(lower) && IsLowerCase(typed) && NounOnly(lower) is { } noun
+        if (_dictionary.Contains(lower) && IsLowerCase(typed)
+            && (NounOnly(lower) ?? NounInContext(lower, context)) is { } noun
             && _history.LearnedForm(lower) != lower) // bewusst klein geschrieben und gelernt
         {
             nounForm = noun;
@@ -216,17 +250,17 @@ public sealed class SuggestionEngine
         // Steht das Getippte im Wörterbuch, gilt die Korrektur nur, wenn sie viel wahrscheinlicher ist. Die bequeme
         // Schreibweise hat dabei Vorrang vor einem anderen, häufigeren Wort ("wont" → "won't", nicht "want").
         bool overrides = false;
-        if (bestCorrection != null && typedFrequency > 0 && !learned && _history.CountOf(lower) == 0)
+        if (best != null && typedFrequency > 0 && !learned && _history.CountOf(lower) == 0)
         {
-            if (bestLazy != null && bestLazyScore >= LazySpellingRatio * typedFrequency)
+            if (bestLazySpelling is { } lazy && lazy.Score >= LazySpellingRatio * typedFrequency)
             {
-                (bestCorrection, bestCorrectionScore, overrides) = (bestLazy, bestLazyScore, true);
+                (best, overrides) = (lazy, true);
             }
             else
             {
                 // Großgeschriebene Einträge sind geprüfte Substantive und Namen ("Ost", "DDR") und bleiben stehen.
-                overrides = bestCorrection != bestLazy
-                    && bestCorrectionScore >= RareWordRatio * typedFrequency
+                overrides = best.Value.Word != bestLazySpelling?.Word
+                    && best.Value.Score >= RareWordRatio * typedFrequency
                     && !char.IsUpper(_dictionary.Lookup(lower)?.Word[0] ?? 'A');
             }
         }
@@ -234,7 +268,7 @@ public sealed class SuggestionEngine
         return new SuggestionAnalysis(
             typed,
             candidates,
-            bestCorrection == null ? null : (bestCorrection, bestCorrectionScore),
+            best == null ? null : (best.Value.Word, best.Value.InContext),
             nounForm,
             typedIsWord,
             _noCorrection.Contains(lower),
@@ -277,22 +311,32 @@ public sealed class SuggestionEngine
         IReadOnlyDictionary<char, System.Numerics.Vector2> keys,
         string? previousWord = null,
         int max = 4) =>
-        [.. GlideScored(path, keys, previousWord, max).Select(r => r.Word)];
+        [.. GlideScored(path, keys, new WordContext(previousWord), max).Select(r => r.Word)];
 
     /// <summary>Wie <see cref="Glide"/>, mit Bewertung (logarithmisch, höher ist besser).</summary>
     public IReadOnlyList<(string Word, double Score)> GlideScored(
         IReadOnlyList<System.Numerics.Vector2> path,
         IReadOnlyDictionary<char, System.Numerics.Vector2> keys,
         string? previousWord = null,
+        int max = 4) =>
+        GlideScored(path, keys, new WordContext(previousWord), max);
+
+    /// <inheritdoc cref="GlideScored(IReadOnlyList{System.Numerics.Vector2}, IReadOnlyDictionary{char, System.Numerics.Vector2}, string?, int)"/>
+    public IReadOnlyList<(string Word, double Score)> GlideScored(
+        IReadOnlyList<System.Numerics.Vector2> path,
+        IReadOnlyDictionary<char, System.Numerics.Vector2> keys,
+        WordContext context,
         int max = 4)
     {
         HashSet<string>? followers = null;
-        if (previousWord != null)
+        if (context.Previous != null)
         {
             followers = new HashSet<string>(
-                _bigrams.Followers(previousWord).Select(f => f.Next.ToLowerInvariant())
-                    .Concat(_history.Followers(previousWord).Select(f => f.Next.ToLowerInvariant())),
-                StringComparer.Ordinal);
+                _model.Predict(context, GlideFollowers).Select(f => f.Word.ToLowerInvariant()), StringComparer.Ordinal);
+            if (context.PreviousWord is { } previousWord)
+            {
+                followers.UnionWith(_history.Followers(previousWord).Select(f => f.Next.ToLowerInvariant()));
+            }
         }
 
         _glide ??= new GlideDecoder(_dictionary, _history);
@@ -301,23 +345,34 @@ public sealed class SuggestionEngine
 
     /// <summary>Nächstes Wort nach <paramref name="previousWord"/>; eigene Wortfolgen haben Vorrang.</summary>
     public IReadOnlyList<string> Predict(string previousWord, int max = 3) =>
-        [.. PredictScored(previousWord, max).Select(p => p.Word)];
+        [.. PredictScored(new WordContext(previousWord), max).Select(p => p.Word)];
 
-    /// <summary>Wie <see cref="Predict"/>, mit Bewertung (Wortpaare 0..1, je gelernte Folge +0,5).</summary>
-    public IReadOnlyList<(string Word, double Score)> PredictScored(string previousWord, int max = 3)
+    /// <summary>Nächstes Wort an dieser Stelle im Satz; eigene Wortfolgen haben Vorrang.</summary>
+    public IReadOnlyList<string> Predict(WordContext context, int max = 3) =>
+        [.. PredictScored(context, max).Select(p => p.Word)];
+
+    /// <summary>Wie <see cref="Predict(string, int)"/>, mit Bewertung.</summary>
+    public IReadOnlyList<(string Word, double Score)> PredictScored(string previousWord, int max = 3) =>
+        PredictScored(new WordContext(previousWord), max);
+
+    /// <summary>Wie <see cref="Predict(WordContext, int)"/>, mit Bewertung (Sprachmodell 0..1, je gelernte Folge +0,5).</summary>
+    public IReadOnlyList<(string Word, double Score)> PredictScored(WordContext context, int max = 3)
     {
         var scores = new Dictionary<string, double>(StringComparer.Ordinal);
 
-        var seed = _bigrams.Followers(previousWord);
+        var seed = _model.Predict(context, Math.Max(max, 6));
         if (seed.Count > 0)
         {
-            double top = seed[0].Freq;
-            foreach (var (next, freq) in seed) scores[next] = freq / top;
+            double top = seed[0].Probability;
+            foreach (var (next, probability) in seed) scores[next] = probability / top;
         }
 
-        foreach (var (next, count) in _history.Followers(previousWord))
+        if (context.PreviousWord is { } previousWord)
         {
-            scores[next] = scores.GetValueOrDefault(next) + count * UserBigramWeight;
+            foreach (var (next, count) in _history.Followers(previousWord))
+            {
+                scores[next] = scores.GetValueOrDefault(next) + count * UserBigramWeight;
+            }
         }
 
         return scores
@@ -366,6 +421,29 @@ public sealed class SuggestionEngine
     {
         var forms = _dictionary.Forms(lower);
         return forms.Count > 0 && forms.All(f => f.Length > 0 && char.IsUpper(f[0])) ? forms[0] : null;
+    }
+
+    /// <summary>
+    /// Bei Wörtern mit beiden Schreibweisen ("frage"/"Frage", "essen"/"Essen") die großgeschriebene, wenn sie an
+    /// dieser Stelle im Satz klar wahrscheinlicher ist ("eine Frage", "das Essen", "vielen Dank").
+    /// </summary>
+    string? NounInContext(string lower, WordContext context)
+    {
+        if (context.Previous == null) return null;
+        var forms = _dictionary.Forms(lower);
+        if (forms.Count < 2 || !forms.Contains(lower)) return null;
+
+        string? best = null;
+        double bestProbability = _model.FormProbability(context, lower) * NounContextRatio;
+        if (bestProbability <= 0) return null;
+        foreach (var form in forms)
+        {
+            if (form == lower || !char.IsUpper(form[0])) continue;
+            double probability = _model.FormProbability(context, form);
+            if (probability >= bestProbability) (best, bestProbability) = (form, probability);
+        }
+
+        return best;
     }
 
     static bool IsLowerCase(string text) => text.Length > 0 && !text.Any(char.IsUpper);

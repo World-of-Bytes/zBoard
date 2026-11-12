@@ -28,7 +28,7 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Multilingual typing (several dictionaries at once, “DE · EN” on the space bar) | ✓ | ✓ up to three languages, language of the previous word preferred |
 | Capitalisation at the start of a sentence | ✓ | ✓ also in apps that don't ask for it |
 | Capitalising German nouns | ✓ | ✓ |
-| Next-word prediction | ✓ | ✓ bundled word pairs plus your own word sequences |
+| Next-word prediction | ✓ | ✓ language model of two- and three-word sequences plus your own word sequences, also at sentence start and after a comma |
 | Suggesting whole phrases ("freundlichen Grüßen") | ✓ | ✓ from what it has learned |
 | Suggestions for a word you tap in the text | ✓ | ✓ tapping replaces the whole word |
 | Suggesting email addresses | ✓ | ✓ remembered addresses and common providers after "@" |
@@ -100,10 +100,10 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang de
 | `Keyboard/` | layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
 | `Emoji/` | `EmojiCatalog` (data, search, skin tones), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (start screen), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (backup file: writing, reading, validation) |
-| `Assets/dict/` | word lists and word pairs per language |
+| `Assets/dict/` | word lists and language models per language |
 | `Assets/emoji/` | emoji by category, names and search terms per language |
 | `Plugins/` | `PluginContract` (interface), `PluginRegistry` (installed plugins), `PluginClient` (messenger) |
 | `plugin-apps/DeepL/` | plugin app "zBoard DeepL" (a separate app with internet permission) |
@@ -120,8 +120,10 @@ The script filters out typical typos from the subtitles ("nciht", "waht").
 The source splits English contractions ("don't", "I'm") into two entries; the script puts them back together
 (frequencies partly estimated, see `EN_SUFFIX_SHARES`).
 
-For prediction: the 5,000 most frequent word pairs each (`de.bigrams.txt`, `en.bigrams.txt`) from the Google Books
-Ngram Corpus, format `first<TAB>second<TAB>frequency`. zBoard learns the rest from your typing
+For prediction: one language model per language (`de.ngrams.bin` …) with the 200,000 most frequent two-word and
+150,000 most frequent three-word sequences, counted in the public-domain sentence collection of Mozilla Common Voice.
+It drives next-word prediction, the order of suggestions, the choice of correction and the capitalisation of
+ambiguous German words ("eine frage" → "Frage"). zBoard learns the rest from your typing
 (`files/learning/<language>.tsv` in the app's private storage).
 
 Capitalisation in German:
@@ -144,20 +146,30 @@ python3 tools/build_dictionaries.py \
   --freq-de FrequencyWords/content/2018/de/de_full.txt \
   --freq-en FrequencyWords/content/2018/en/en_full.txt \
   --nouns german-nouns/german_nouns/nouns.csv \
-  --hunspell-de dictionaries/dictionaries/de/index.dic \
-  --bigrams-de google-books-ngram-frequency/ngrams/2grams_german.csv \
-  --bigrams-en google-books-ngram-frequency/ngrams/2grams_english.csv
+  --hunspell-de dictionaries/dictionaries/de/index.dic
 ```
-
-The word pairs come from `git clone --depth 1 https://github.com/orgtre/google-books-ngram-frequency`.
 
 Capitalisation errors can be corrected with the hand-maintained lists at the top of the script
 (`DE_FORCE_LOWER`, `DE_FORCE_NOUN`, `DE_FORCE_BOTH`).
 
+### Regenerating the language models
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/common-voice/common-voice
+git -C common-voice sparse-checkout set --no-cone '/server/data/de/*' '/server/data/en/*'
+
+dotnet run -c Release --project tools/NgramBuilder -- \
+  --words Assets/dict/de.txt --out Assets/dict/de.ngrams.bin --common-voice common-voice/server/data/de
+```
+
+Likewise for the other languages (`en`, `fr`, `es`, `it`). Submitted everyday sentences count ten times, Wikipedia
+sentences only 15 %, because they read differently from messages; add your own texts with `--source`.
+Regenerate the models after changing the word lists so the spellings match.
+
 ## License
 
-The code is licensed under the **BSD 2-Clause License** (`LICENSE`). The word lists in `Assets/dict/` are licensed
-under **CC BY-SA 4.0**, the word pairs under **CC BY 3.0**; sources and obligations in `THIRD_PARTY_NOTICES.md`.
+The code is licensed under the **BSD 2-Clause License** (`LICENSE`). The word lists and language models in
+`Assets/dict/` are licensed under **CC BY-SA 4.0**; sources and obligations in `THIRD_PARTY_NOTICES.md`.
 The app credits the sources under "About zBoard".
 
 ## Glide typing
@@ -241,7 +253,7 @@ python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json 
 
 The logo, the app icon and the icons of the plugin apps (World of Bytes colours) are generated by `python3 tools/build_logo.py`; the Play Store graphics by `node tools/render_store_graphics.js`.
 
-More dictionary languages: `--extra fr:fr_full.txt:2grams_french.csv` (see `tools/build_dictionaries.py --help`).
+More dictionary languages: `--extra fr:fr_full.txt` (see `tools/build_dictionaries.py --help`).
 
 ## Next steps
 

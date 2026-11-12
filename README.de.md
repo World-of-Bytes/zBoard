@@ -28,7 +28,7 @@ Stand: **alle fünf Meilensteine umgesetzt** – Testphase auf echten Geräten, 
 | Großschreibung deutscher Substantive | ✓ | ✓ |
 | Mehrsprachige Eingabe (mehrere Wörterbücher gleichzeitig, „DE · EN“ auf der Leertaste) | ✓ | ✓ bis zu drei Sprachen, Sprache des vorherigen Worts bevorzugt |
 | Großschreibung am Satzanfang | ✓ | ✓ auch in Apps, die sie nicht anfordern |
-| Nächstes-Wort-Vorhersage | ✓ | ✓ mitgelieferte Wortpaare plus eigene Wortfolgen |
+| Nächstes-Wort-Vorhersage | ✓ | ✓ Sprachmodell aus Zweier- und Dreierfolgen plus eigene Wortfolgen, auch am Satzanfang und nach Komma |
 | Ganze Wortfolgen vorschlagen („freundlichen Grüßen“) | ✓ | ✓ aus Gelerntem |
 | Vorschläge für ein angetipptes Wort im Text | ✓ | ✓ Antippen ersetzt das ganze Wort |
 | E-Mail-Adressen vorschlagen | ✓ | ✓ gemerkte Adressen und bekannte Anbieter nach „@“ |
@@ -100,10 +100,10 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang de
 | `Keyboard/` | Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `BigramModel`, `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (Sicherungsdatei: Schreiben, Lesen, Prüfen) |
-| `Assets/dict/` | Wortlisten und Wortpaare pro Sprache |
+| `Assets/dict/` | Wortlisten und Sprachmodelle pro Sprache |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
 | `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
 | `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
@@ -120,8 +120,10 @@ Typische Tippfehler aus den Untertiteln („nciht“, „waht“) filtert das Sk
 Englische Kurzformen („don't“, „I'm“) zerlegt die Quelle in zwei Einträge; das Skript setzt sie wieder zusammen
 (Häufigkeiten teils geschätzt, siehe `EN_SUFFIX_SHARES`).
 
-Für die Vorhersage: je 5 000 häufigste Wortpaare (`de.bigrams.txt`, `en.bigrams.txt`) aus dem Google Books
-Ngram Corpus, Format `erstes<TAB>zweites<TAB>häufigkeit`. Den Rest lernt zBoard aus deinen Eingaben
+Für die Vorhersage: ein Sprachmodell je Sprache (`de.ngrams.bin` …) mit den 200 000 häufigsten Zweier- und 150 000
+häufigsten Dreierfolgen von Wörtern, gezählt in der gemeinfreien Satzsammlung von Mozilla Common Voice. Es bestimmt
+die Vorhersage des nächsten Worts, die Reihenfolge der Vorschläge, die Wahl der Korrektur und die Großschreibung
+mehrdeutiger Wörter („eine frage“ → „Frage“). Den Rest lernt zBoard aus deinen Eingaben
 (`files/learning/<sprache>.tsv` im app-privaten Speicher).
 
 Großschreibung im Deutschen:
@@ -144,20 +146,30 @@ python3 tools/build_dictionaries.py \
   --freq-de FrequencyWords/content/2018/de/de_full.txt \
   --freq-en FrequencyWords/content/2018/en/en_full.txt \
   --nouns german-nouns/german_nouns/nouns.csv \
-  --hunspell-de dictionaries/dictionaries/de/index.dic \
-  --bigrams-de google-books-ngram-frequency/ngrams/2grams_german.csv \
-  --bigrams-en google-books-ngram-frequency/ngrams/2grams_english.csv
+  --hunspell-de dictionaries/dictionaries/de/index.dic
 ```
-
-Die Wortpaare kommen aus `git clone --depth 1 https://github.com/orgtre/google-books-ngram-frequency`.
 
 Fehler in der Großschreibung lassen sich über die Handlisten oben im Skript korrigieren
 (`DE_FORCE_LOWER`, `DE_FORCE_NOUN`, `DE_FORCE_BOTH`).
 
+### Sprachmodelle neu erzeugen
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/common-voice/common-voice
+git -C common-voice sparse-checkout set --no-cone '/server/data/de/*' '/server/data/en/*'
+
+dotnet run -c Release --project tools/NgramBuilder -- \
+  --words Assets/dict/de.txt --out Assets/dict/de.ngrams.bin --common-voice common-voice/server/data/de
+```
+
+Für die anderen Sprachen entsprechend (`en`, `fr`, `es`, `it`). Eingesandte Alltagssätze zählen zehnfach, Sätze aus
+Wikipedia nur zu 15 %, weil sie anders klingen als Nachrichten; eigene Texte lassen sich mit `--source` dazunehmen.
+Nach einer Änderung an den Wortlisten die Modelle neu erzeugen, damit die Schreibweisen übereinstimmen.
+
 ## Lizenz
 
-Der Code steht unter der **BSD 2-Clause License** (`LICENSE`). Die Wortlisten in `Assets/dict/` stehen unter
-**CC BY-SA 4.0**, die Wortpaare unter **CC BY 3.0**; Quellen und Pflichten in `THIRD_PARTY_NOTICES.md`. Die App nennt die Quellen unter „Über zBoard“.
+Der Code steht unter der **BSD 2-Clause License** (`LICENSE`). Die Wortlisten und Sprachmodelle in `Assets/dict/` stehen
+unter **CC BY-SA 4.0**; Quellen und Pflichten in `THIRD_PARTY_NOTICES.md`. Die App nennt die Quellen unter „Über zBoard“.
 
 ## Wischeingabe
 
@@ -243,7 +255,7 @@ python3 tools/build_emoji.py --emoji-json unicode-emoji-json/data-by-group.json 
 
 Das Logo, das App-Symbol und die Symbole der Plugin-Apps (Farben von World of Bytes) erzeugt `python3 tools/build_logo.py`, die Play-Store-Grafiken `node tools/render_store_graphics.js`.
 
-Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt:2grams_french.csv` (siehe `tools/build_dictionaries.py --help`).
+Weitere Sprachen für die Wörterbücher: `--extra fr:fr_full.txt` (siehe `tools/build_dictionaries.py --help`).
 
 ## Nächste Schritte
 
