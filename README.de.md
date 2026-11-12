@@ -117,6 +117,8 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang de
 Mitgeliefert: **Deutsch** mit 120 000 Wörtern, **Englisch** mit 100 000 Wörtern, jeweils nach Häufigkeit
 aus Film- und Serienuntertiteln (OpenSubtitles 2018). Format: eine Schreibweise pro Zeile, `wort<TAB>häufigkeit`.
 Typische Tippfehler aus den Untertiteln („nciht“, „waht“) filtert das Skript heraus.
+Englische Kurzformen („don't“, „I'm“) zerlegt die Quelle in zwei Einträge; das Skript setzt sie wieder zusammen
+(Häufigkeiten teils geschätzt, siehe `EN_SUFFIX_SHARES`).
 
 Für die Vorhersage: je 5 000 häufigste Wortpaare (`de.bigrams.txt`, `en.bigrams.txt`) aus dem Google Books
 Ngram Corpus, Format `erstes<TAB>zweites<TAB>häufigkeit`. Den Rest lernt zBoard aus deinen Eingaben

@@ -23,6 +23,10 @@ public sealed record SuggestionResult(
 /// <param name="CorrectionSuppressed">Der Nutzer hat eine Korrektur dieses Worts rückgängig gemacht.</param>
 /// <param name="TypedFrequency">Häufigkeit des getippten Worts im Wörterbuch (0, wenn unbekannt).</param>
 /// <param name="TypedLearned">Das getippte Wort wurde oft genug selbst geschrieben.</param>
+/// <param name="CorrectionOverrides">
+/// Das Getippte steht zwar im Wörterbuch, die Korrektur ist aber so viel wahrscheinlicher, dass sie trotzdem gilt
+/// ("fur" → "für", "dont" → "don't").
+/// </param>
 public sealed record SuggestionAnalysis(
     string Typed,
     IReadOnlyList<(string Word, double Score)> Candidates,
@@ -31,7 +35,8 @@ public sealed record SuggestionAnalysis(
     bool TypedIsWord,
     bool CorrectionSuppressed,
     int TypedFrequency = 0,
-    bool TypedLearned = false)
+    bool TypedLearned = false,
+    bool CorrectionOverrides = false)
 {
     public static readonly SuggestionAnalysis Empty = new(string.Empty, [], null, null, false, false);
 }
@@ -48,6 +53,22 @@ public sealed class SuggestionEngine
     const double UserWordWeight = 5000.0;   // eine gelernte Verwendung zählt wie ein mittelhäufiges Wort
     const double ContextBoost = 4.0;        // Vorschlag passt zum vorherigen Wort
     const double UserBigramWeight = 0.5;    // je gelernte Wortfolge, gegenüber 0..1 aus den Wortpaaren
+
+    /// <summary>
+    /// Die Wortlisten enthalten seltene Einträge, die fast immer bequeme Schreibweisen oder Tippfehler sind ("fur",
+    /// "mussen", "dont", "yiu"). Ein solcher Eintrag wird trotzdem korrigiert, wenn die Korrektur um diesen Faktor
+    /// wahrscheinlicher ist. Für weggelassene Umlaute, Akzente und Apostrophe reicht ein kleiner Faktor: Das tippt man
+    /// mit Absicht so.
+    /// </summary>
+    public const double LazySpellingRatio = 30.0;
+
+    /// <summary>
+    /// Wie <see cref="LazySpellingRatio"/> für alle anderen Fehler (Nachbartaste, Buchstabe fehlt …). Sehr streng,
+    /// damit seltene echte Wörter stehen bleiben ("fettig" neben "fertig"): Es trifft nur Einträge, die seltener als
+    /// etwa einmal pro Million Wörter vorkommen und neben einem der häufigsten Wörter liegen.
+    /// Abgestimmt mit tools/SuggestionEval.
+    /// </summary>
+    public const double RareWordRatio = 3000.0;
 
     readonly WordDictionary _dictionary;
     readonly KeyProximity _proximity;
@@ -84,7 +105,7 @@ public sealed class SuggestionEngine
         string? autoCorrection = null;
         if (!analysis.CorrectionSuppressed)
         {
-            if (!analysis.TypedIsWord && analysis.Correction is { } correction && typed.Length >= 2)
+            if ((!analysis.TypedIsWord || analysis.CorrectionOverrides) && analysis.Correction is { } correction && typed.Length >= 2)
             {
                 autoCorrection = MatchCase(correction.Word, typed);
             }
@@ -110,7 +131,8 @@ public sealed class SuggestionEngine
 
         var lower = typed.ToLowerInvariant();
         bool learned = _history.IsKnown(lower);
-        bool typedIsWord = _dictionary.Contains(lower) || learned;
+        int typedFrequency = _dictionary.Lookup(lower)?.Freq ?? ApostropheFormFrequency(lower);
+        bool typedIsWord = typedFrequency > 0 || learned;
         var scores = new Dictionary<string, double>(StringComparer.Ordinal);
 
         void Offer(string word, double score)
@@ -134,13 +156,14 @@ public sealed class SuggestionEngine
         // 2. Korrekturen per gewichteter Editierdistanz
         float maxDistance = lower.Length switch
         {
-            <= 2 => 0f,
+            <= 1 => 0f,
+            2 => WordDictionary.MissingApostropheCost, // nur Umlaut, Akzent oder Apostroph: "im" → "I'm", "ol" → "Öl"
             <= 5 => 1f,
             _ => 2f,
         };
 
-        string? bestCorrection = null;
-        double bestCorrectionScore = 0;
+        string? bestCorrection = null, bestLazy = null;
+        double bestCorrectionScore = 0, bestLazyScore = 0;
         if (maxDistance > 0 && !lower.Any(char.IsDigit))
         {
             foreach (var (word, freq, distance) in _dictionary.FindSimilar(lower, maxDistance, proximity.SubstitutionCost))
@@ -152,6 +175,12 @@ public sealed class SuggestionEngine
                 {
                     bestCorrectionScore = score;
                     bestCorrection = word;
+                }
+
+                if (score > bestLazyScore && KeyProximity.IsLazySpelling(lower, word))
+                {
+                    bestLazyScore = score;
+                    bestLazy = word;
                 }
             }
         }
@@ -184,6 +213,24 @@ public sealed class SuggestionEngine
             nounForm = noun;
         }
 
+        // Steht das Getippte im Wörterbuch, gilt die Korrektur nur, wenn sie viel wahrscheinlicher ist. Die bequeme
+        // Schreibweise hat dabei Vorrang vor einem anderen, häufigeren Wort ("wont" → "won't", nicht "want").
+        bool overrides = false;
+        if (bestCorrection != null && typedFrequency > 0 && !learned && _history.CountOf(lower) == 0)
+        {
+            if (bestLazy != null && bestLazyScore >= LazySpellingRatio * typedFrequency)
+            {
+                (bestCorrection, bestCorrectionScore, overrides) = (bestLazy, bestLazyScore, true);
+            }
+            else
+            {
+                // Großgeschriebene Einträge sind geprüfte Substantive und Namen ("Ost", "DDR") und bleiben stehen.
+                overrides = bestCorrection != bestLazy
+                    && bestCorrectionScore >= RareWordRatio * typedFrequency
+                    && !char.IsUpper(_dictionary.Lookup(lower)?.Word[0] ?? 'A');
+            }
+        }
+
         return new SuggestionAnalysis(
             typed,
             candidates,
@@ -191,8 +238,25 @@ public sealed class SuggestionEngine
             nounForm,
             typedIsWord,
             _noCorrection.Contains(lower),
-            _dictionary.Lookup(lower)?.Freq ?? 0,
-            learned);
+            typedFrequency,
+            learned,
+            overrides);
+    }
+
+    /// <summary>
+    /// Wörter mit Apostroph, die nicht einzeln im Wörterbuch stehen, aber aus bekannten Teilen bestehen: Genitiv und
+    /// angehängtes "s" ("John's", "geht's", "parents'") und Elisionen ("l'amico", "j'ai": "l'" und "j'" stehen in
+    /// der Wortliste). Liefert die Häufigkeit des Hauptworts, 0 für alles andere.
+    /// </summary>
+    int ApostropheFormFrequency(string lower)
+    {
+        int cut = lower.LastIndexOf('\'');
+        if (cut <= 0) return 0;
+
+        string head = lower[..cut], tail = lower[(cut + 1)..];
+        if (tail is "" or "s") return _dictionary.Lookup(head)?.Freq ?? 0;
+        if (tail.Contains('\'')) return 0;
+        return _dictionary.Contains(lower[..(cut + 1)]) ? _dictionary.Lookup(tail)?.Freq ?? 0 : 0;
     }
 
     /// <summary>Steht das Wort im Wörterbuch dieser Sprache?</summary>

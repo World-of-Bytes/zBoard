@@ -94,7 +94,7 @@ List<string> examples = [];
 
 for (int run = 0; run < options.Runs; run++)
 {
-    var noise = new TypingNoise(layout, options.Seed + run) { Sigma = options.Sigma };
+    var noise = new TypingNoise(layout, options.Seed + run) { Sigma = options.Sigma, LazyAccentRate = options.Lazy };
     foreach (var word in words)
     {
         string target = word.Target, intended = word.Intended;
@@ -216,11 +216,11 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, int Seed, int Runs, double Sigma, bool UseContext, bool Verbose)
+        string Language, string? Text, string? Root, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool Verbose)
     {
         public static Options? Parse(string[] args)
         {
-            var options = new Options("de", null, null, Seed: 1, Runs: 5, Sigma: 0.24, UseContext: true, Verbose: false);
+            var options = new Options("de", null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, Verbose: false);
             for (int i = 0; i < args.Length; i++)
             {
                 string? Value() => i + 1 < args.Length ? args[++i] : null;
@@ -235,6 +235,10 @@ namespace ZBoard.Tools.SuggestionEval
                         && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var s) && s >= 0:
                         options = options with { Sigma = s };
                         break;
+                    case "--lazy" when Value() is { } v
+                        && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var l) && l is >= 0 and <= 1:
+                        options = options with { Lazy = l };
+                        break;
                     case "--no-context": options = options with { UseContext = false }; break;
                     case "--verbose": options = options with { Verbose = true }; break;
                     default:
@@ -245,6 +249,7 @@ namespace ZBoard.Tools.SuggestionEval
                               --text <Datei>          eigener Testtext, ein Satz pro Zeile (Vorgabe: samples/<Sprache>.txt)
                               --runs <n>              Durchläufe mit unterschiedlichen Tippfehlern; Vorgabe 5
                               --sigma <x>             Streuung der Fingerposition in Tastenbreiten; Vorgabe 0.24
+                              --lazy <x>              Anteil der Umlaute/Akzente, die als Grundbuchstabe getippt werden; Vorgabe 0.3
                               --seed <n>              Startwert des Zufallsgenerators; Vorgabe 1
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben

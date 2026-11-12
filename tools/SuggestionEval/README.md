@@ -9,7 +9,7 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang en --verbose     
 dotnet run -c Release --project tools/SuggestionEval -- --lang de --text mein.txt  # eigener Text, ein Satz pro Zeile
 ```
 
-Weitere Optionen: `--runs`, `--sigma`, `--seed`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
+Weitere Optionen: `--runs`, `--sigma`, `--lazy`, `--seed`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
 dieselben Zahlen.
 
 ## Was gemessen wird
@@ -26,16 +26,20 @@ dann im Text stünde.
 Wie am Gerät tippt der simulierte Nutzer mitten im Satz alles klein und überlässt die Großschreibung der Tastatur.
 Gelerntes gibt es nicht (frisch installierte Tastatur).
 
-## Ausgangswerte (Version 0.11.1, mitgelieferte Testsätze)
+## Werte (mitgelieferte Testsätze)
 
-| | Deutsch | Englisch |
-| --- | --- | --- |
-| Nächstes Wort vorhergesagt, unter den ersten 3 | 15,6 % | 18,2 % |
-| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 71,0 % |
-| Gesparte Tastendrücke | 42,1 % | 39,3 % |
-| Tippfehler richtig korrigiert | 66,3 % | 60,1 % |
-| Richtig getippte Wörter, die verändert wurden | 0,0 % | 1,4 % |
-| Falsche Wörter im Text nach der Korrektur | 8,8 % | 8,5 % |
+| | Deutsch 0.11.1 | Deutsch jetzt | Englisch 0.11.1 | Englisch jetzt |
+| --- | --- | --- | --- | --- |
+| Nächstes Wort vorhergesagt, unter den ersten 3 | 15,6 % | 15,6 % | 18,2 % | 18,2 % |
+| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 59,0 % | 71,0 % | 72,5 % |
+| Gesparte Tastendrücke | 42,1 % | 41,9 % | 39,3 % | 40,0 % |
+| Tippfehler richtig korrigiert | 66,3 % | 73,4 % | 60,1 % | 72,1 % |
+| Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 1,4 % | 0,0 % |
+| Falsche Wörter im Text nach der Korrektur | 8,8 % | 7,3 % | 8,5 % | 5,4 % |
+
+„Jetzt“ enthält die englischen Kurzformen in der Wortliste („don't“, „I'm“) und die Korrektur seltener
+Wörterbucheinträge („fur“ → „für“, „dont“ → „don't“, „yiu“ → „you“; `LazySpellingRatio` und `RareWordRatio` in
+`SuggestionEngine`). Ohne bequem getippte Umlaute (`--lazy 0`) steigt die deutsche Korrekturquote von 71,7 % auf 75,1 %.
 
 ## Grenzen
 
