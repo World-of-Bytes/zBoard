@@ -77,6 +77,40 @@ SECOND_FORM_SHARE = 0.6
 
 EN_CAPITALIZED = {"i": "I", "i'm": "I'm", "i'll": "I'll", "i've": "I've", "i'd": "I'd"}
 
+# Die Quelle zerlegt englische Kurzformen in zwei Einträge ("don" + "'t", "i" + "'m"); die zweite Hälfte beginnt mit
+# einem Apostroph und fällt als Wort heraus. Ohne die Kurzformen hält zBoard ein richtig getipptes "don't" für einen
+# Tippfehler. Sie werden deshalb aus den Hälften wieder zusammengesetzt.
+#
+# "n't": Stämme, die nur in der Kurzform vorkommen – die Häufigkeit des Stamms ist die der Kurzform, der Stamm entfällt.
+EN_NT_STEMS = """
+didn doesn isn wasn wouldn couldn aren shouldn weren hasn hadn mustn needn shan daren mightn ain
+""".split()
+# Stämme, die auch eigene Wörter sind: (Stamm, geschätzter Anteil der Kurzform an der Häufigkeit des Stamms)
+EN_NT_SHARED = {"don": 0.98, "haven": 0.98}
+# Der Rest von "'t" gehört zu "can't" und "won't" (in der Quelle "can" + "'t" und "won" + "'t"); geschätzte Aufteilung.
+EN_NT_REST = {"can": 0.75, "won": 0.25}
+EN_NT_IRREGULAR = {"can": "can't", "won": "won't"}
+
+# Übrige Kurzformen: geschätzter Anteil an der Häufigkeit der abgetrennten Endung. Die Quelle nennt nur die Summe je
+# Endung; die Aufteilung ist eine Schätzung und bestimmt nur die Reihenfolge der Vorschläge. Was bei "'s" übrig
+# bleibt, sind Genitive ("John's"); die erkennt zBoard an der Form.
+EN_SUFFIX_SHARES = {
+    "'m": {"i": 1.0},
+    "'re": {"you": 0.62, "we": 0.20, "they": 0.15, "what": 0.01, "who": 0.005},
+    "'ll": {"i": 0.45, "you": 0.16, "we": 0.14, "it": 0.06, "he": 0.06, "they": 0.06, "she": 0.03, "that": 0.03,
+            "there": 0.01},
+    "'ve": {"i": 0.52, "you": 0.20, "we": 0.14, "they": 0.07, "would": 0.02, "could": 0.02, "should": 0.02,
+            "might": 0.005, "must": 0.005},
+    "'d": {"i": 0.42, "you": 0.15, "he": 0.12, "we": 0.09, "she": 0.08, "they": 0.08, "it": 0.03, "that": 0.01,
+           "who": 0.01, "there": 0.01},
+    "'s": {"it": 0.21, "that": 0.15, "what": 0.08, "he": 0.07, "there": 0.055, "let": 0.05, "she": 0.04, "here": 0.03,
+           "who": 0.018, "where": 0.014, "how": 0.008, "everything": 0.003, "something": 0.003, "when": 0.002},
+}
+# Wörter, die die Quelle am Apostroph trennt: Kurzform -> Hälfte, deren Häufigkeit übernommen wird
+EN_SPLIT_WORDS = {"o'clock": "'clock", "ma'am": "'am", "y'all": "'all", "c'mon": "'mon"}
+# Bruchstücke von Kurzformen, die ohne Apostroph in der Quelle stehen und keine Wörter sind
+EN_FRAGMENTS = {"ll", "ve"}
+
 
 def load_frequencies(path, min_freq):
     entries = []
@@ -181,15 +215,67 @@ def build_german(args):
     return lines
 
 
+def raw_counts(path, wanted):
+    """Häufigkeiten einzelner Einträge direkt aus der Quelle (auch solcher, die load_frequencies verwirft)."""
+    counts = {}
+    with open(path, encoding="utf-8") as src:
+        for line in src:
+            parts = line.split()
+            if len(parts) == 2 and parts[0] in wanted and parts[1].isdigit():
+                counts[parts[0]] = int(parts[1])
+    return counts
+
+
+def english_contractions(path):
+    """
+    Setzt die englischen Kurzformen aus den Hälften der Quelle wieder zusammen.
+    Ergebnis: (Kurzform -> Häufigkeit, Stamm -> Häufigkeit, die ihm abgezogen wird; None = Stamm entfällt).
+    """
+    suffixes = set(EN_SUFFIX_SHARES) | {"'t"} | set(EN_SPLIT_WORDS.values())
+    stems = set(EN_NT_STEMS) | set(EN_NT_SHARED) | set(EN_NT_REST)
+    counts = raw_counts(path, suffixes | stems)
+
+    contractions, deduct = {}, {}
+    rest = counts.get("'t", 0)
+    for stem in EN_NT_STEMS:
+        freq = counts.get(stem, 0)
+        contractions[stem + "'t"] = freq
+        deduct[stem] = None
+        rest -= freq
+    for stem, share in EN_NT_SHARED.items():
+        freq = round(counts.get(stem, 0) * share)
+        contractions[stem + "'t"] = freq
+        deduct[stem] = freq
+        rest -= freq
+    for stem, share in EN_NT_REST.items():
+        freq = min(round(max(rest, 0) * share), counts.get(stem, 0) // 2)
+        contractions[EN_NT_IRREGULAR[stem]] = freq
+        deduct[stem] = freq
+
+    for suffix, shares in EN_SUFFIX_SHARES.items():
+        for stem, share in shares.items():
+            contractions[stem + suffix] = round(counts.get(suffix, 0) * share)
+    for word, half in EN_SPLIT_WORDS.items():
+        contractions[word] = counts.get(half, 0)
+    return {w: f for w, f in contractions.items() if f > 0}, deduct
+
+
 def build_english(args):
-    lines = []
+    contractions, deduct = english_contractions(args.freq_en)
+    entries = []
     for word, freq in load_frequencies(args.freq_en, args.min_freq):
         if len(word) < 2 and word not in ("a", "i"):
             continue
-        lines.append((EN_CAPITALIZED.get(word, word), freq))
-        if len(lines) >= args.limit_en:
-            break
-    return lines
+        if word in EN_FRAGMENTS or word in contractions:
+            continue
+        if word in deduct:
+            if deduct[word] is None:
+                continue
+            freq -= deduct[word]
+        entries.append((word, freq))
+    entries.extend(contractions.items())
+    entries.sort(key=lambda e: e[1], reverse=True)  # stabil: gleiche Häufigkeit behält die Reihenfolge der Quelle
+    return [(EN_CAPITALIZED.get(word, word), freq) for word, freq in entries[:args.limit_en]]
 
 
 def build_bigrams(path):

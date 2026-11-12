@@ -498,9 +498,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         bool restored = typed == _restoredWord; // wiederhergestelltes Original: nicht korrigieren, sondern lernen
         _restoredWord = null;
 
+        // Derselbe Kontext wie in der Vorschlagsleiste, damit eingesetzt wird, was dort hervorgehoben ist.
+        string? previous = PreviousWord();
         if (autocorrect && !restored && _settings.AutoCorrect && _profile.AllowAutocorrect)
         {
-            var result = Engine?.Suggest(typed);
+            var result = Engine?.Suggest(typed, previous);
             if (result?.AutoCorrection is { } corrected && corrected != typed)
             {
                 final = corrected;
@@ -508,7 +510,6 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             }
         }
 
-        string? previous = PreviousWord();
         ic.CommitText(J(final + separator), 1);
         _composing.Clear();
         _glideActive = false;

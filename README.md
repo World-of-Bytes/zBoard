@@ -85,6 +85,13 @@ dotnet test tests/ZBoard.Core.Tests
 The emulator test (`tools/emulator_test.py`, run by GitHub Actions) checks typing, autocorrect, glide typing, the
 popups, the suggestion bar and the layout on a real Android system, partly by measuring screenshots.
 
+`tools/SuggestionEval` measures the quality of suggestions and autocorrect with simulated typing
+(metrics and baseline, in German: [tools/SuggestionEval/README.md](tools/SuggestionEval/README.md)):
+
+```bash
+dotnet run -c Release --project tools/SuggestionEval -- --lang de
+```
+
 ## Structure
 
 | Folder | Contents |
@@ -110,6 +117,8 @@ popups, the suggestion bar and the layout on a real Android system, partly by me
 Bundled: **German** with 120,000 words and **English** with 100,000 words, each ranked by frequency in film and TV
 subtitles (OpenSubtitles 2018). Format: one spelling per line, `word<TAB>frequency`.
 The script filters out typical typos from the subtitles ("nciht", "waht").
+The source splits English contractions ("don't", "I'm") into two entries; the script puts them back together
+(frequencies partly estimated, see `EN_SUFFIX_SHARES`).
 
 For prediction: the 5,000 most frequent word pairs each (`de.bigrams.txt`, `en.bigrams.txt`) from the Google Books
 Ngram Corpus, format `first<TAB>second<TAB>frequency`. zBoard learns the rest from your typing

@@ -117,7 +117,10 @@ public sealed class MultilingualEngine
                 if (best == null || score > best.Value.Score) best = (c.Word, score);
             }
 
-            if (!typedIsWord && best is { } correction && typed.Length >= 2)
+            // Richtig geschrieben ist das Getippte, wenn eine Sprache es kennt und es dort nicht nur ein seltener
+            // Eintrag neben einem viel wahrscheinlicheren Wort ist ("fur" neben "für").
+            bool solid = analyses.Where((a, i) => a.TypedLearned || IsWordIn(a, i) && !a.CorrectionOverrides).Any();
+            if (!solid && best is { } correction && typed.Length >= 2)
             {
                 autoCorrection = SuggestionEngine.MatchCase(correction.Word, typed);
             }

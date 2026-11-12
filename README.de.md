@@ -85,6 +85,13 @@ dotnet test tests/ZBoard.Core.Tests
 Der Emulator-Test (`tools/emulator_test.py`, läuft in GitHub Actions) prüft Tippen, Autokorrektur, Wischeingabe,
 Popups, Vorschlagsleiste und Lage der Tastatur auf einem echten Android-System, teils durch Ausmessen von Screenshots.
 
+Wie gut Vorschläge und Autokorrektur sind, misst `tools/SuggestionEval` mit simuliertem Tippen
+(Kennzahlen und Ausgangswerte: [tools/SuggestionEval/README.md](tools/SuggestionEval/README.md)):
+
+```bash
+dotnet run -c Release --project tools/SuggestionEval -- --lang de
+```
+
 ## Aufbau
 
 | Ordner | Inhalt |
@@ -110,6 +117,8 @@ Popups, Vorschlagsleiste und Lage der Tastatur auf einem echten Android-System, 
 Mitgeliefert: **Deutsch** mit 120 000 Wörtern, **Englisch** mit 100 000 Wörtern, jeweils nach Häufigkeit
 aus Film- und Serienuntertiteln (OpenSubtitles 2018). Format: eine Schreibweise pro Zeile, `wort<TAB>häufigkeit`.
 Typische Tippfehler aus den Untertiteln („nciht“, „waht“) filtert das Skript heraus.
+Englische Kurzformen („don't“, „I'm“) zerlegt die Quelle in zwei Einträge; das Skript setzt sie wieder zusammen
+(Häufigkeiten teils geschätzt, siehe `EN_SUFFIX_SHARES`).
 
 Für die Vorhersage: je 5 000 häufigste Wortpaare (`de.bigrams.txt`, `en.bigrams.txt`) aus dem Google Books
 Ngram Corpus, Format `erstes<TAB>zweites<TAB>häufigkeit`. Den Rest lernt zBoard aus deinen Eingaben
