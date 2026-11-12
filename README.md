@@ -85,6 +85,13 @@ dotnet test tests/ZBoard.Core.Tests
 The emulator test (`tools/emulator_test.py`, run by GitHub Actions) checks typing, autocorrect, glide typing, the
 popups, the suggestion bar and the layout on a real Android system, partly by measuring screenshots.
 
+`tools/SuggestionEval` measures the quality of suggestions and autocorrect with simulated typing
+(metrics and baseline, in German: [tools/SuggestionEval/README.md](tools/SuggestionEval/README.md)):
+
+```bash
+dotnet run -c Release --project tools/SuggestionEval -- --lang de
+```
+
 ## Structure
 
 | Folder | Contents |
