@@ -75,6 +75,41 @@ public sealed class UserHistory
         }
     }
 
+    /// <summary>
+    /// Nimmt eine Verwendung zurück, die sich als Teil eines Tippfehlers herausgestellt hat ("ha" aus "ha llo").
+    /// Bekannte Wörter bleiben bekannt.
+    /// </summary>
+    public void Unlearn(string? previous, string word)
+    {
+        lock (_lock)
+        {
+            var key = word.ToLowerInvariant();
+            if (_words.TryGetValue(key, out var entry) && entry.Count != KnownThreshold)
+            {
+                if (entry.Count <= 1) _words.Remove(key);
+                else _words[key] = (entry.Form, entry.Count - 1);
+                IsDirty = true;
+            }
+
+            if (previous != null && _bigrams.TryGetValue(previous.ToLowerInvariant(), out var followers)
+                && followers.TryGetValue(word, out int count))
+            {
+                if (count <= 1)
+                {
+                    followers.Remove(word);
+                    _bigramCount--;
+                    if (followers.Count == 0) _bigrams.Remove(previous.ToLowerInvariant());
+                }
+                else
+                {
+                    followers[word] = count - 1;
+                }
+
+                IsDirty = true;
+            }
+        }
+    }
+
     public int CountOf(string word)
     {
         lock (_lock) return _words.TryGetValue(word.ToLowerInvariant(), out var e) ? e.Count : 0;

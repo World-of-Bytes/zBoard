@@ -103,6 +103,7 @@ foreach (var word in words)
 
 // ---------- 2. Autokorrektur bei ungenauem Tippen ----------
 
+int wrongJoins = 0;
 var noisy = new Outcome();
 var clean = new Outcome();
 List<string> examples = [];
@@ -110,6 +111,7 @@ List<string> examples = [];
 for (int run = 0; run < options.Runs; run++)
 {
     var noise = new TypingNoise(layout, options.Seed + run) { Sigma = options.Sigma, LazyAccentRate = options.Lazy };
+    string? previousTyped = null;
     foreach (var word in words)
     {
         string target = word.Target, intended = word.Intended;
@@ -118,6 +120,22 @@ for (int run = 0; run < options.Runs; run++)
 
         var result = engine.Suggest(typed, Context(word), touches: Touches(points, noise.Keys, points.Length));
         string final = result.AutoCorrection ?? typed;
+
+        // Fehlalarm der Leertasten-Regel: Zwei Wörter dürfen nicht verschmelzen, auch wenn eines vertippt ist –
+        // weder das richtige vorherige mit diesem noch das vertippte vorherige mit dem richtigen hier.
+        if (word.Context.PreviousWord is { } before)
+        {
+            var beforeContext = new WordContext(word.Context.BeforePrevious);
+            var wronglyJoined = engine.JoinAcrossSpace(before, typed, beforeContext)
+                ?? (previousTyped is { } beforeTyped ? engine.JoinAcrossSpace(beforeTyped, intended, beforeContext) : null);
+            if (wronglyJoined != null)
+            {
+                final = "⟨" + wronglyJoined.Value.Word + "⟩";
+                wrongJoins++;
+            }
+        }
+
+        previousTyped = typed;
         var outcome = typo ? noisy : clean;
         outcome.Total++;
 
@@ -164,6 +182,43 @@ for (int i = 0; i + 1 < words.Count; i++)
     }
 }
 
+// ---------- 4. Leertaste mitten im Wort ----------
+
+// Die Leertaste trifft statt eines Buchstabens der untersten Reihe ("da ke") oder zusätzlich ("dan ke").
+var bottomRow = KeyProximity.FromLayout(layout).BottomRowLetters;
+var spaceRandom = new Random(options.Seed);
+int insteadOf = 0, insteadOfFixed = 0, extra = 0, extraFixed = 0;
+foreach (var word in words)
+{
+    string target = word.Target, intended = word.Intended;
+    if (intended.Length < 5 || !intended.All(char.IsLetter)) continue;
+
+    string Typed(string first, string second)
+    {
+        if (engine.JoinAcrossSpace(first, second, Context(word)) is { } joinedWord) return joinedWord.Word;
+        string firstFinal = engine.Suggest(first, Context(word)).AutoCorrection ?? first;
+        string secondFinal = engine.Suggest(second, new WordContext(firstFinal, word.Context.Previous)).AutoCorrection ?? second;
+        return firstFinal + " " + secondFinal;
+    }
+
+    int cut = Enumerable.Range(2, intended.Length - 4).Where(i => bottomRow.Contains(char.ToLowerInvariant(intended[i])))
+        .DefaultIfEmpty(-1).First();
+    if (cut > 0)
+    {
+        insteadOf++;
+        if (Typed(intended[..cut], intended[(cut + 1)..]) == target) insteadOfFixed++;
+    }
+
+    int at = spaceRandom.Next(2, intended.Length - 1);
+    extra++;
+    string result = Typed(intended[..at], intended[at..]);
+    if (result == target) extraFixed++;
+    else if (options.Verbose && examples.Count < 520)
+    {
+        examples.Add($"{"Leertaste",-10}  {"",-14}  {word.Context.Previous ?? "–",-14} {intended[..at] + " " + intended[at..],-18} → {result,-18} (gewollt: {target})");
+    }
+}
+
 // ---------- Ausgabe ----------
 
 // Deutsche Schreibweise von Hand, damit die Ausgabe nicht von den Spracheinstellungen des Rechners abhängt.
@@ -206,6 +261,13 @@ Console.WriteLine($"| Fehlendes Leerzeichen ({joined} Wortpaare, sonst fehlerfre
 Console.WriteLine("| --- | --- |");
 Console.WriteLine($"| In die beiden Wörter getrennt | {Pct(joinedSplit, joined)} |");
 Console.WriteLine($"| In etwas anderes korrigiert | {Pct(joinedOther, joined)} |");
+
+Console.WriteLine();
+Console.WriteLine("| Leertaste mitten im Wort (sonst fehlerfrei getippt) | Wert |");
+Console.WriteLine("| --- | --- |");
+Console.WriteLine($"| Leertaste statt Buchstabe der untersten Reihe: Wort wiederhergestellt | {Pct(insteadOfFixed, insteadOf)} ({insteadOf}) |");
+Console.WriteLine($"| Zusätzliche Leertaste: Wort wiederhergestellt | {Pct(extraFixed, extra)} ({extra}) |");
+Console.WriteLine($"| Fehlalarm: zwei richtige Wörter verschmolzen (Durchläufe mit Tippfehlern) | {Pct(wrongJoins, all)} |");
 
 if (options.Verbose)
 {

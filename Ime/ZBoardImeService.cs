@@ -39,6 +39,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     sealed record Correction(string Original, string Corrected, string Separator);
 
+    /// <summary>Das zuletzt mit der Leertaste abgeschlossene Wort: wie getippt, wie eingefügt, und was davor stand.</summary>
+    sealed record SpaceCommit(string Typed, string Committed, WordContext Context, string? Previous);
+
+    SpaceCommit? _lastSpaceCommit;
+
     readonly StringBuilder _composing = new();
 
     ZBoardSettings _settings = null!;
@@ -506,9 +511,33 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         // Derselbe Kontext wie in der Vorschlagsleiste, damit eingesetzt wird, was dort hervorgehoben ist.
         string? previous = PreviousWord();
-        if (autocorrect && !restored && _settings.AutoCorrect && _profile.AllowAutocorrect)
+        var context = SentenceContext();
+        bool mayCorrect = autocorrect && !restored && _settings.AutoCorrect && _profile.AllowAutocorrect;
+
+        // Leertaste mitten im Wort ("da ke", "ha llo"): Das Stück davor und dieses ergeben zusammen das gemeinte Wort.
+        var before = _lastSpaceCommit;
+        _lastSpaceCommit = null;
+        if (mayCorrect && !_glideActive && before != null
+            && TextBeforeCursor(before.Committed.Length + 1 + typed.Length) == before.Committed + " " + typed
+            && Engine?.JoinAcrossSpace(before.Typed, typed, before.Context) is { } joined)
         {
-            var result = Engine?.Suggest(typed, SentenceContext(), touches: Touches());
+            ic.BeginBatchEdit();
+            ic.FinishComposingText();
+            ic.DeleteSurroundingText(before.Committed.Length + 1 + typed.Length, 0);
+            ic.CommitText(J(joined + separator), 1);
+            ic.EndBatchEdit();
+
+            _lastCorrection = new Correction(before.Typed + " " + typed, joined, separator); // Löschen stellt das Getippte wieder her
+            _composing.Clear();
+            _currentSuggestions = SuggestionResult.Empty;
+            if (_settings.LearnWords && _profile.AllowLearning) Engine?.Unlearn(before.Previous, before.Committed);
+            Learn(before.Previous, joined);
+            return;
+        }
+
+        if (mayCorrect)
+        {
+            var result = Engine?.Suggest(typed, context, touches: Touches());
             if (result?.AutoCorrection is { } corrected && corrected != typed)
             {
                 final = corrected;
@@ -517,6 +546,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         ic.CommitText(J(final + separator), 1);
+        if (separator == " " && !_glideActive && !restored) _lastSpaceCommit = new SpaceCommit(typed, final, context, previous);
         _composing.Clear();
         _glideActive = false;
         _currentSuggestions = SuggestionResult.Empty;

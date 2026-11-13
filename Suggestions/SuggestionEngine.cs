@@ -76,8 +76,10 @@ public sealed class SuggestionEngine
     // sein muss (Anteil an allen Wörtern; schließt seltene Einträge aus, die oft selbst Tippfehler sind).
     const int CompoundPartLength = 3;
     const int MaxCompoundParts = 4;
+    const double CompoundCompletionWeight = 0.02;
     const double MissingSpaceCost = 0.5; // ein vergessenes Leerzeichen ist ein häufiger Fehler: billiger als ein falscher Buchstabe
     const double MinPartShare = 2e-6;
+    const int MinJoinedLength = 4;
     const double MinSingleLetterShare = 2e-3;
 
     /// <inheritdoc cref="NearMissDistance"/>
@@ -205,6 +207,7 @@ public sealed class SuggestionEngine
         }
 
         if (compound != null) Offer(compound.Value.Form, compound.Value.Freq * ExactBoost);
+        foreach (var (word, score) in CompoundCompletions(lower)) Offer(word, score);
 
         // 2. Korrekturen per gewichteter Editierdistanz
         float maxDistance = lower.Length switch
@@ -377,6 +380,13 @@ public sealed class SuggestionEngine
     /// <summary>Steht das Wort im Wörterbuch dieser Sprache?</summary>
     public bool InDictionary(string word) => _dictionary.Contains(word);
 
+    /// <summary>Ein gängiges Wort dieser Sprache (kein seltener Eintrag der Wortliste) oder oft genug selbst geschrieben.</summary>
+    public bool IsCommonWord(string word) =>
+        (_dictionary.Lookup(word)?.Freq ?? 0) >= Math.Max(1, _dictionary.TotalFrequency * MinPartShare) || _history.IsKnown(word);
+
+    /// <summary>Nimmt ein eben gelerntes Wort zurück (es war Teil eines Tippfehlers).</summary>
+    public void Unlearn(string? previous, string word) => _history.Unlearn(previous, word);
+
     /// <summary>Kennt diese Sprache das Wort (Wörterbuch oder oft genug selbst geschrieben)?</summary>
     public bool Knows(string word) => _dictionary.Contains(word) || _history.IsKnown(word);
 
@@ -500,23 +510,55 @@ public sealed class SuggestionEngine
         int n = lower.Length;
         if (n < 2 * CompoundPartLength || n > 40 || !lower.All(char.IsLetter)) return null;
 
-        int NounFrequency(int from, int to)
+        var parts = CompoundPrefixes(lower);
+        for (int start = CompoundPartLength; start <= n - CompoundPartLength; start++)
         {
-            if (to - from < CompoundPartLength) return 0;
-            string part = lower[from..to];
-            if (NounOnly(part) == null) return 0;
-            int freq = _dictionary.Lookup(part)!.Value.Freq;
-            return freq >= _dictionary.TotalFrequency * MinPartShare ? freq : 0;
+            if (parts[start] > 0 && CompoundPartFrequency(lower[start..]) is > 0 and var freq)
+            {
+                return (char.ToUpperInvariant(lower[0]) + lower[1..], freq);
+            }
         }
 
-        // parts[i]: aus wie vielen Substantiven lower[..i] besteht (0 = nicht zerlegbar)
+        return null;
+    }
+
+    /// <summary>
+    /// Vervollständigt das letzte Glied eines zusammengesetzten Substantivs: "haustürschl" → "Haustürschlüssel".
+    /// Weit schwächer bewertet als Wörter, die als Ganzes im Wörterbuch stehen.
+    /// </summary>
+    IEnumerable<(string Word, double Score)> CompoundCompletions(string lower)
+    {
+        int n = lower.Length;
+        if (n < CompoundPartLength + 2 || n > 40 || !lower.All(char.IsLetter)) yield break;
+
+        var parts = CompoundPrefixes(lower);
+        for (int start = CompoundPartLength; start <= n - 2; start++)
+        {
+            if (parts[start] == 0) continue;
+            string rest = lower[start..];
+            foreach (var (word, _) in _dictionary.Complete(rest))
+            {
+                if (word.Length <= rest.Length || CompoundPartFrequency(word.ToLowerInvariant()) is not (> 0 and var freq)) continue;
+                yield return (char.ToUpperInvariant(lower[0]) + lower[1..start] + word.ToLowerInvariant(),
+                    freq * CompletionWeight * CompoundCompletionWeight);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Für jede Stelle i: aus wie vielen Substantiven (mit Fugen-s) der Anfang lower[..i] besteht; 0 = nicht zerlegbar
+    /// oder schon <see cref="MaxCompoundParts"/> Glieder.
+    /// </summary>
+    int[] CompoundPrefixes(string lower)
+    {
+        int n = lower.Length;
         var parts = new int[n + 1];
         for (int end = CompoundPartLength; end < n; end++)
         {
             for (int start = 0; start <= end - CompoundPartLength; start++)
             {
                 if (start > 0 && parts[start] == 0) continue;
-                if (NounFrequency(start, end) == 0) continue;
+                if (CompoundPartFrequency(lower[start..end]) == 0) continue;
                 int count = (start > 0 ? parts[start] : 0) + 1;
                 if (count >= MaxCompoundParts) continue;
                 if (parts[end] == 0 || count < parts[end]) parts[end] = count;
@@ -524,15 +566,15 @@ public sealed class SuggestionEngine
             }
         }
 
-        for (int start = CompoundPartLength; start <= n - CompoundPartLength; start++)
-        {
-            if (parts[start] > 0 && NounFrequency(start, n) is > 0 and var freq)
-            {
-                return (char.ToUpperInvariant(lower[0]) + lower[1..], freq);
-            }
-        }
+        return parts;
+    }
 
-        return null;
+    /// <summary>Häufigkeit, wenn <paramref name="part"/> als Glied taugt (gängiges, nur großgeschriebenes Substantiv), sonst 0.</summary>
+    int CompoundPartFrequency(string part)
+    {
+        if (part.Length < CompoundPartLength || NounOnly(part) == null) return 0;
+        int freq = _dictionary.Lookup(part)!.Value.Freq;
+        return freq >= _dictionary.TotalFrequency * MinPartShare ? freq : 0;
     }
 
     /// <summary>
@@ -571,6 +613,51 @@ public sealed class SuggestionEngine
             double share = entry.Freq / total;
             return share >= (part.Length == 1 ? MinSingleLetterShare : MinPartShare) ? (entry.Word, entry.Freq) : null;
         }
+    }
+
+    /// <summary>
+    /// Leertaste mitten im Wort: statt eines Buchstabens der untersten Reihe ("da ke" für "danke") oder zusätzlich
+    /// ("ha llo" für "hallo"). Prüft beim Abschluss des zweiten Stücks, ob beide Stücke zusammen ein
+    /// gängiges Wort ergeben, das besser passt, als das zweite Stück für sich zu korrigieren.
+    /// </summary>
+    /// <param name="previousTyped">Das Stück vor dem Leerzeichen, wie es getippt wurde (vor einer Autokorrektur).</param>
+    /// <param name="typed">Das Stück nach dem Leerzeichen.</param>
+    /// <param name="context">Satzkontext vor dem ersten Stück.</param>
+    /// <returns>Das zusammengesetzte Wort mit Bewertung, oder null.</returns>
+    public (string Word, double Score)? JoinAcrossSpace(
+        string previousTyped, string typed, WordContext context, KeyProximity? proximity = null)
+    {
+        string first = previousTyped.ToLowerInvariant(), second = typed.ToLowerInvariant();
+        if (first.Length == 0 || second.Length == 0 || first.Length + second.Length < MinJoinedLength) return null;
+        if (!first.All(char.IsLetter) || !second.All(char.IsLetter) || _dictionary.TotalFrequency == 0) return null;
+
+        // Zwei richtige Wörter bleiben, wie sie sind – auch wenn sie zusammen ein drittes ergäben ("ein mal").
+        double minFrequency = _dictionary.TotalFrequency * MinPartShare;
+        bool firstIsWord = IsCommonWord(first);
+        bool secondIsWord = IsCommonWord(second) || _history.CountOf(second) > 0 || Compound(second) != null;
+        if (firstIsWord && secondIsWord) return null;
+
+        (string Word, double Score)? best = null;
+        void Consider(string joined)
+        {
+            if (_dictionary.Lookup(joined) is not { } entry || entry.Freq < minFrequency) return;
+            double score = entry.Freq * Math.Min(MaxContextFactor, _model.ContextFactor(context, entry.Word))
+                / Math.Pow(DistancePenaltyBase, MissingSpaceCost);
+            if (best == null || score > best.Value.Score) best = (entry.Word, score);
+        }
+
+        Consider(first + second);
+        foreach (char letter in (proximity ?? _proximity).BottomRowLetters) Consider(first + letter + second);
+        if (best == null) return null;
+
+        // Die Alternative: Nur das Stück, das kein Wort ist, wird für sich korrigiert. Sind beide keine Wörter,
+        // müssten beide korrigiert werden; das ist unwahrscheinlicher.
+        double aloneScore = secondIsWord
+            ? Analyze(previousTyped, context, proximity).Correction?.Score ?? 0
+            : Analyze(typed, new WordContext(previousTyped, context.Previous), proximity).Correction?.Score ?? 0;
+        if (!firstIsWord && !secondIsWord) aloneScore /= DistancePenaltyBase;
+
+        return best.Value.Score > aloneScore ? (MatchCase(best.Value.Word, previousTyped), best.Value.Score) : null;
     }
 
     /// <summary>Schreibweisen aus dem Wörterbuch, sonst das (gelernte) Wort selbst.</summary>

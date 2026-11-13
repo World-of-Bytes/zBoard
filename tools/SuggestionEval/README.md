@@ -27,6 +27,10 @@ dann im Text stünde.
 **Fehlendes Leerzeichen:** Je zwei aufeinanderfolgende Wörter werden ohne Leerzeichen dazwischen und sonst
 fehlerfrei getippt; gezählt wird, wie oft danach beide Wörter richtig dastehen.
 
+**Leertaste mitten im Wort:** Jedes Wort ab fünf Buchstaben wird einmal mit einer Leertaste statt eines Buchstabens
+der untersten Reihe und einmal mit einer zusätzlichen Leertaste getippt. Als Fehlalarm zählt, wenn in den Durchläufen
+mit Tippfehlern zwei verschiedene Wörter verschmelzen.
+
 Wie am Gerät tippt der simulierte Nutzer mitten im Satz alles klein und überlässt die Großschreibung der Tastatur.
 Gelerntes gibt es nicht (frisch installierte Tastatur).
 
@@ -58,6 +62,10 @@ Seit 0.11.1 dazugekommen:
    ein fehlendes Leerzeichen wird eingesetzt, wenn die beiden Wörter im Sprachmodell aufeinander folgen („ichhabe“ →
    „ich habe“). Von den Wortpaaren der Testsätze, ohne Leerzeichen getippt, werden 68,6 % (Deutsch) und 63,5 %
    (Englisch) richtig getrennt.
+5. Leertaste mitten im Wort (`JoinAcrossSpace`): Trifft die Leertaste statt eines Buchstabens der untersten Reihe
+   („da ke“) oder zusätzlich („ha llo“), setzt zBoard beim nächsten Leerzeichen das gemeinte Wort ein. Wiederhergestellt
+   werden 57,4 % bzw. 66,0 % (Deutsch) und 68,3 % bzw. 67,2 % (Englisch); zwei richtige Wörter bleiben immer getrennt.
+   Dazu werden zusammengesetzte Substantive vervollständigt („Haustürschl“ → „Haustürschlüssel“).
 
 ## Grenzen
 

@@ -178,6 +178,32 @@ public sealed class MultilingualEngine
     public IReadOnlyList<string> Predict(string previousWord, int max = 3) =>
         Predict(new WordContext(previousWord), max);
 
+    /// <summary>Nimmt ein eben gelerntes Wort in allen Sprachen zurück (es war Teil eines Tippfehlers).</summary>
+    public void Unlearn(string? previous, string word)
+    {
+        foreach (var (_, engine) in _engines) engine.Unlearn(previous, word);
+    }
+
+    /// <inheritdoc cref="SuggestionEngine.JoinAcrossSpace"/>
+    public string? JoinAcrossSpace(string previousTyped, string typed, WordContext sentence)
+    {
+        var proximity = Primary.Proximity;
+        (string Word, double Score)? best = null;
+        // Sind beide Stücke in irgendeiner der Sprachen gängige Wörter, bleibt alles, wie es ist.
+        if (_engines.Any(e => e.Engine.IsCommonWord(previousTyped)) && _engines.Any(e => e.Engine.IsCommonWord(typed))) return null;
+
+        foreach (var (_, engine) in _engines)
+        {
+            if (engine.JoinAcrossSpace(previousTyped, typed, sentence, proximity) is { } joined
+                && (best == null || joined.Score > best.Value.Score))
+            {
+                best = joined;
+            }
+        }
+
+        return best?.Word;
+    }
+
     /// <summary>Nächstes Wort an dieser Stelle im Satz aus allen Sprachen.</summary>
     public IReadOnlyList<string> Predict(WordContext sentence, int max = 3)
     {
