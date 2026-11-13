@@ -10,8 +10,7 @@ Quellen (per git holen, siehe README "Wörterbücher neu erzeugen"):
   --hunspell-de          igerman98 / de_DE Hunspell, GPLv2/GPLv3 (nur als Prüfliste, wird nicht ausgeliefert)
                          https://github.com/wooorm/dictionaries
 
-  --bigrams-de / --bigrams-en  (optional) Google Books Ngram, häufigste Wortpaare 2010–2019, CC BY 3.0
-                         https://github.com/orgtre/google-books-ngram-frequency (ngrams/2grams_*.csv)
+Die Sprachmodelle für die Vorhersage (Assets/dict/<Sprache>.ngrams.bin) erzeugt tools/NgramBuilder.
 
 Die Häufigkeitslisten sind komplett kleingeschrieben. Für Deutsch wird die Großschreibung so bestimmt:
   * Form kommt in Wiktionary als Substantiv vor UND nicht als kleingeschriebenes Wort in Hunspell
@@ -278,29 +277,6 @@ def build_english(args):
     return [(EN_CAPITALIZED.get(word, word), freq) for word, freq in entries[:args.limit_en]]
 
 
-def build_bigrams(path):
-    """CSV "ngram,freq" -> [(erstes Wort, zweites Wort, Häufigkeit)], nur echte Wortpaare."""
-    out = []
-    with open(path, encoding="utf-8") as src:
-        next(src, None)  # Kopfzeile
-        for line in src:
-            ngram, _, freq = line.rstrip("\n").rpartition(",")
-            parts = ngram.split(" ")
-            if len(parts) != 2 or not freq.isdigit():
-                continue
-            if all(WORD.match(p) for p in parts):
-                out.append((parts[0], parts[1], int(freq)))
-    return out
-
-
-def write_bigrams(path, rows, source_note):
-    with open(path, "w", encoding="utf-8") as dst:
-        dst.write(f"# {source_note}\n")
-        for first, second, freq in rows:
-            dst.write(f"{first}\t{second}\t{freq}\n")
-    print(f"{path}: {len(rows)} Wortpaare")
-
-
 TYPO_KEEP = {"beriet", "gnu"}
 
 
@@ -357,14 +333,12 @@ def main():
     p.add_argument("--freq-en", required=True)
     p.add_argument("--nouns", required=True)
     p.add_argument("--hunspell-de", required=True)
-    p.add_argument("--bigrams-de")
-    p.add_argument("--bigrams-en")
     p.add_argument("--out-dir", default="Assets/dict")
     p.add_argument("--limit-de", type=int, default=120_000)
     p.add_argument("--limit-en", type=int, default=100_000)
     p.add_argument("--min-freq", type=int, default=3)
-    p.add_argument("--extra", action="append", default=[], metavar="SPRACHE:HÄUFIGKEITEN[:WORTPAARE]",
-                   help="weitere Sprache, z. B. fr:fr_full.txt:2grams_french.csv (mehrfach möglich)")
+    p.add_argument("--extra", action="append", default=[], metavar="SPRACHE:HÄUFIGKEITEN",
+                   help="weitere Sprache, z. B. fr:fr_full.txt (mehrfach möglich)")
     p.add_argument("--limit-extra", type=int, default=80_000)
     args = p.parse_args()
 
@@ -372,18 +346,11 @@ def main():
           "Quellen: FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0), Großschreibung nach german-nouns/Wiktionary (CC BY-SA 4.0)")
     write(f"{args.out_dir}/en.txt", drop_transposition_typos(build_english(args), skip_capitalized=False),
           "Quelle: FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0)")
-    note = "Quelle: Google Books Ngram Corpus 2010-2019 via orgtre/google-books-ngram-frequency (CC BY 3.0)"
-    if args.bigrams_de:
-        write_bigrams(f"{args.out_dir}/de.bigrams.txt", build_bigrams(args.bigrams_de), note)
-    if args.bigrams_en:
-        write_bigrams(f"{args.out_dir}/en.bigrams.txt", build_bigrams(args.bigrams_en), note)
     for spec in args.extra:
-        lang, freq_path, *rest = spec.split(":")
+        lang, freq_path = spec.split(":")[:2]
         write(f"{args.out_dir}/{lang}.txt",
               drop_transposition_typos(build_other(freq_path, args.limit_extra, args.min_freq), skip_capitalized=False),
               "Quelle: FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0)")
-        if rest:
-            write_bigrams(f"{args.out_dir}/{lang}.bigrams.txt", build_bigrams(rest[0]), note)
 
 
 if __name__ == "__main__":

@@ -181,7 +181,15 @@ public sealed class WordDictionary
     /// Präfixe werden wiederverwendet und aussichtslose Präfixe komplett übersprungen (wie die Suche in einem Trie).
     /// </summary>
     public List<(string Word, int Freq, float Distance)> FindSimilar(
-        string input, float maxDistance, Func<char, char, float> substitutionCost, float transpositionCost = 0.6f)
+        string input, float maxDistance, Func<char, char, float> substitutionCost, float transpositionCost = 0.6f) =>
+        FindSimilar(input, maxDistance, (_, typed, candidate) => substitutionCost(typed, candidate), transpositionCost);
+
+    /// <summary>
+    /// Wie <see cref="FindSimilar(string, float, Func{char, char, float}, float)"/>; die Ersetzungskosten hängen
+    /// zusätzlich von der Stelle im getippten Wort ab (Position, getippter Buchstabe, Buchstabe des Kandidaten).
+    /// </summary>
+    public List<(string Word, int Freq, float Distance)> FindSimilar(
+        string input, float maxDistance, Func<int, char, char, float> substitutionCost, float transpositionCost = 0.6f)
     {
         var target = input.ToLowerInvariant();
         int n = target.Length;
@@ -217,7 +225,7 @@ public sealed class WordDictionary
                 {
                     float insert = row[j - 1] + 1;
                     float delete = prev[j] + (ch == '\'' ? MissingApostropheCost : 1); // Buchstabe des Worts fehlt in der Eingabe
-                    float replace = prev[j - 1] + (target[j - 1] == ch ? 0 : substitutionCost(target[j - 1], ch));
+                    float replace = prev[j - 1] + (target[j - 1] == ch ? 0 : substitutionCost(j - 1, target[j - 1], ch));
                     float v = Math.Min(Math.Min(insert, delete), replace);
                     if (depth >= 2 && j >= 2 && target[j - 1] == key[depth - 2] && target[j - 2] == ch)
                     {

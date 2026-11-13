@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using ZBoard.Keyboard;
 using ZBoard.Suggestions;
 using ZBoard.Tools.SuggestionEval;
@@ -24,16 +25,16 @@ using (var stream = File.OpenRead(Path.Combine(dictDir, $"{options.Language}.txt
     dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal);
 }
 
-var bigrams = BigramModel.Empty;
-string bigramPath = Path.Combine(dictDir, $"{options.Language}.bigrams.txt");
-if (File.Exists(bigramPath))
+var model = NgramModel.Empty;
+string modelPath = options.Model ?? Path.Combine(dictDir, $"{options.Language}.ngrams.bin");
+if (File.Exists(modelPath))
 {
-    using var stream = File.OpenRead(bigramPath);
-    bigrams = BigramModel.Load(stream);
+    using var stream = File.OpenRead(modelPath);
+    model = NgramModel.Load(stream);
 }
 
 var layout = Layouts.Alphabet(options.Language, showLanguageKey: false);
-var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), bigrams, new UserHistory());
+var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), model, new UserHistory());
 var words = Corpus.Load(textPath);
 if (words.Count == 0)
 {
@@ -41,36 +42,50 @@ if (words.Count == 0)
     return 1;
 }
 
-string? Context(TestWord word) => options.UseContext ? word.Previous : null;
+WordContext Context(TestWord word) => options.UseContext ? word.Context : WordContext.None;
+TouchTrace? Touches(Vector2?[] points, IReadOnlyDictionary<char, Vector2> keys, int count) =>
+    options.UseTouch ? new TouchTrace(points[..count], keys) : null;
 
 // ---------- 1. Vorschläge bei fehlerfreiem Tippen ----------
 
-int withContext = 0, predictedTop1 = 0, predictedTop3 = 0;
+int predictedTop1 = 0, predictedTop3 = 0;
+int afterWord = 0, afterWordTop3 = 0; // nur Stellen mit einem Wort davor (ohne Satzanfang und Komma)
 int halfWords = 0, halfTop1 = 0, halfTop3 = 0;
 long keysNeeded = 0, keysBaseline = 0;
 int unknown = 0;
 
+var cleanTyping = new TypingNoise(layout, options.Seed - 1) { Sigma = options.Sigma };
 foreach (var word in words)
 {
     string target = word.Target, intended = word.Intended;
     if (!engine.InDictionary(target)) unknown++;
+    var cleanPoints = cleanTyping.PointsFor(intended);
 
     int cost = intended.Length + 1; // ausschreiben und Leertaste
-    if (word.Previous != null && options.UseContext)
+    if (options.UseContext)
     {
-        withContext++;
-        var predictions = engine.Predict(word.Previous, 3);
+        // Am Satzanfang ist die Umschalttaste aktiv: Die Leiste zeigt die Vorhersagen großgeschrieben.
+        var predictions = engine.Predict(word.Context, 3)
+            .Select(p => word.SentenceStart ? char.ToUpperInvariant(p[0]) + p[1..] : p).ToList();
+        bool hit = predictions.Contains(target);
         if (predictions.Count > 0 && predictions[0] == target) predictedTop1++;
-        if (predictions.Contains(target))
+        if (hit)
         {
             predictedTop3++;
             cost = 1; // antippen; das Leerzeichen kommt von selbst
+        }
+
+        if (word.Context.PreviousWord != null)
+        {
+            afterWord++;
+            if (hit) afterWordTop3++;
         }
     }
 
     for (int typedLetters = 1; typedLetters < intended.Length; typedLetters++)
     {
-        var bar = Bar.Of(engine.Suggest(intended[..typedLetters], Context(word)));
+        var bar = Bar.Of(engine.Suggest(
+            intended[..typedLetters], Context(word), touches: Touches(cleanPoints, cleanTyping.Keys, typedLetters)));
         bool visible = bar.Contains(target);
         if (visible && cost > typedLetters + 1) cost = typedLetters + 1;
 
@@ -88,6 +103,7 @@ foreach (var word in words)
 
 // ---------- 2. Autokorrektur bei ungenauem Tippen ----------
 
+int wrongJoins = 0;
 var noisy = new Outcome();
 var clean = new Outcome();
 List<string> examples = [];
@@ -95,14 +111,31 @@ List<string> examples = [];
 for (int run = 0; run < options.Runs; run++)
 {
     var noise = new TypingNoise(layout, options.Seed + run) { Sigma = options.Sigma, LazyAccentRate = options.Lazy };
+    string? previousTyped = null;
     foreach (var word in words)
     {
         string target = word.Target, intended = word.Intended;
-        string typed = noise.Type(intended);
+        var (typed, points) = noise.Type(intended);
         bool typo = !string.Equals(typed, intended, StringComparison.OrdinalIgnoreCase);
 
-        var result = engine.Suggest(typed, Context(word));
+        var result = engine.Suggest(typed, Context(word), touches: Touches(points, noise.Keys, points.Length));
         string final = result.AutoCorrection ?? typed;
+
+        // Fehlalarm der Leertasten-Regel: Zwei Wörter dürfen nicht verschmelzen, auch wenn eines vertippt ist –
+        // weder das richtige vorherige mit diesem noch das vertippte vorherige mit dem richtigen hier.
+        if (word.Context.PreviousWord is { } before)
+        {
+            var beforeContext = new WordContext(word.Context.BeforePrevious);
+            var wronglyJoined = engine.JoinAcrossSpace(before, typed, beforeContext)
+                ?? (previousTyped is { } beforeTyped ? engine.JoinAcrossSpace(beforeTyped, intended, beforeContext) : null);
+            if (wronglyJoined != null)
+            {
+                final = "⟨" + wronglyJoined.Value.Word + "⟩";
+                wrongJoins++;
+            }
+        }
+
+        previousTyped = typed;
         var outcome = typo ? noisy : clean;
         outcome.Total++;
 
@@ -121,8 +154,68 @@ for (int run = 0; run < options.Runs; run++)
 
         if (options.Verbose && examples.Count < 400)
         {
-            examples.Add($"{(typo ? "Tippfehler" : "richtig"),-10}  {kind,-14}  {word.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {target})");
+            examples.Add($"{(typo ? "Tippfehler" : "richtig"),-10}  {kind,-14}  {word.Context.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {target})");
         }
+    }
+}
+
+// ---------- 3. Fehlendes Leerzeichen ----------
+
+// Je zwei aufeinanderfolgende Wörter ohne Leerzeichen dazwischen getippt, sonst fehlerfrei.
+int joined = 0, joinedSplit = 0, joinedOther = 0;
+for (int i = 0; i + 1 < words.Count; i++)
+{
+    var (first, second) = (words[i], words[i + 1]);
+    if (second.Context.PreviousWord != first.Target || second.Context.BeforePrevious != first.Context.Previous) continue;
+
+    string typed = first.Intended + second.Intended;
+    string wanted = first.Target + " " + second.Target;
+    var result = engine.Suggest(typed, Context(first));
+    string final = result.AutoCorrection ?? typed;
+    joined++;
+    if (final == wanted) joinedSplit++;
+    else if (final != typed && !string.Equals(final, wanted, StringComparison.OrdinalIgnoreCase)) joinedOther++;
+
+    if (options.Verbose && final != wanted && examples.Count < 480)
+    {
+        examples.Add($"{"Leerzeichen",-10}  {"",-14}  {first.Context.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {wanted})");
+    }
+}
+
+// ---------- 4. Leertaste mitten im Wort ----------
+
+// Die Leertaste trifft statt eines Buchstabens der untersten Reihe ("da ke") oder zusätzlich ("dan ke").
+var bottomRow = KeyProximity.FromLayout(layout).BottomRowLetters;
+var spaceRandom = new Random(options.Seed);
+int insteadOf = 0, insteadOfFixed = 0, extra = 0, extraFixed = 0;
+foreach (var word in words)
+{
+    string target = word.Target, intended = word.Intended;
+    if (intended.Length < 5 || !intended.All(char.IsLetter)) continue;
+
+    string Typed(string first, string second)
+    {
+        if (engine.JoinAcrossSpace(first, second, Context(word)) is { } joinedWord) return joinedWord.Word;
+        string firstFinal = engine.Suggest(first, Context(word)).AutoCorrection ?? first;
+        string secondFinal = engine.Suggest(second, new WordContext(firstFinal, word.Context.Previous)).AutoCorrection ?? second;
+        return firstFinal + " " + secondFinal;
+    }
+
+    int cut = Enumerable.Range(2, intended.Length - 4).Where(i => bottomRow.Contains(char.ToLowerInvariant(intended[i])))
+        .DefaultIfEmpty(-1).First();
+    if (cut > 0)
+    {
+        insteadOf++;
+        if (Typed(intended[..cut], intended[(cut + 1)..]) == target) insteadOfFixed++;
+    }
+
+    int at = spaceRandom.Next(2, intended.Length - 1);
+    extra++;
+    string result = Typed(intended[..at], intended[at..]);
+    if (result == target) extraFixed++;
+    else if (options.Verbose && examples.Count < 520)
+    {
+        examples.Add($"{"Leertaste",-10}  {"",-14}  {word.Context.Previous ?? "–",-14} {intended[..at] + " " + intended[at..],-18} → {result,-18} (gewollt: {target})");
     }
 }
 
@@ -142,8 +235,9 @@ Console.WriteLine($"Wörterbuch {dictionary.Count} Einträge, davon unbekannt im
 Console.WriteLine();
 Console.WriteLine("| Vorschläge (fehlerfrei getippt) | Wert |");
 Console.WriteLine("| --- | --- |");
-Console.WriteLine($"| Nächstes Wort vorhergesagt, Platz 1 | {Pct(predictedTop1, withContext)} |");
-Console.WriteLine($"| Nächstes Wort vorhergesagt, unter den ersten 3 | {Pct(predictedTop3, withContext)} |");
+Console.WriteLine($"| Nächstes Wort vorhergesagt, Platz 1 | {Pct(predictedTop1, words.Count)} |");
+Console.WriteLine($"| Nächstes Wort vorhergesagt, unter den ersten 3 | {Pct(predictedTop3, words.Count)} |");
+Console.WriteLine($"| … nur nach einem Wort (ohne Satzanfang und Komma) | {Pct(afterWordTop3, afterWord)} |");
 Console.WriteLine($"| Wort nach der Hälfte der Buchstaben in der Mitte der Leiste | {Pct(halfTop1, halfWords)} |");
 Console.WriteLine($"| Wort nach der Hälfte der Buchstaben in der Leiste | {Pct(halfTop3, halfWords)} |");
 Console.WriteLine($"| Gesparte Tastendrücke | {Pct(keysBaseline - keysNeeded, keysBaseline)} |");
@@ -161,6 +255,19 @@ Console.WriteLine($"| Richtig getippte Wörter, die verändert wurden | {Pct(cle
 Console.WriteLine($"| Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | {Pct(clean.CaseOnly, clean.Total)} |");
 Console.WriteLine($"| **Falsche Wörter im Text nach der Korrektur** | **{Pct(wrongAfter, all)}** |");
 Console.WriteLine($"| … ohne reine Groß-/Kleinschreibung | {Pct(wrongAfterIgnoringCase, all)} |");
+
+Console.WriteLine();
+Console.WriteLine($"| Fehlendes Leerzeichen ({joined} Wortpaare, sonst fehlerfrei getippt) | Wert |");
+Console.WriteLine("| --- | --- |");
+Console.WriteLine($"| In die beiden Wörter getrennt | {Pct(joinedSplit, joined)} |");
+Console.WriteLine($"| In etwas anderes korrigiert | {Pct(joinedOther, joined)} |");
+
+Console.WriteLine();
+Console.WriteLine("| Leertaste mitten im Wort (sonst fehlerfrei getippt) | Wert |");
+Console.WriteLine("| --- | --- |");
+Console.WriteLine($"| Leertaste statt Buchstabe der untersten Reihe: Wort wiederhergestellt | {Pct(insteadOfFixed, insteadOf)} ({insteadOf}) |");
+Console.WriteLine($"| Zusätzliche Leertaste: Wort wiederhergestellt | {Pct(extraFixed, extra)} ({extra}) |");
+Console.WriteLine($"| Fehlalarm: zwei richtige Wörter verschmolzen (Durchläufe mit Tippfehlern) | {Pct(wrongJoins, all)} |");
 
 if (options.Verbose)
 {
@@ -216,11 +323,11 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool Verbose)
+        string Language, string? Text, string? Root, string? Model, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose)
     {
         public static Options? Parse(string[] args)
         {
-            var options = new Options("de", null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, Verbose: false);
+            var options = new Options("de", null, null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, UseTouch: true, Verbose: false);
             for (int i = 0; i < args.Length; i++)
             {
                 string? Value() => i + 1 < args.Length ? args[++i] : null;
@@ -228,6 +335,7 @@ namespace ZBoard.Tools.SuggestionEval
                 {
                     case "--lang" when Value() is { } v: options = options with { Language = v }; break;
                     case "--text" when Value() is { } v: options = options with { Text = v }; break;
+                    case "--model" when Value() is { } v: options = options with { Model = v }; break;
                     case "--root" when Value() is { } v: options = options with { Root = v }; break;
                     case "--seed" when Value() is { } v && int.TryParse(v, out var n): options = options with { Seed = n }; break;
                     case "--runs" when Value() is { } v && int.TryParse(v, out var n) && n > 0: options = options with { Runs = n }; break;
@@ -239,20 +347,23 @@ namespace ZBoard.Tools.SuggestionEval
                         && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var l) && l is >= 0 and <= 1:
                         options = options with { Lazy = l };
                         break;
+                    case "--no-touch": options = options with { UseTouch = false }; break;
                     case "--no-context": options = options with { UseContext = false }; break;
                     case "--verbose": options = options with { Verbose = true }; break;
                     default:
                         Console.Error.WriteLine(
                             """
                             Aufruf: dotnet run -c Release --project tools/SuggestionEval -- [Optionen]
-                              --lang de|en|fr|es|it   Sprache (Wörterbuch, Wortpaare, Layout); Vorgabe de
+                              --lang de|en|fr|es|it   Sprache (Wörterbuch, Sprachmodell, Layout); Vorgabe de
                               --text <Datei>          eigener Testtext, ein Satz pro Zeile (Vorgabe: samples/<Sprache>.txt)
                               --runs <n>              Durchläufe mit unterschiedlichen Tippfehlern; Vorgabe 5
                               --sigma <x>             Streuung der Fingerposition in Tastenbreiten; Vorgabe 0.24
                               --lazy <x>              Anteil der Umlaute/Akzente, die als Grundbuchstabe getippt werden; Vorgabe 0.3
                               --seed <n>              Startwert des Zufallsgenerators; Vorgabe 1
+                              --no-touch              ohne Fingerpositionen messen (nur Nachbartasten)
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben
+                              --model <Datei>         anderes Sprachmodell (Vorgabe: Assets/dict/<Sprache>.ngrams.bin)
                               --root <Ordner>         zBoard-Ordner, falls nicht von dort gestartet
                             """);
                         return null;

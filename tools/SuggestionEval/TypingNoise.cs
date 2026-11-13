@@ -48,10 +48,14 @@ public sealed class TypingNoise
         }
     }
 
-    /// <summary>Tippt <paramref name="intended"/> mit Fehlern.</summary>
-    public string Type(string intended)
+    /// <summary>Mitten der Buchstabentasten in Tastenbreiten (für <see cref="ZBoard.Suggestions.TouchTrace"/>).</summary>
+    public IReadOnlyDictionary<char, Vector2> Keys => _keys;
+
+    /// <summary>Tippt <paramref name="intended"/> mit Fehlern; liefert den Text und je Zeichen den Punkt des Fingers.</summary>
+    public (string Typed, Vector2?[] Points) Type(string intended)
     {
         var typed = new StringBuilder(intended.Length + 2);
+        var points = new List<Vector2?>(intended.Length + 2);
         foreach (char original in intended)
         {
             if (_random.NextDouble() < OmitRate) continue;
@@ -64,25 +68,56 @@ public sealed class TypingNoise
                 lower = plain;
             }
 
+            Vector2? point = null;
             if (_keys.TryGetValue(lower, out var center))
             {
-                char hit = NearestKey(center + new Vector2((float)(Gaussian() * Sigma), (float)(Gaussian() * Sigma)));
+                point = Scatter(center);
+                char hit = NearestKey(point.Value);
                 c = char.IsUpper(c) ? char.ToUpperInvariant(hit) : hit;
             }
 
             typed.Append(c);
-            if (_random.NextDouble() < DoubleRate) typed.Append(char.ToLowerInvariant(c));
+            points.Add(point);
+            if (_random.NextDouble() < DoubleRate)
+            {
+                typed.Append(char.ToLowerInvariant(c));
+                points.Add(point);
+            }
         }
 
         for (int i = 0; i + 1 < typed.Length; i++)
         {
             if (_random.NextDouble() >= SwapRate || !char.IsLower(typed[i]) || !char.IsLower(typed[i + 1])) continue;
             (typed[i], typed[i + 1]) = (typed[i + 1], typed[i]);
+            (points[i], points[i + 1]) = (points[i + 1], points[i]);
             i++;
         }
 
-        return typed.ToString();
+        return (typed.ToString(), [.. points]);
     }
+
+    /// <summary>
+    /// Fingerpunkte für fehlerfrei getipptes <paramref name="intended"/>: gestreut wie sonst auch, aber jeder Punkt
+    /// liegt auf der richtigen Taste. Zeichen ohne eigene Taste (Umlaute aus dem Popup) haben keinen Punkt.
+    /// </summary>
+    public Vector2?[] PointsFor(string intended)
+    {
+        var points = new Vector2?[intended.Length];
+        for (int i = 0; i < intended.Length; i++)
+        {
+            char lower = char.ToLowerInvariant(intended[i]);
+            if (!_keys.TryGetValue(lower, out var center)) continue;
+
+            var point = Scatter(center);
+            for (int attempt = 0; attempt < 20 && NearestKey(point) != lower; attempt++) point = Scatter(center);
+            points[i] = NearestKey(point) == lower ? point : center;
+        }
+
+        return points;
+    }
+
+    Vector2 Scatter(Vector2 center) =>
+        center + new Vector2((float)(Gaussian() * Sigma), (float)(Gaussian() * Sigma));
 
     char NearestKey(Vector2 point)
     {

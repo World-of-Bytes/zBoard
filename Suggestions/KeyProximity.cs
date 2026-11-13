@@ -9,7 +9,7 @@ namespace ZBoard.Suggestions;
 public sealed class KeyProximity
 {
     const float NeighborCost = 0.5f;
-    const float VariantCost = 0.3f;
+    public const float VariantCost = 0.3f;
     const float DefaultCost = 1f;
 
     static readonly (char A, char B)[] Variants =
@@ -92,6 +92,17 @@ public sealed class KeyProximity
         }
 
         return proximity;
+    }
+
+    /// <summary>Buchstaben der untersten Reihe: Sie liegen direkt über der Leertaste und werden mit ihr verwechselt.</summary>
+    public IReadOnlyList<char> BottomRowLetters
+    {
+        get
+        {
+            if (_positions.Count == 0) return [];
+            int bottom = _positions.Values.Max(p => p.Row);
+            return [.. _positions.Where(p => p.Value.Row == bottom).Select(p => p.Key).Order()];
+        }
     }
 
     public float SubstitutionCost(char a, char b)
