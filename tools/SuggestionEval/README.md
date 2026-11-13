@@ -36,7 +36,7 @@ Gelerntes gibt es nicht (frisch installierte Tastatur).
 
 ## Werte (mitgelieferte Testsätze)
 
-| | Deutsch 0.11.1 | Deutsch jetzt | Englisch 0.11.1 | Englisch jetzt |
+| | Deutsch 0.11.1 | Deutsch 0.12.0 | Englisch 0.11.1 | Englisch 0.12.0 |
 | --- | --- | --- | --- | --- |
 | Nächstes Wort vorhergesagt, unter den ersten 3 | – | 31,0 % | – | 35,0 % |
 | … nur nach einem Wort (ohne Satzanfang und Komma) | 15,6 % | 28,2 % | 18,2 % | 33,6 % |
@@ -47,7 +47,7 @@ Gelerntes gibt es nicht (frisch installierte Tastatur).
 | Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | 2,0 % | 1,2 % | 1,0 % | 1,0 % |
 | Falsche Wörter im Text nach der Korrektur | 8,8 % | 4,8 % | 8,5 % | 4,3 % |
 
-Seit 0.11.1 dazugekommen:
+In 0.12.0 dazugekommen:
 
 1. Englische Kurzformen in der Wortliste („don't“, „I'm“) und die Korrektur seltener Wörterbucheinträge („fur“ →
    „für“, „dont“ → „don't“, „yiu“ → „you“; `LazySpellingRatio` und `RareWordRatio` in `SuggestionEngine`).
