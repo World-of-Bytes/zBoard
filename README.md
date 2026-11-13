@@ -24,7 +24,7 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Learning from your typing | yes, models are improved with Google's servers via federated learning | yes, only on the device, can be turned off and deleted |
 | Languages | a great many languages and layouts | German (QWERTZ), English, Spanish, Italian (QWERTY), French (AZERTY) |
 | Typing, shift, symbols, long press for accented characters | ✓ | ✓ in Gboard's order, most frequent character preselected |
-| Word suggestions and autocorrect | ✓ | ✓ 120,000 German, 100,000 English words; uses where the finger hit each key, plus swapped letters, umlauts and sentence context |
+| Word suggestions and autocorrect | ✓ | ✓ 120,000 German, 100,000 English words; uses where the finger hit each key, plus swapped letters, umlauts, sentence context and missing spaces; German compound nouns count as correct |
 | Multilingual typing (several dictionaries at once, “DE · EN” on the space bar) | ✓ | ✓ up to three languages, language of the previous word preferred |
 | Capitalisation at the start of a sentence | ✓ | ✓ also in apps that don't ask for it |
 | Capitalising German nouns | ✓ | ✓ |

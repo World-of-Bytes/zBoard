@@ -72,6 +72,14 @@ public sealed class SuggestionEngine
 
     const float NeighborSlipCost = 0.75f;
 
+    // Zusammengesetzte Wörter und fehlende Leerzeichen: Mindestlänge der Teile, und wie häufig ein Teil mindestens
+    // sein muss (Anteil an allen Wörtern; schließt seltene Einträge aus, die oft selbst Tippfehler sind).
+    const int CompoundPartLength = 3;
+    const int MaxCompoundParts = 4;
+    const double MissingSpaceCost = 0.5; // ein vergessenes Leerzeichen ist ein häufiger Fehler: billiger als ein falscher Buchstabe
+    const double MinPartShare = 2e-6;
+    const double MinSingleLetterShare = 2e-3;
+
     /// <inheritdoc cref="NearMissDistance"/>
     public const double NearMissRatio = 10.0;
 
@@ -170,6 +178,11 @@ public sealed class SuggestionEngine
         var lower = typed.ToLowerInvariant();
         bool learned = _history.IsKnown(lower);
         int typedFrequency = _dictionary.Lookup(lower)?.Freq ?? ApostropheFormFrequency(lower);
+
+        // Zusammengesetzte Substantive stehen nicht einzeln im Wörterbuch, sind aber richtig geschrieben.
+        var compound = typedFrequency == 0 && !learned ? Compound(lower) : null;
+        if (compound != null) typedFrequency = compound.Value.Freq;
+
         bool typedIsWord = typedFrequency > 0 || learned;
         var scores = new Dictionary<string, double>(StringComparer.Ordinal);
 
@@ -190,6 +203,8 @@ public sealed class SuggestionEngine
             bool exact = word.Length == lower.Length;
             Offer(word, count * UserWordWeight * (exact ? ExactBoost : CompletionWeight));
         }
+
+        if (compound != null) Offer(compound.Value.Form, compound.Value.Freq * ExactBoost);
 
         // 2. Korrekturen per gewichteter Editierdistanz
         float maxDistance = lower.Length switch
@@ -276,6 +291,19 @@ public sealed class SuggestionEngine
             }
         }
 
+        // Fehlendes Leerzeichen ("ichhabe"): zwei Wörter, wenn das besser passt als jede einzelne Korrektur. Manche
+        // dieser Verschmelzungen stehen als seltene Einträge in den Wortlisten; dann gilt dieselbe Hürde wie für
+        // bequeme Schreibweisen.
+        bool splitOverrides = false;
+        if (compound == null && !learned && _history.CountOf(lower) == 0 && Split(lower, context) is { } split
+            && (typedFrequency == 0 || split.Score >= LazySpellingRatio * typedFrequency)
+            && (best == null || split.Score > best.Value.InContext))
+        {
+            best = (split.Text, split.Score, split.Score, false);
+            splitOverrides = typedFrequency > 0;
+            Offer(split.Text, split.Score);
+        }
+
         // Alle Schreibweisen der besten Wörter anbieten ("frage" und "Frage"); OrderByDescending ist stabil.
         var candidates = scores
             .OrderByDescending(s => s.Value)
@@ -285,8 +313,8 @@ public sealed class SuggestionEngine
             .ToList();
 
         string? nounForm = null;
-        if (_dictionary.Contains(lower) && IsLowerCase(typed)
-            && (NounOnly(lower) ?? NounInContext(lower, context)) is { } noun
+        if ((_dictionary.Contains(lower) || compound != null) && IsLowerCase(typed)
+            && (compound?.Form ?? NounOnly(lower) ?? NounInContext(lower, context)) is { } noun
             && _history.LearnedForm(lower) != lower) // bewusst klein geschrieben und gelernt
         {
             nounForm = noun;
@@ -294,10 +322,11 @@ public sealed class SuggestionEngine
 
         // Steht das Getippte im Wörterbuch, gilt die Korrektur nur, wenn sie viel wahrscheinlicher ist. Die bequeme
         // Schreibweise hat dabei Vorrang vor einem anderen, häufigeren Wort ("wont" → "won't", nicht "want").
-        bool overrides = false;
-        if (best != null && typedFrequency > 0 && !learned && _history.CountOf(lower) == 0)
+        bool overrides = splitOverrides;
+        if (!overrides && best != null && typedFrequency > 0 && !learned && _history.CountOf(lower) == 0)
         {
-            if (bestLazySpelling is { } lazy && lazy.Score >= LazySpellingRatio * typedFrequency)
+            // Bei einem zusammengesetzten Wort zählt die Häufigkeit des letzten Teils nicht: "fussball" → "Fußball".
+            if (bestLazySpelling is { } lazy && lazy.Score >= LazySpellingRatio * (compound != null ? 1 : typedFrequency))
             {
                 (best, overrides) = (lazy, true);
             }
@@ -459,6 +488,89 @@ public sealed class SuggestionEngine
         }
 
         return parts.Count == 0 ? null : string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// Deutsches zusammengesetztes Substantiv aus bekannten Substantiven ("Haustürschlüssel" = Haus + Tür + Schlüssel,
+    /// "Geburtstagskuchen" mit Fugen-s): großgeschriebene Form und Häufigkeit des letzten Teils, sonst null. Greift nur,
+    /// wo die Wortliste Substantive großschreibt, also im Deutschen.
+    /// </summary>
+    (string Form, int Freq)? Compound(string lower)
+    {
+        int n = lower.Length;
+        if (n < 2 * CompoundPartLength || n > 40 || !lower.All(char.IsLetter)) return null;
+
+        int NounFrequency(int from, int to)
+        {
+            if (to - from < CompoundPartLength) return 0;
+            string part = lower[from..to];
+            if (NounOnly(part) == null) return 0;
+            int freq = _dictionary.Lookup(part)!.Value.Freq;
+            return freq >= _dictionary.TotalFrequency * MinPartShare ? freq : 0;
+        }
+
+        // parts[i]: aus wie vielen Substantiven lower[..i] besteht (0 = nicht zerlegbar)
+        var parts = new int[n + 1];
+        for (int end = CompoundPartLength; end < n; end++)
+        {
+            for (int start = 0; start <= end - CompoundPartLength; start++)
+            {
+                if (start > 0 && parts[start] == 0) continue;
+                if (NounFrequency(start, end) == 0) continue;
+                int count = (start > 0 ? parts[start] : 0) + 1;
+                if (count >= MaxCompoundParts) continue;
+                if (parts[end] == 0 || count < parts[end]) parts[end] = count;
+                if (lower[end] == 's' && end + 1 < n && (parts[end + 1] == 0 || count < parts[end + 1])) parts[end + 1] = count; // Fugen-s
+            }
+        }
+
+        for (int start = CompoundPartLength; start <= n - CompoundPartLength; start++)
+        {
+            if (parts[start] > 0 && NounFrequency(start, n) is > 0 and var freq)
+            {
+                return (char.ToUpperInvariant(lower[0]) + lower[1..], freq);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Zwei Wörter ohne Leerzeichen dazwischen ("ichhabe" → "ich habe"): beide müssen gängige Wörter sein und im
+    /// Sprachmodell aufeinander folgen. Bewertung wie eine Korrektur mit einem fehlenden Zeichen.
+    /// </summary>
+    (string Text, double Score)? Split(string lower, WordContext context)
+    {
+        if (lower.Length < 3 || !lower.All(char.IsLetter) || _dictionary.TotalFrequency == 0) return null;
+
+        double total = _dictionary.TotalFrequency;
+        (string Text, double Score)? best = null;
+        for (int cut = 1; cut < lower.Length; cut++)
+        {
+            if (SplitPart(lower[..cut]) is not { } first || SplitPart(lower[cut..]) is not { } second) continue;
+
+            var afterFirst = new WordContext(first.Word, context.Previous);
+            double together = _model.ContextFactor(afterFirst, second.Word);
+            if (together <= 1.0) continue; // im Sprachmodell nie hintereinander gesehen
+
+            // "vielen dank" → "vielen Dank": die Schreibweise, die nach dem ersten Wort üblich ist
+            string secondForm = _dictionary.Forms(second.Word)
+                .Select(form => (Form: form, P: _model.FormProbability(afterFirst, form)))
+                .Where(f => f.P > 0).OrderByDescending(f => f.P).Select(f => f.Form).FirstOrDefault() ?? second.Word;
+
+            double score = first.Freq * second.Freq / total * Math.Min(MaxContextFactor, together) / Math.Pow(DistancePenaltyBase, MissingSpaceCost);
+            if (best == null || score > best.Value.Score) best = (first.Word + " " + secondForm, score);
+        }
+
+        return best;
+
+        // Ein Teil muss ein gängiges Wort sein; ein einzelner Buchstabe nur, wenn er ein sehr häufiges Wort ist ("I", "a").
+        (string Word, double Freq)? SplitPart(string part)
+        {
+            if (_dictionary.Lookup(part) is not { } entry) return null;
+            double share = entry.Freq / total;
+            return share >= (part.Length == 1 ? MinSingleLetterShare : MinPartShare) ? (entry.Word, entry.Freq) : null;
+        }
     }
 
     /// <summary>Schreibweisen aus dem Wörterbuch, sonst das (gelernte) Wort selbst.</summary>

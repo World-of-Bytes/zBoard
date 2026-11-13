@@ -572,7 +572,14 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     void Learn(string? previous, string word, bool accepted = false)
     {
-        if (_settings.LearnWords && _profile.AllowLearning) Engine?.Learn(previous, word, accepted);
+        if (!_settings.LearnWords || !_profile.AllowLearning) return;
+
+        // Eine Korrektur kann zwei Wörter liefern ("ichhabe" → "ich habe"): jedes einzeln lernen.
+        foreach (var part in word.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            Engine?.Learn(previous, part, accepted);
+            previous = part;
+        }
     }
 
     /// <summary>

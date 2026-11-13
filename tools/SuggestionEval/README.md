@@ -24,6 +24,9 @@ Tastenbreiten); die nächstgelegene Taste zählt. Dazu kommen ausgelassene, dopp
 Umlaute, die als Grundbuchstabe getippt werden („fur“). Nach jedem Wort folgt die Leertaste; verglichen wird, was
 dann im Text stünde.
 
+**Fehlendes Leerzeichen:** Je zwei aufeinanderfolgende Wörter werden ohne Leerzeichen dazwischen und sonst
+fehlerfrei getippt; gezählt wird, wie oft danach beide Wörter richtig dastehen.
+
 Wie am Gerät tippt der simulierte Nutzer mitten im Satz alles klein und überlässt die Großschreibung der Tastatur.
 Gelerntes gibt es nicht (frisch installierte Tastatur).
 
@@ -51,6 +54,10 @@ Seit 0.11.1 dazugekommen:
    „Nachbartaste ja oder nein“ (`TouchTrace.Sigma`), und ein echtes Wort wird korrigiert, wenn der Finger fast auf
    der Grenze zur Nachbartaste lag und das Nachbarwort viel besser in den Satz passt („heute drei“ → „frei“;
    `NearMissDistance`, `NearMissRatio`). Vergleich ohne Fingerpositionen: `--no-touch`.
+4. Zusammengesetzte Substantive aus bekannten Substantiven gelten als richtig geschrieben („Haustürschlüssel“), und
+   ein fehlendes Leerzeichen wird eingesetzt, wenn die beiden Wörter im Sprachmodell aufeinander folgen („ichhabe“ →
+   „ich habe“). Von den Wortpaaren der Testsätze, ohne Leerzeichen getippt, werden 68,6 % (Deutsch) und 63,5 %
+   (Englisch) richtig getrennt.
 
 ## Grenzen
 

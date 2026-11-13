@@ -141,6 +141,29 @@ for (int run = 0; run < options.Runs; run++)
     }
 }
 
+// ---------- 3. Fehlendes Leerzeichen ----------
+
+// Je zwei aufeinanderfolgende Wörter ohne Leerzeichen dazwischen getippt, sonst fehlerfrei.
+int joined = 0, joinedSplit = 0, joinedOther = 0;
+for (int i = 0; i + 1 < words.Count; i++)
+{
+    var (first, second) = (words[i], words[i + 1]);
+    if (second.Context.PreviousWord != first.Target || second.Context.BeforePrevious != first.Context.Previous) continue;
+
+    string typed = first.Intended + second.Intended;
+    string wanted = first.Target + " " + second.Target;
+    var result = engine.Suggest(typed, Context(first));
+    string final = result.AutoCorrection ?? typed;
+    joined++;
+    if (final == wanted) joinedSplit++;
+    else if (final != typed && !string.Equals(final, wanted, StringComparison.OrdinalIgnoreCase)) joinedOther++;
+
+    if (options.Verbose && final != wanted && examples.Count < 480)
+    {
+        examples.Add($"{"Leerzeichen",-10}  {"",-14}  {first.Context.Previous ?? "–",-14} {typed,-18} → {final,-18} (gewollt: {wanted})");
+    }
+}
+
 // ---------- Ausgabe ----------
 
 // Deutsche Schreibweise von Hand, damit die Ausgabe nicht von den Spracheinstellungen des Rechners abhängt.
@@ -177,6 +200,12 @@ Console.WriteLine($"| Richtig getippte Wörter, die verändert wurden | {Pct(cle
 Console.WriteLine($"| Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | {Pct(clean.CaseOnly, clean.Total)} |");
 Console.WriteLine($"| **Falsche Wörter im Text nach der Korrektur** | **{Pct(wrongAfter, all)}** |");
 Console.WriteLine($"| … ohne reine Groß-/Kleinschreibung | {Pct(wrongAfterIgnoringCase, all)} |");
+
+Console.WriteLine();
+Console.WriteLine($"| Fehlendes Leerzeichen ({joined} Wortpaare, sonst fehlerfrei getippt) | Wert |");
+Console.WriteLine("| --- | --- |");
+Console.WriteLine($"| In die beiden Wörter getrennt | {Pct(joinedSplit, joined)} |");
+Console.WriteLine($"| In etwas anderes korrigiert | {Pct(joinedOther, joined)} |");
 
 if (options.Verbose)
 {
