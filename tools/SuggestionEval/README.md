@@ -41,8 +41,8 @@ Gelerntes gibt es nicht (frisch installierte Tastatur).
 | Nächstes Wort vorhergesagt, unter den ersten 3 | – | 31,0 % | – | 35,0 % |
 | … nur nach einem Wort (ohne Satzanfang und Komma) | 15,6 % | 28,2 % | 18,2 % | 33,6 % |
 | Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 76,6 % | 71,0 % | 83,7 % |
-| Gesparte Tastendrücke | 42,1 % | 51,1 % | 39,3 % | 49,9 % |
-| Tippfehler richtig korrigiert | 66,3 % | 82,0 % | 60,1 % | 78,9 % |
+| Gesparte Tastendrücke | 42,1 % | 51,0 % | 39,3 % | 49,9 % |
+| Tippfehler richtig korrigiert | 66,3 % | 81,9 % | 60,1 % | 78,9 % |
 | Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 1,4 % | 0,0 % |
 | Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | 2,0 % | 1,2 % | 1,0 % | 1,0 % |
 | Falsche Wörter im Text nach der Korrektur | 8,8 % | 4,8 % | 8,5 % | 4,3 % |
