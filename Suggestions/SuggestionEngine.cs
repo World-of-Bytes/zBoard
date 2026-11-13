@@ -63,6 +63,19 @@ public sealed class SuggestionEngine
     public const double MaxContextFactor = 100.0;
 
     /// <summary>
+    /// Bis zu dieser Editierdistanz gilt ein Tastendruck als „fast auf der Grenze zur Nachbartaste“ (nur mit
+    /// Fingerpositionen, siehe <see cref="TouchTrace"/>). Dann darf auch ein echtes Wort korrigiert werden, wenn das
+    /// Wort mit dem Nachbarbuchstaben im Satz um <see cref="NearMissRatio"/> wahrscheinlicher ist.
+    /// Abgestimmt mit tools/SuggestionEval.
+    /// </summary>
+    public const float NearMissDistance = 0.25f;
+
+    const float NeighborSlipCost = 0.75f;
+
+    /// <inheritdoc cref="NearMissDistance"/>
+    public const double NearMissRatio = 10.0;
+
+    /// <summary>
     /// So viel wahrscheinlicher muss die großgeschriebene Form eines mehrdeutigen Worts im Satz sein, damit zBoard sie
     /// von selbst einsetzt ("eine frage" → "Frage"). Bei kleineren Werten wird zu oft fälschlich großgeschrieben
     /// ("und liebe" → "Liebe").
@@ -114,11 +127,12 @@ public sealed class SuggestionEngine
         Suggest(typed, new WordContext(previousWord), max);
 
     /// <summary>Vorschläge für das gerade getippte Wort; der Satzkontext verbessert die Reihenfolge.</summary>
-    public SuggestionResult Suggest(string typed, WordContext context, int max = 3)
+    /// <param name="touches">Wo der Finger bei jedem Buchstaben lag, falls bekannt: macht die Korrektur genauer.</param>
+    public SuggestionResult Suggest(string typed, WordContext context, int max = 3, TouchTrace? touches = null)
     {
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionResult.Empty;
 
-        var analysis = Analyze(typed, context, max: max);
+        var analysis = Analyze(typed, context, max: max, touches: touches);
         var candidates = analysis.Candidates.Take(max).Select(c => c.Word).ToList();
 
         string? autoCorrection = null;
@@ -147,7 +161,8 @@ public sealed class SuggestionEngine
         Analyze(typed, new WordContext(previousWord), proximity, max);
 
     /// <inheritdoc cref="Analyze(string, string?, KeyProximity?, int)"/>
-    public SuggestionAnalysis Analyze(string typed, WordContext context, KeyProximity? proximity = null, int max = 8)
+    public SuggestionAnalysis Analyze(
+        string typed, WordContext context, KeyProximity? proximity = null, int max = 8, TouchTrace? touches = null)
     {
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionAnalysis.Empty;
         proximity ??= _proximity;
@@ -185,19 +200,43 @@ public sealed class SuggestionEngine
             _ => 2f,
         };
 
-        var corrections = new List<(string Word, double Score, double InContext)>(); // Bewertung ohne und mit Satzkontext
+        // Bewertung ohne und mit Satzkontext; NearMiss: nur knapp neben der gemeinten Taste gelandet
+        var corrections = new List<(string Word, double Score, double InContext, bool NearMiss)>();
+        bool hasTouches = touches != null && touches.Count == lower.Length;
         if (maxDistance > 0 && !lower.Any(char.IsDigit))
         {
-            foreach (var (word, freq, distance) in _dictionary.FindSimilar(lower, maxDistance, proximity.SubstitutionCost))
+            // Mit Fingerpositionen zählt der tatsächliche Abstand zur Taste; Umlaute und Akzente (keine Tippfehler,
+            // sondern Abkürzungen) und Stellen ohne Position behalten die festen Kosten.
+            Func<int, char, char, float> substitution = (_, a, b) => proximity.SubstitutionCost(a, b);
+            if (hasTouches)
+            {
+                substitution = (position, a, b) =>
+                {
+                    float fixedCost = proximity.SubstitutionCost(a, b);
+                    if (fixedCost <= KeyProximity.VariantCost || touches!.Cost(position, a, b, DistancePenaltyBase) is not { } cost)
+                    {
+                        return fixedCost;
+                    }
+
+                    // Eine Nachbartaste bleibt etwas billiger als ein beliebiger Buchstabe, auch wenn der Finger mitten
+                    // auf der Taste lag: Wer sich vertut, landet meist nebenan.
+                    return fixedCost < 1f ? Math.Min(cost, NeighborSlipCost) : cost;
+                };
+            }
+
+            foreach (var (word, freq, distance) in _dictionary.FindSimilar(lower, maxDistance, substitution))
             {
                 if (distance <= 0) continue;
                 double score = freq / Math.Pow(DistancePenaltyBase, distance);
                 Offer(word, score);
-                corrections.Add((word, score, score));
+                bool nearMiss = hasTouches && distance <= NearMissDistance && word.Length == lower.Length
+                    && !KeyProximity.IsLazySpelling(lower, word);
+                corrections.Add((word, score, score, nearMiss));
             }
         }
 
         // 3. Satzkontext: Wörter, die an dieser Stelle typisch sind, nach vorn
+        double typedInContext = typedFrequency;
         if (context.Previous != null)
         {
             HashSet<string>? ownFollowers = context.PreviousWord is { } previousWord
@@ -210,6 +249,7 @@ public sealed class SuggestionEngine
             }
 
             foreach (var word in scores.Keys.ToList()) scores[word] *= Factor(word);
+            typedInContext *= Factor(lower);
 
             // Auch die Korrektur richtet sich nach dem Satz ("ich hae" → "habe", nicht das häufigere "hat").
             for (int i = 0; i < corrections.Count; i++)
@@ -220,10 +260,15 @@ public sealed class SuggestionEngine
 
         // Welche Korrektur es wird, entscheidet der Satz mit; ob ein Wort aus dem Wörterbuch überhaupt korrigiert
         // wird (weiter unten), entscheidet allein die Bewertung ohne Kontext.
-        (string Word, double Score, double InContext)? best = null, bestLazySpelling = null;
+        (string Word, double Score, double InContext, bool NearMiss)? best = null, bestLazySpelling = null, bestNearMiss = null;
         foreach (var correction in corrections)
         {
             if (best == null || correction.InContext > best.Value.InContext) best = correction;
+            if (correction.NearMiss && (bestNearMiss == null || correction.InContext > bestNearMiss.Value.InContext))
+            {
+                bestNearMiss = correction;
+            }
+
             if ((bestLazySpelling == null || correction.InContext > bestLazySpelling.Value.InContext)
                 && KeyProximity.IsLazySpelling(lower, correction.Word))
             {
@@ -262,6 +307,13 @@ public sealed class SuggestionEngine
                 overrides = best.Value.Word != bestLazySpelling?.Word
                     && best.Value.Score >= RareWordRatio * typedFrequency
                     && !char.IsUpper(_dictionary.Lookup(lower)?.Word[0] ?? 'A');
+            }
+
+            // Der Finger lag fast auf der Grenze zur Nachbartaste, und das Wort mit dem Nachbarbuchstaben passt viel
+            // besser in den Satz ("heute drei" → "frei"): Hier darf auch ein echtes Wort korrigiert werden.
+            if (!overrides && bestNearMiss is { } near && near.InContext >= NearMissRatio * typedInContext)
+            {
+                (best, overrides) = (near, true);
             }
         }
 

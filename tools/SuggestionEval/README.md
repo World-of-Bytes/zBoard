@@ -9,7 +9,7 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang en --verbose     
 dotnet run -c Release --project tools/SuggestionEval -- --lang de --text mein.txt  # eigener Text, ein Satz pro Zeile
 ```
 
-Weitere Optionen: `--runs`, `--sigma`, `--lazy`, `--seed`, `--model`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
+Weitere Optionen: `--runs`, `--sigma`, `--lazy`, `--seed`, `--model`, `--no-touch`, `--no-context` (siehe `--help`). Gleiche Optionen ergeben immer
 dieselben Zahlen.
 
 ## Was gemessen wird
@@ -33,12 +33,12 @@ Gelerntes gibt es nicht (frisch installierte Tastatur).
 | --- | --- | --- | --- | --- |
 | Nächstes Wort vorhergesagt, unter den ersten 3 | – | 31,0 % | – | 35,0 % |
 | … nur nach einem Wort (ohne Satzanfang und Komma) | 15,6 % | 28,2 % | 18,2 % | 33,6 % |
-| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 75,4 % | 71,0 % | 82,8 % |
-| Gesparte Tastendrücke | 42,1 % | 50,9 % | 39,3 % | 49,7 % |
-| Tippfehler richtig korrigiert | 66,3 % | 76,9 % | 60,1 % | 72,7 % |
+| Wort nach der Hälfte der Buchstaben in der Leiste | 61,1 % | 76,6 % | 71,0 % | 83,7 % |
+| Gesparte Tastendrücke | 42,1 % | 51,1 % | 39,3 % | 49,9 % |
+| Tippfehler richtig korrigiert | 66,3 % | 82,0 % | 60,1 % | 78,9 % |
 | Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 1,4 % | 0,0 % |
 | Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | 2,0 % | 1,2 % | 1,0 % | 1,0 % |
-| Falsche Wörter im Text nach der Korrektur | 8,8 % | 5,8 % | 8,5 % | 5,3 % |
+| Falsche Wörter im Text nach der Korrektur | 8,8 % | 4,8 % | 8,5 % | 4,3 % |
 
 Seit 0.11.1 dazugekommen:
 
@@ -47,11 +47,16 @@ Seit 0.11.1 dazugekommen:
 2. Das Sprachmodell (`NgramModel`, erzeugt mit `tools/NgramBuilder`) statt der 5 000 Wortpaare: Vorhersage aus zwei
    Wörtern Kontext, auch am Satzanfang und nach Komma; Vorschläge und Korrekturen nach dem Satz geordnet
    (`MaxContextFactor`); Großschreibung mehrdeutiger Wörter aus dem Satz („eine frage“ → „Frage“, `NounContextRatio`).
+3. Fingerpositionen (`TouchTrace`): Die Korrektur rechnet mit dem Abstand des Fingers zu den Tasten statt mit
+   „Nachbartaste ja oder nein“ (`TouchTrace.Sigma`), und ein echtes Wort wird korrigiert, wenn der Finger fast auf
+   der Grenze zur Nachbartaste lag und das Nachbarwort viel besser in den Satz passt („heute drei“ → „frei“;
+   `NearMissDistance`, `NearMissRatio`). Vergleich ohne Fingerpositionen: `--no-touch`.
 
 ## Grenzen
 
 - Die Testsätze in `samples/` sind wenige (rund 1 000 Wörter je Sprache) und eigens geschrieben. Unterschiede unter
   etwa einem Prozentpunkt sind Zufall; mit `--runs 20` oder einem größeren Text wird es genauer.
 - Die Tippfehler sind simuliert. Echte Finger treffen systematisch daneben (z. B. zu tief), das bildet die
-  Normalverteilung nicht ab.
+  Normalverteilung nicht ab. Das gilt besonders für den Gewinn durch die Fingerpositionen: Die Korrektur nimmt
+  dieselbe Art von Streuung an, mit der die Messung tippt. Auf dem Gerät kann der Gewinn deshalb kleiner ausfallen.
 - Wischeingabe, mehrsprachige Eingabe und Gelerntes werden nicht gemessen.

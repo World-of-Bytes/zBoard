@@ -24,7 +24,7 @@ Status: **all five milestones done** – testing on real devices, not yet publis
 | Learning from your typing | yes, models are improved with Google's servers via federated learning | yes, only on the device, can be turned off and deleted |
 | Languages | a great many languages and layouts | German (QWERTZ), English, Spanish, Italian (QWERTY), French (AZERTY) |
 | Typing, shift, symbols, long press for accented characters | ✓ | ✓ in Gboard's order, most frequent character preselected |
-| Word suggestions and autocorrect | ✓ | ✓ 120,000 German, 100,000 English words; neighbouring keys, swapped letters, umlauts |
+| Word suggestions and autocorrect | ✓ | ✓ 120,000 German, 100,000 English words; uses where the finger hit each key, plus swapped letters, umlauts and sentence context |
 | Multilingual typing (several dictionaries at once, “DE · EN” on the space bar) | ✓ | ✓ up to three languages, language of the previous word preferred |
 | Capitalisation at the start of a sentence | ✓ | ✓ also in apps that don't ask for it |
 | Capitalising German nouns | ✓ | ✓ |
@@ -100,7 +100,7 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang de
 | `Keyboard/` | layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
 | `Emoji/` | `EmojiCatalog` (data, search, skin tones), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `TouchTrace` (finger positions), `UserHistory`, `EmailMemory`, `KeyProximity`, `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (start screen), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (backup file: writing, reading, validation) |
 | `Assets/dict/` | word lists and language models per language |

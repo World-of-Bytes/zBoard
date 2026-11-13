@@ -57,6 +57,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     long _lastSpaceMs;
     bool _autoSpaceInserted;    // Leerzeichen kam von einem Vorschlag
     bool _toolbarOpen;          // Werkzeugleiste über den Pfeil geöffnet; bleibt, bis getippt wird
+
+    /// <summary>Je Zeichen des Worts in Bearbeitung: das Zeichen und wo der Finger die Taste traf (null = unbekannt).</summary>
+    readonly List<(char Char, Vector2? Point)> _touches = [];
     Correction? _lastCorrection;
     string? _restoredWord;      // per Rücktaste wiederhergestelltes Original; das nächste Leerzeichen übernimmt und lernt es
     SuggestionResult _currentSuggestions = SuggestionResult.Empty;
@@ -261,6 +264,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         if (wordChar && _profile.AllowSuggestions)
         {
             _autoSpaceInserted = false;
+            TrackTouches(text, _keyboardView?.TapPoint);
             _composing.Append(text);
             ic.SetComposingText(J(_composing.ToString()), 1);
             UpdateSuggestions();
@@ -504,7 +508,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         string? previous = PreviousWord();
         if (autocorrect && !restored && _settings.AutoCorrect && _profile.AllowAutocorrect)
         {
-            var result = Engine?.Suggest(typed, SentenceContext());
+            var result = Engine?.Suggest(typed, SentenceContext(), touches: Touches());
             if (result?.AutoCorrection is { } corrected && corrected != typed)
             {
                 final = corrected;
@@ -621,6 +625,37 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         return WordContext.FromText(before, fromFieldStart);
+    }
+
+    /// <summary>Merkt sich zu den Zeichen, die gleich an das Wort in Bearbeitung angehängt werden, den Fingerpunkt.</summary>
+    void TrackTouches(string text, Vector2? point)
+    {
+        // Das Wort kann sich anders als durch Tippen geändert haben (Löschen, Wiederherstellen): Liste angleichen.
+        int length = _composing.Length;
+        if (_touches.Count > length) _touches.RemoveRange(length, _touches.Count - length);
+        while (_touches.Count < length) _touches.Add((_composing[_touches.Count], null));
+
+        foreach (char c in text) _touches.Add((c, text.Length == 1 ? point : null));
+    }
+
+    /// <summary>
+    /// Fingerpunkte zum Wort in Bearbeitung für die Autokorrektur; null, wenn keine bekannt sind. Punkte zählen nur,
+    /// wo das gemerkte Zeichen noch an derselben Stelle steht.
+    /// </summary>
+    TouchTrace? Touches()
+    {
+        if (_keyboardView == null || _glideActive || _composing.Length == 0 || _touches.Count < _composing.Length) return null;
+
+        var points = new Vector2?[_composing.Length];
+        bool any = false;
+        for (int i = 0; i < points.Length; i++)
+        {
+            if (char.ToLowerInvariant(_touches[i].Char) != char.ToLowerInvariant(_composing[i])) continue;
+            points[i] = _touches[i].Point;
+            any |= points[i] != null;
+        }
+
+        return any ? new TouchTrace(points, _keyboardView.KeyCenters) : null;
     }
 
     // ---------- Wischeingabe ----------
@@ -740,7 +775,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var typed = _composing.ToString();
-        var result = engine.Suggest(typed, SentenceContext());
+        var result = engine.Suggest(typed, SentenceContext(), touches: Touches());
         _currentSuggestions = result;
         bool autocorrectActive = _settings.AutoCorrect && _profile.AllowAutocorrect;
 

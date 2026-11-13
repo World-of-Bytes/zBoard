@@ -9,7 +9,7 @@ namespace ZBoard.Suggestions;
 public sealed class KeyProximity
 {
     const float NeighborCost = 0.5f;
-    const float VariantCost = 0.3f;
+    public const float VariantCost = 0.3f;
     const float DefaultCost = 1f;
 
     static readonly (char A, char B)[] Variants =

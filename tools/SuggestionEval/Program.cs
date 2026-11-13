@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using ZBoard.Keyboard;
 using ZBoard.Suggestions;
 using ZBoard.Tools.SuggestionEval;
@@ -42,6 +43,8 @@ if (words.Count == 0)
 }
 
 WordContext Context(TestWord word) => options.UseContext ? word.Context : WordContext.None;
+TouchTrace? Touches(Vector2?[] points, IReadOnlyDictionary<char, Vector2> keys, int count) =>
+    options.UseTouch ? new TouchTrace(points[..count], keys) : null;
 
 // ---------- 1. Vorschläge bei fehlerfreiem Tippen ----------
 
@@ -51,10 +54,12 @@ int halfWords = 0, halfTop1 = 0, halfTop3 = 0;
 long keysNeeded = 0, keysBaseline = 0;
 int unknown = 0;
 
+var cleanTyping = new TypingNoise(layout, options.Seed - 1) { Sigma = options.Sigma };
 foreach (var word in words)
 {
     string target = word.Target, intended = word.Intended;
     if (!engine.InDictionary(target)) unknown++;
+    var cleanPoints = cleanTyping.PointsFor(intended);
 
     int cost = intended.Length + 1; // ausschreiben und Leertaste
     if (options.UseContext)
@@ -79,7 +84,8 @@ foreach (var word in words)
 
     for (int typedLetters = 1; typedLetters < intended.Length; typedLetters++)
     {
-        var bar = Bar.Of(engine.Suggest(intended[..typedLetters], Context(word)));
+        var bar = Bar.Of(engine.Suggest(
+            intended[..typedLetters], Context(word), touches: Touches(cleanPoints, cleanTyping.Keys, typedLetters)));
         bool visible = bar.Contains(target);
         if (visible && cost > typedLetters + 1) cost = typedLetters + 1;
 
@@ -107,10 +113,10 @@ for (int run = 0; run < options.Runs; run++)
     foreach (var word in words)
     {
         string target = word.Target, intended = word.Intended;
-        string typed = noise.Type(intended);
+        var (typed, points) = noise.Type(intended);
         bool typo = !string.Equals(typed, intended, StringComparison.OrdinalIgnoreCase);
 
-        var result = engine.Suggest(typed, Context(word));
+        var result = engine.Suggest(typed, Context(word), touches: Touches(points, noise.Keys, points.Length));
         string final = result.AutoCorrection ?? typed;
         var outcome = typo ? noisy : clean;
         outcome.Total++;
@@ -226,11 +232,11 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, string? Model, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool Verbose)
+        string Language, string? Text, string? Root, string? Model, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose)
     {
         public static Options? Parse(string[] args)
         {
-            var options = new Options("de", null, null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, Verbose: false);
+            var options = new Options("de", null, null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, UseTouch: true, Verbose: false);
             for (int i = 0; i < args.Length; i++)
             {
                 string? Value() => i + 1 < args.Length ? args[++i] : null;
@@ -250,6 +256,7 @@ namespace ZBoard.Tools.SuggestionEval
                         && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var l) && l is >= 0 and <= 1:
                         options = options with { Lazy = l };
                         break;
+                    case "--no-touch": options = options with { UseTouch = false }; break;
                     case "--no-context": options = options with { UseContext = false }; break;
                     case "--verbose": options = options with { Verbose = true }; break;
                     default:
@@ -262,6 +269,7 @@ namespace ZBoard.Tools.SuggestionEval
                               --sigma <x>             Streuung der Fingerposition in Tastenbreiten; Vorgabe 0.24
                               --lazy <x>              Anteil der Umlaute/Akzente, die als Grundbuchstabe getippt werden; Vorgabe 0.3
                               --seed <n>              Startwert des Zufallsgenerators; Vorgabe 1
+                              --no-touch              ohne Fingerpositionen messen (nur Nachbartasten)
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben
                               --model <Datei>         anderes Sprachmodell (Vorgabe: Assets/dict/<Sprache>.ngrams.bin)

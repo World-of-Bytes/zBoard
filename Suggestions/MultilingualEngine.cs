@@ -79,14 +79,14 @@ public sealed class MultilingualEngine
         Suggest(typed, new WordContext(previousWord), max);
 
     /// <inheritdoc cref="Suggest(string, string?, int)"/>
-    public SuggestionResult Suggest(string typed, WordContext sentence, int max = 3)
+    public SuggestionResult Suggest(string typed, WordContext sentence, int max = 3, TouchTrace? touches = null)
     {
-        if (!IsMultilingual) return Primary.Suggest(typed, sentence, max);
+        if (!IsMultilingual) return Primary.Suggest(typed, sentence, max, touches);
         if (string.IsNullOrWhiteSpace(typed)) return SuggestionResult.Empty;
 
         int context = ContextLanguage(sentence.PreviousWord);
         var proximity = Primary.Proximity;
-        var analyses = _engines.Select(e => e.Engine.Analyze(typed, sentence, proximity, max)).ToArray();
+        var analyses = _engines.Select(e => e.Engine.Analyze(typed, sentence, proximity, max, touches)).ToArray();
 
         var ranked = analyses
             .SelectMany((a, i) => a.Candidates.Select(c => (c.Word, Language: i, Score: c.Score * Weight(i, context))))
