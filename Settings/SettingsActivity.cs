@@ -685,6 +685,10 @@ public sealed class SettingsActivity : Activity
             string languages = string.Join(", ", data.Learned.Keys.Order(StringComparer.Ordinal)
                 .Select(code => Layouts.LanguageNames.GetValueOrDefault(code, code)));
             lines.Add(L.T($"{words} gelernte Wörter", $"{words} learned words") + (languages.Length > 0 ? $" ({languages})" : string.Empty));
+            if (data.Pinyin is { Count: > 0 } pinyin)
+            {
+                lines.Add(L.T($"{pinyin.Count} gewählte Schriftzeichen (Pinyin)", $"{pinyin.Count} chosen characters (Pinyin)"));
+            }
         }
 
         if (data.Emails != null) lines.Add(L.T($"{data.Emails.Count} E-Mail-Adresse(n)", $"{data.Emails.Count} email address(es)"));

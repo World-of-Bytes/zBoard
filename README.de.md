@@ -310,7 +310,8 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   den längsten passenden Wörtern („womenshipengyou“ → 我们是朋友), angefangene Wörter und kürzere Wörter für den Anfang
   der Eingabe. Die Zeile lässt sich mit dem Finger seitlich schieben; die Leertaste nimmt den ersten (fetten) Vorschlag, Enter
   die Buchstaben. Was du wählst, merkt sich zBoard auf dem Gerät: Einmal Gewähltes rückt auf den zweiten Platz, beim
-  zweiten Mal auf den ersten – auch ganze Sätze. Nach einem eingesetzten Wort sagt zBoard das nächste vorher. Die Emoji-Suche versteht Pinyin („xiaolian“ → 😀).
+  zweiten Mal auf den ersten – auch ganze Sätze. Die gewählten Zeichen gehören zu den gelernten Wörtern: Sie stehen
+  in der Sicherung (`learning/zh.pinyin.tsv`) und werden bei der Synchronisation mit denen anderer Geräte vereint. Nach einem eingesetzten Wort sagt zBoard das nächste vorher. Die Emoji-Suche versteht Pinyin („xiaolian“ → 😀).
 - **Mehrsprachige Eingabe:** Wie bei Gboard gelten die Wörterbücher aller aktiven Sprachen gleichzeitig (bis zu drei),
   auf der Leertaste steht dann z. B. „DE · EN“. Ein englisches Wort wird in einem deutschen Satz nicht „korrigiert“,
   Tippfehler werden in die passende Sprache korrigiert, und was du schreibst, lernt zBoard in der Sprache, zu der das Wort
@@ -360,6 +361,5 @@ in `Assets/dict/`, `Assets/emoji/keywords.<Sprache>.txt`. `LanguagesTests` prüf
 - Testsätze für alle Sprachen außer Deutsch und Englisch; mehr Alltagstext für die Sprachmodelle (für Griechisch,
   Vietnamesisch und Rumänisch gibt es bisher nur wenige tausend Sätze)
 - Die 13 neuen Sprachen auf echten Geräten prüfen, besonders Arabisch (Schreibrichtung) und Chinesisch
-- Chinesisch: gelernte Schriftzeichen in Sicherung und Synchronisation aufnehmen (`learning/zh.pinyin.tsv`)
 - F-Droid-Metadaten
 - Weitere Sprachen für die Oberfläche (Französisch, Spanisch, Italienisch)

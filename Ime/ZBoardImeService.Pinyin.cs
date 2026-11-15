@@ -39,7 +39,7 @@ public sealed partial class ZBoardImeService
             if (File.Exists(learned))
             {
                 using var stream = File.OpenRead(learned);
-                engine.LoadLearned(stream);
+                engine.Learned.ReplaceWith(PinyinLearned.Load(stream));
             }
 
             return engine;
@@ -55,17 +55,76 @@ public sealed partial class ZBoardImeService
 
     void SavePinyinLearning()
     {
-        if (_pinyinTable is not { IsCompletedSuccessfully: true } table || !table.Result.IsDirty) return;
+        if (_pinyinTable is not { IsCompletedSuccessfully: true } table || !table.Result.Learned.IsDirty) return;
         var path = PinyinLearningFile(this);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using var stream = File.Create(path);
-        table.Result.SaveLearned(stream);
+        table.Result.Learned.Save(stream);
     }
+
+    // ---------- Sicherung und Synchronisation (aufgerufen aus ZBoardImeService.Backup.cs, unter BackupLock) ----------
+
+    /// <summary>Das Gelernte der geladenen Tabelle; null, wenn keine geladen ist. Eine ladende wird verworfen.</summary>
+    static PinyinLearned? LivePinyinLearned()
+    {
+        if (_pinyinTable is not { } table) return null;
+        if (table.IsCompletedSuccessfully) return table.Result.Learned;
+
+        // Lädt gerade (vielleicht noch den alten Stand): verwerfen, das nächste Tippen lädt neu.
+        _pinyinTable = null;
+        return null;
+    }
+
+    static PinyinLearned LoadPinyinLearned(Android.Content.Context context)
+    {
+        var path = PinyinLearningFile(context);
+        if (!File.Exists(path)) return new PinyinLearned();
+        using var stream = File.OpenRead(path);
+        return PinyinLearned.Load(stream);
+    }
+
+    static void SavePinyinLearned(Android.Content.Context context, PinyinLearned learned)
+    {
+        var path = PinyinLearningFile(context);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var stream = File.Create(path);
+        learned.Save(stream);
+    }
+
+    /// <summary>Für die Sicherung: der Stand im Speicher, sonst der aus der Datei.</summary>
+    static PinyinLearned CurrentPinyinLearned(Android.Content.Context context) =>
+        _pinyinTable is { IsCompletedSuccessfully: true } table ? table.Result.Learned : LoadPinyinLearned(context);
+
+    /// <summary>Wiederherstellen: ersetzt das Gelernte vollständig, in der Datei und in einer geladenen Tabelle.</summary>
+    static void RestorePinyinLearned(Android.Content.Context context, PinyinLearned restored)
+    {
+        var live = LivePinyinLearned();
+        live?.ReplaceWith(restored);
+        var path = PinyinLearningFile(context);
+        if (restored.Count > 0)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using var stream = File.Create(path);
+            restored.SaveCopy(stream);
+        }
+        else if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Synchronisation: vereint den Stand aus der Cloud mit dem eigenen (je Eintrag die höhere Anzahl).</summary>
+    static void MergePinyinLearned(Android.Content.Context context, PinyinLearned theirs)
+    {
+        var mine = LivePinyinLearned() ?? LoadPinyinLearned(context);
+        if (mine.MergeFrom(theirs)) SavePinyinLearned(context, mine);
+    }
+
 
     /// <summary>Vergisst die gewählten Schriftzeichen (die Datei löscht <see cref="ClearLearned"/> mit dem Ordner).</summary>
     static void ClearPinyinLearning()
     {
-        if (_pinyinTable is { IsCompletedSuccessfully: true } table) table.Result.ClearLearned();
+        if (_pinyinTable is { IsCompletedSuccessfully: true } table) table.Result.Learned.Clear();
     }
 
     void LearnPinyin(string pinyin, string word)
@@ -94,6 +153,7 @@ public sealed partial class ZBoardImeService
     void ShowPinyinCandidates()
     {
         if (_suggestionBar == null) return;
+        EnsurePinyin(); // nach einem Wiederherstellen während des Ladens wurde die Tabelle verworfen
         string typed = _composing.ToString();
         if (typed != _pinyinFor)
         {

@@ -24,9 +24,8 @@ public sealed class PinyinEngine
     readonly int[] _freq;
     readonly int _longestKey;
 
-    // Gelernt: was der Nutzer zu einer Schreibweise gewählt hat, mit Anzahl; häufig Gewähltes rückt nach vorn.
-    readonly Dictionary<string, List<(string Word, int Count)>> _learned = new(StringComparer.Ordinal);
-    int _longestLearned;
+    /// <summary>Was der Nutzer gewählt hat; häufig Gewähltes rückt nach vorn. Gesichert und synchronisiert wie gelernte Wörter.</summary>
+    public PinyinLearned Learned { get; } = new();
 
     /// <summary>Ab so vielen Malen steht eine gewählte Schreibweise vor dem häufigsten Wort der Tabelle.</summary>
     public const int LearnedFirstAfter = 2;
@@ -68,62 +67,12 @@ public sealed class PinyinEngine
 
     // ---------- Lernen ----------
 
-    /// <summary>Seit dem Laden oder Speichern wurde etwas gelernt.</summary>
-    public bool IsDirty { get; private set; }
-
     /// <summary>
     /// Merkt sich, dass der Nutzer für <paramref name="pinyin"/> diese Schriftzeichen gewählt hat – auch ganze
     /// Sätze, die nicht in der Tabelle stehen. Einmal Gewähltes rückt auf den zweiten Platz, ab
     /// <see cref="LearnedFirstAfter"/> Malen auf den ersten.
     /// </summary>
-    public void Learn(string pinyin, string word)
-    {
-        if (!IsPinyin(pinyin) || word.Length == 0) return;
-        string key = pinyin.ToLowerInvariant();
-        if (!_learned.TryGetValue(key, out var list)) _learned[key] = list = [];
-        int at = list.FindIndex(e => e.Word == word);
-        if (at < 0) list.Add((word, 1));
-        else list[at] = (word, list[at].Count + 1);
-        list.Sort((a, b) => b.Count.CompareTo(a.Count)); // stabil genug: wenige Einträge je Schreibweise
-        _longestLearned = Math.Max(_longestLearned, key.Length);
-        IsDirty = true;
-    }
-
-    public void ClearLearned()
-    {
-        _learned.Clear();
-        _longestLearned = 0;
-        IsDirty = false;
-    }
-
-    /// <summary>Speichert das Gelernte: "pinyin[Tab]wort[Tab]anzahl" je Zeile.</summary>
-    public void SaveLearned(Stream stream)
-    {
-        using var writer = new StreamWriter(stream);
-        foreach (var (key, list) in _learned.OrderBy(e => e.Key, StringComparer.Ordinal))
-        {
-            foreach (var (word, count) in list) writer.Write($"{key}\t{word}\t{count}\n");
-        }
-
-        IsDirty = false;
-    }
-
-    /// <summary>Lädt Gelerntes (Format von <see cref="SaveLearned"/>); unlesbare Zeilen werden übergangen.</summary>
-    public void LoadLearned(Stream stream)
-    {
-        using var reader = new StreamReader(stream);
-        string? line;
-        while ((line = reader.ReadLine()) != null)
-        {
-            var parts = line.Split('\t');
-            if (parts.Length != 3 || !IsPinyin(parts[0]) || parts[1].Length == 0 || !int.TryParse(parts[2], out int count) || count < 1) continue;
-            if (!_learned.TryGetValue(parts[0], out var list)) _learned[parts[0]] = list = [];
-            if (list.All(e => e.Word != parts[1])) list.Add((parts[1], count));
-            _longestLearned = Math.Max(_longestLearned, parts[0].Length);
-        }
-
-        foreach (var list in _learned.Values) list.Sort((a, b) => b.Count.CompareTo(a.Count));
-    }
+    public void Learn(string pinyin, string word) => Learned.Learn(pinyin, word);
 
     /// <summary>
     /// Alle Wörter mit genau dieser Schreibweise, bestes zuerst: oft Gewähltes, das häufigste der Tabelle,
@@ -132,20 +81,20 @@ public sealed class PinyinEngine
     List<string> Exact(string key)
     {
         var (start, end) = Range(key);
-        _learned.TryGetValue(key, out var learned);
-        var words = new List<string>(end - start + (learned?.Count ?? 0));
-        if (learned != null) words.AddRange(learned.Where(e => e.Count >= LearnedFirstAfter).Select(e => e.Word));
+        var learned = Learned.For(key);
+        var words = new List<string>(end - start + learned.Count);
+        words.AddRange(learned.Where(e => e.Count >= LearnedFirstAfter).Select(e => e.Word));
         if (start < end && !words.Contains(_words[start])) words.Add(_words[start]);
-        if (learned != null) words.AddRange(learned.Select(e => e.Word).Where(w => !words.Contains(w)));
+        words.AddRange(learned.Select(e => e.Word).Where(w => !words.Contains(w)));
         for (int i = start; i < end; i++)
         {
-            if (learned == null || !words.Contains(_words[i])) words.Add(_words[i]);
+            if (learned.Count == 0 || !words.Contains(_words[i])) words.Add(_words[i]);
         }
 
         return words;
     }
 
-    int LongestKey => Math.Max(_longestKey, _longestLearned);
+    int LongestKey => Math.Max(_longestKey, Learned.LongestKey);
 
     /// <summary>
     /// Ist die Eingabe Pinyin, also nur Buchstaben a–z? Anderes (Ziffern, Bindestrich) bleibt, wie es getippt wurde.

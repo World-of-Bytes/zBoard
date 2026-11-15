@@ -309,7 +309,8 @@ used. zBoard has no internet permission (release build).
   matching words ("womenshipengyou" → 我们是朋友), words you have started and shorter words for the beginning of your
   input. The row scrolls sideways with your finger; space takes the first (bold) candidate, Enter keeps the letters.
   zBoard remembers your choices on the device: a candidate chosen once moves to second place, chosen twice to
-  first – whole sentences too. After a word is inserted, zBoard predicts the next one. Emoji search understands Pinyin ("xiaolian" → 😀).
+  first – whole sentences too. Your choices belong to the learned words: they are part of the backup
+  (`learning/zh.pinyin.tsv`) and are merged with those of other devices when syncing. After a word is inserted, zBoard predicts the next one. Emoji search understands Pinyin ("xiaolian" → 😀).
 - **Multilingual typing:** Like Gboard, zBoard uses the dictionaries of all active languages at once (up to three); the
   space bar then shows e.g. “DE · EN”. An English word in a German sentence is not “corrected”, typos are corrected into
   the matching language, and what you write is learned in the language the word belongs to. If the previous word clearly
@@ -358,6 +359,5 @@ the 3000 most frequent words can be typed with the layout.
 - Test sentences for every language except German and English; more everyday text for the language models (Greek,
   Vietnamese and Romanian have only a few thousand sentences so far)
 - Checking the 13 new languages on real devices, especially Arabic (right-to-left) and Chinese
-- Chinese: include learned characters in backup and sync (`learning/zh.pinyin.tsv`)
 - F-Droid metadata
 - More user-interface languages (French, Spanish, Italian)

@@ -386,17 +386,17 @@ public class PinyinTests
         var engine = Small();
         engine.Learn("ma", "妈");
         engine.Learn("ma", "妈");
-        Assert.True(engine.IsDirty);
+        Assert.True(engine.Learned.IsDirty);
         using var saved = new MemoryStream();
-        engine.SaveLearned(saved);
-        Assert.False(engine.IsDirty);
+        engine.Learned.Save(saved);
+        Assert.False(engine.Learned.IsDirty);
 
         var other = Small();
-        other.LoadLearned(new MemoryStream(saved.ToArray()));
+        other.Learned.ReplaceWith(PinyinLearned.Load(new MemoryStream(saved.ToArray())));
         Assert.Equal("妈", other.Candidates("ma")[0].Text);
-        Assert.False(other.IsDirty);
+        Assert.False(other.Learned.IsDirty);
 
-        other.ClearLearned();
+        other.Learned.Clear();
         Assert.Equal("吗", other.Candidates("ma")[0].Text);
     }
 
@@ -404,7 +404,8 @@ public class PinyinTests
     public void LoadLearned_IgnoresBrokenLines()
     {
         var engine = Small();
-        engine.LoadLearned(new MemoryStream(System.Text.Encoding.UTF8.GetBytes("ma\t妈\t5\nkaputt\n\nma\t\t3\nm1\t妈\t2\nma\t麻\tx\n")));
+        engine.Learned.ReplaceWith(PinyinLearned.Load(new MemoryStream(
+            System.Text.Encoding.UTF8.GetBytes("ma\t妈\t5\nkaputt\n\nma\t\t3\nm1\t妈\t2\nma\t麻\tx\nMA\t马\t9\n"))));
         Assert.Equal(["妈", "吗"], engine.Candidates("ma").Select(c => c.Text));
     }
 }
