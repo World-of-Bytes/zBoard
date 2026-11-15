@@ -5,7 +5,8 @@ namespace ZBoard.Ime;
 
 /// <summary>
 /// Chinesisch wie bei Gboard: Man tippt Pinyin auf QWERTY, das Getippte steht unterstrichen im Text, und die
-/// Vorschlagsleiste bietet die Schriftzeichen an. Die Leertaste nimmt den ersten Vorschlag, Enter die Buchstaben.
+/// Vorschlagsleiste bietet die Schriftzeichen in einer durchgehenden Zeile an, die sich seitlich schieben lässt.
+/// Die Leertaste nimmt den ersten Vorschlag, Enter die Buchstaben. Was man wählt, rückt beim nächsten Mal nach vorn.
 /// Die Auswahl selbst steckt in <see cref="PinyinEngine"/> (mit Unit-Tests); hier steht nur die Anbindung.
 /// </summary>
 public sealed partial class ZBoardImeService
@@ -13,16 +14,12 @@ public sealed partial class ZBoardImeService
     /// <summary>Chinesische Satzzeichen, die wie ".,!?" ein Wort abschließen.</summary>
     const string ChinesePunctuation = "，。？！；：、";
 
-    /// <summary>Wort des Eintrags "⋯" in der Leiste: zeigt die nächsten Vorschläge.</summary>
-    const string PinyinMore = "\u0001more";
-
-    const int PinyinMaxCandidates = 40;
+    const int PinyinMaxCandidates = 60;
 
     static Task<PinyinEngine>? _pinyinTable;
 
     IReadOnlyList<PinyinCandidate> _pinyinCandidates = [];
     string _pinyinFor = string.Empty; // Eingabe, zu der die Vorschläge gehören
-    int _pinyinFirst;                 // erster gezeigter Vorschlag (Blättern mit "⋯")
     string? _chineseLast;             // zuletzt eingesetztes Wort, für die Vorhersage (Chinesisch hat keine Leerzeichen)
 
     bool IsChinese => _language == Layouts.Chinese;
@@ -34,25 +31,64 @@ public sealed partial class ZBoardImeService
     {
         if (!IsChinese || _pinyinTable is { IsFaulted: false }) return;
         var assets = Assets!;
+        string learned = PinyinLearningFile(this);
         _pinyinTable = Task.Run(() =>
         {
-            using var stream = assets.Open("dict/zh.pinyin.txt");
-            return PinyinEngine.Load(stream);
+            PinyinEngine engine;
+            using (var stream = assets.Open("dict/zh.pinyin.txt")) engine = PinyinEngine.Load(stream);
+            if (File.Exists(learned))
+            {
+                using var stream = File.OpenRead(learned);
+                engine.LoadLearned(stream);
+            }
+
+            return engine;
         });
         _pinyinTable.ContinueWith(
             _ => new Android.OS.Handler(Android.OS.Looper.MainLooper!).Post(UpdateSuggestions),
             TaskContinuationOptions.OnlyOnRanToCompletion);
     }
 
+    /// <summary>Gewählte Schriftzeichen je Pinyin-Schreibweise; der Punkt im Namen hält die Datei aus den Sprachdateien heraus.</summary>
+    static string PinyinLearningFile(Android.Content.Context context) =>
+        Path.Combine(context.FilesDir!.AbsolutePath, "learning", "zh.pinyin.tsv");
+
+    void SavePinyinLearning()
+    {
+        if (_pinyinTable is not { IsCompletedSuccessfully: true } table || !table.Result.IsDirty) return;
+        var path = PinyinLearningFile(this);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var stream = File.Create(path);
+        table.Result.SaveLearned(stream);
+    }
+
+    /// <summary>Vergisst die gewählten Schriftzeichen (die Datei löscht <see cref="ClearLearned"/> mit dem Ordner).</summary>
+    static void ClearPinyinLearning()
+    {
+        if (_pinyinTable is { IsCompletedSuccessfully: true } table) table.Result.ClearLearned();
+    }
+
+    void LearnPinyin(string pinyin, string word)
+    {
+        if (_settings.LearnWords && _profile.AllowLearning) Pinyin?.Learn(pinyin, word);
+    }
+
     void ResetPinyin()
     {
         _pinyinCandidates = [];
         _pinyinFor = string.Empty;
-        _pinyinFirst = 0;
+    }
+
+    /// <summary>Schriftzeichen in der Vorschlagszeile angetippt.</summary>
+    void OnPinyinCandidatePicked(int index)
+    {
+        if (!IsChinese || _glideActive || index < 0 || index >= _pinyinCandidates.Count) return;
+        if (_pinyinFor != _composing.ToString()) return;
+        ApplyPinyin(_pinyinCandidates[index]);
     }
 
     /// <summary>
-    /// Zeigt die Schriftzeichen zum getippten Pinyin: bester Vorschlag in der Mitte, rechts "⋯" für weitere.
+    /// Zeigt die Schriftzeichen zum getippten Pinyin als durchgehende Zeile, bester Vorschlag zuerst.
     /// Ist das Getippte kein Pinyin ("WLAN", "abc1"), steht es selbst in der Leiste.
     /// </summary>
     void ShowPinyinCandidates()
@@ -63,7 +99,6 @@ public sealed partial class ZBoardImeService
         {
             _pinyinCandidates = Pinyin?.Candidates(typed, PinyinMaxCandidates) ?? [];
             _pinyinFor = typed;
-            _pinyinFirst = 0;
         }
 
         _currentSuggestions = SuggestionResult.Empty;
@@ -74,45 +109,19 @@ public sealed partial class ZBoardImeService
             return;
         }
 
-        if (_pinyinFirst >= candidates.Count) _pinyinFirst = 0;
-        int first = _pinyinFirst;
-        SuggestionSlot? Slot(int offset) => first + offset < candidates.Count
-            ? new SuggestionSlot(candidates[first + offset].Text, candidates[first + offset].Text, first + offset == 0, false)
-            : null;
-
-        // Drei Plätze: Gibt es mehr Vorschläge, blättert der rechte Platz weiter.
-        var right = candidates.Count > 3 ? new SuggestionSlot("⋯", PinyinMore, false, false) : Slot(2);
-        _suggestionBar.SetSlots(Slot(1), Slot(0), right);
+        _suggestionBar.SetCandidates([.. candidates.Select(c => c.Text)]);
     }
 
-    /// <summary>Antippen eines Eintrags der Leiste im chinesischen Layout. false: kein chinesischer Eintrag.</summary>
+    /// <summary>
+    /// Antippen einer Vorhersage im chinesischen Layout: ohne Leerzeichen anhängen. false: kein solcher Eintrag
+    /// (die Schriftzeichen zum Getippten kommen über <see cref="OnPinyinCandidatePicked"/>).
+    /// </summary>
     bool PickChinese(SuggestionSlot slot)
     {
-        if (!IsChinese || slot.IsLiteral) return false;
+        if (!IsChinese || slot.IsLiteral || _composing.Length > 0) return false;
         var ic = Ic;
         if (ic == null) return false;
 
-        if (slot.Word == PinyinMore)
-        {
-            _pinyinFirst += 2;
-            ShowPinyinCandidates();
-            return true;
-        }
-
-        if (_composing.Length > 0)
-        {
-            if (_glideActive || _pinyinFor != _composing.ToString()) return false;
-            foreach (var candidate in _pinyinCandidates)
-            {
-                if (candidate.Text != slot.Word) continue;
-                ApplyPinyin(candidate);
-                return true;
-            }
-
-            return false;
-        }
-
-        // Vorhersage des nächsten Worts: ohne Leerzeichen anhängen
         MarkEdit();
         string word = slot.Word.Replace(" ", string.Empty);
         string? previous = ChinesePrevious();
@@ -148,6 +157,7 @@ public sealed partial class ZBoardImeService
         _autoSpaceInserted = false;
         ResetPinyin();
         Learn(previous, candidate.Text);
+        LearnPinyin(typed[..candidate.Consumed], candidate.Text);
         _chineseLast = candidate.Text;
         UpdateAutoShift();
         UpdateSuggestions();
@@ -177,6 +187,7 @@ public sealed partial class ZBoardImeService
             string rest = candidates[0].Consumed < typed.Length ? typed[candidates[0].Consumed..] : string.Empty;
             ic.CommitText(J(candidates[0].Text + rest + (separator == " " ? string.Empty : separator)), 1);
             Learn(previous, candidates[0].Text);
+            LearnPinyin(typed[..candidates[0].Consumed], candidates[0].Text);
             _chineseLast = rest.Length == 0 && separator is "" or " " ? candidates[0].Text : null;
         }
         else

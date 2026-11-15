@@ -257,6 +257,14 @@ public sealed class SettingsActivity : Activity
         Toggle(L.T("Eigene Tasten für ü, ö, ä", "Separate keys for ü, ö, ä"),
             L.T("Sonst per langem Druck auf u, o, a (ß auf s)", "Otherwise by long-pressing u, o, a (ß on s)"),
             _settings.UmlautKeys, (_, v) => _settings.UmlautKeys = v);
+
+        Section("Tiếng Việt");
+        Toggle("Telex",
+            L.T("Zeichen und Töne durch Buchstaben: aa → â, aw → ă, dd → đ, s f r x j für die Töne, z entfernt den Ton. "
+                + "Dieselbe Taste noch einmal nimmt es zurück.",
+                "Marks and tones by letters: aa → â, aw → ă, dd → đ, s f r x j for the tones, z removes the tone. "
+                + "The same key again takes it back."),
+            _settings.VietnameseTelex, (_, v) => _settings.VietnameseTelex = v);
     }
 
     void BuildPreferences()

@@ -104,6 +104,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             if (task.IsCompletedSuccessfully) task.Result.History.Clear();
         }
 
+        ClearPinyinLearning();
+
         var dir = Path.Combine(context.FilesDir!.AbsolutePath, "learning");
         if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
     }
@@ -118,6 +120,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             using var stream = File.Create(path);
             task.Result.History.Save(stream);
         }
+
+        SavePinyinLearning();
     }
 
     public override View? OnCreateInputView() => BuildInputView();
@@ -270,7 +274,17 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         {
             _autoSpaceInserted = false;
             TrackTouches(text, _keyboardView?.TapPoint);
-            _composing.Append(text);
+            if (text.Length == 1 && _language == "vi" && _settings.VietnameseTelex)
+            {
+                // Telex: Der Buchstabe kann das Wort verändern statt angehängt zu werden ("tieng" + "s" → "tiếng").
+                string word = Telex.Apply(_composing.ToString(), text[0]);
+                _composing.Clear().Append(word);
+            }
+            else
+            {
+                _composing.Append(text);
+            }
+
             ic.SetComposingText(J(_composing.ToString()), 1);
             UpdateSuggestions();
         }

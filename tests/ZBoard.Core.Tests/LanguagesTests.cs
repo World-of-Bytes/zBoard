@@ -355,4 +355,89 @@ public class PinyinTests
     [Fact]
     public void Table_CompletesUnfinishedWords() =>
         Assert.Contains("中国", Table.Value.Candidates("zhongg").Select(c => c.Text));
+
+    // ---------- Lernen ----------
+
+    [Fact]
+    public void Learn_ChosenOnce_MovesToSecondPlace_Twice_ToFirst()
+    {
+        var engine = Small();
+        engine.Learn("ni", "尼");
+        Assert.Equal(["你", "尼"], engine.Candidates("ni").Take(2).Select(c => c.Text));
+        Assert.Equal("你", engine.Convert("ni"));
+        engine.Learn("ni", "尼");
+        Assert.Equal(["尼", "你"], engine.Candidates("ni").Take(2).Select(c => c.Text));
+        Assert.Equal("尼", engine.Convert("ni"));
+    }
+
+    [Fact]
+    public void Learn_KeepsPhrasesThatAreNotInTheTable()
+    {
+        var engine = Small();
+        engine.Learn("nihaohao", "你好好");
+        Assert.Equal(new PinyinCandidate("你好好", 8), engine.Candidates("nihaohao")[0]);
+        Assert.Equal(1, engine.Candidates("nihaohao").Count(c => c.Text == "你好好"));
+        Assert.Equal("你好好吗", engine.Convert("nihaohaoma"));
+    }
+
+    [Fact]
+    public void Learned_SurvivesSaveAndLoad_AndCanBeCleared()
+    {
+        var engine = Small();
+        engine.Learn("ma", "妈");
+        engine.Learn("ma", "妈");
+        Assert.True(engine.IsDirty);
+        using var saved = new MemoryStream();
+        engine.SaveLearned(saved);
+        Assert.False(engine.IsDirty);
+
+        var other = Small();
+        other.LoadLearned(new MemoryStream(saved.ToArray()));
+        Assert.Equal("妈", other.Candidates("ma")[0].Text);
+        Assert.False(other.IsDirty);
+
+        other.ClearLearned();
+        Assert.Equal("吗", other.Candidates("ma")[0].Text);
+    }
+
+    [Fact]
+    public void LoadLearned_IgnoresBrokenLines()
+    {
+        var engine = Small();
+        engine.LoadLearned(new MemoryStream(System.Text.Encoding.UTF8.GetBytes("ma\t妈\t5\nkaputt\n\nma\t\t3\nm1\t妈\t2\nma\t麻\tx\n")));
+        Assert.Equal(["妈", "吗"], engine.Candidates("ma").Select(c => c.Text));
+    }
+}
+
+public class CandidateStripTests
+{
+    [Fact]
+    public void EntriesAreAsWideAsTheirText_ButAtLeastAFingerWide()
+    {
+        var strip = new CandidateStrip([10, 100, 10], padding: 12, minWidth: 44);
+        Assert.Equal((0f, 44f), strip.Bounds(0));
+        Assert.Equal((44f, 168f), strip.Bounds(1));
+        Assert.Equal(212f, strip.TotalWidth);
+        Assert.Equal(3, strip.Count);
+    }
+
+    [Fact]
+    public void Scroll_StaysBetweenStartAndEnd()
+    {
+        var strip = new CandidateStrip([10, 100, 10], 12, 44);
+        Assert.Equal(0f, strip.Clamp(-30, 100));
+        Assert.Equal(112f, strip.Clamp(500, 100));
+        Assert.Equal(50f, strip.Clamp(50, 100));
+        Assert.Equal(0f, strip.Clamp(50, 400)); // alles passt: nichts zu schieben
+    }
+
+    [Fact]
+    public void Visible_ListsPartlyVisibleEntries()
+    {
+        var strip = new CandidateStrip([10, 100, 10], 12, 44);
+        Assert.Equal((0, 2), strip.Visible(0, 100));
+        Assert.Equal((1, 3), strip.Visible(50, 150));
+        Assert.Equal((2, 3), strip.Visible(168, 100));
+        Assert.Equal((0, 0), new CandidateStrip([], 12, 44).Visible(0, 100));
+    }
 }

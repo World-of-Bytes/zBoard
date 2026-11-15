@@ -298,14 +298,19 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   auf dem Gerät. Abgeglichen wird beim Öffnen und Schließen der Tastatur, höchstens alle 15 Minuten.
 - **Sprachen:** Jede der 18 Sprachen bringt ihr Layout, eine Wortliste, ein Sprachmodell für die Vorhersage und die
   Emoji-Suche mit. Türkisch schreibt i/İ und ı/I richtig groß und klein; Arabisch hat keine Umschalttaste und eigene
-  Satzzeichen (، ؟); Vietnamesisch hat alle Vokale mit Ton- und Zusatzzeichen im Popup, und wer ohne sie tippt
-  („khong“), bekommt die richtige Schreibweise („không“) vorgeschlagen bzw. eingesetzt. Das gilt in allen Sprachen
-  („dziekuje“ → „dziękuję“, „ευχαριστω“ → „ευχαριστώ“). Telex für Vietnamesisch gibt es noch nicht.
+  Satzzeichen (، ؟); wer ohne Akzente tippt, bekommt in allen Sprachen die richtige Schreibweise vorgeschlagen bzw. eingesetzt
+  („dziekuje“ → „dziękuję“, „ευχαριστω“ → „ευχαριστώ“, „khong“ → „không“).
+- **Vietnamesisch (Telex):** wie bei Gboard entstehen Zusatz- und Tonzeichen durch Buchstaben: aa → â, aw → ă, ee → ê,
+  oo → ô, ow → ơ, uw → ư, dd → đ; s, f, r, x, j setzen den Ton („tieengs“ → „tiếng“, „dduowcj“ → „được“), z entfernt
+  ihn. Der Ton steht von selbst an der richtigen Stelle („toans“ → „toán“, „hoaf“ → „hòa“). Dieselbe Taste noch einmal
+  nimmt die Umwandlung zurück („ass“ → „as“); Wörter mit mehreren Silben („online“) bleiben unverändert. Abschaltbar
+  unter Einstellungen → Sprachen; alle Zeichen gibt es weiterhin per langem Druck.
 - **Chinesisch (Pinyin):** Pinyin ohne Tonzeichen auf QWERTY tippen (ü als v); das Getippte steht unterstrichen im
   Text, die Leiste zeigt die vereinfachten Schriftzeichen – Wörter, die genau so geschrieben werden, ganze Sätze aus
   den längsten passenden Wörtern („womenshipengyou“ → 我们是朋友), angefangene Wörter und kürzere Wörter für den Anfang
-  der Eingabe. „⋯“ rechts blättert weiter, die Leertaste nimmt den ersten Vorschlag, Enter die Buchstaben. Nach einem
-  eingesetzten Wort sagt zBoard das nächste vorher. Die Emoji-Suche versteht Pinyin („xiaolian“ → 😀).
+  der Eingabe. Die Zeile lässt sich mit dem Finger seitlich schieben; die Leertaste nimmt den ersten (fetten) Vorschlag, Enter
+  die Buchstaben. Was du wählst, merkt sich zBoard auf dem Gerät: Einmal Gewähltes rückt auf den zweiten Platz, beim
+  zweiten Mal auf den ersten – auch ganze Sätze. Nach einem eingesetzten Wort sagt zBoard das nächste vorher. Die Emoji-Suche versteht Pinyin („xiaolian“ → 😀).
 - **Mehrsprachige Eingabe:** Wie bei Gboard gelten die Wörterbücher aller aktiven Sprachen gleichzeitig (bis zu drei),
   auf der Leertaste steht dann z. B. „DE · EN“. Ein englisches Wort wird in einem deutschen Satz nicht „korrigiert“,
   Tippfehler werden in die passende Sprache korrigiert, und was du schreibst, lernt zBoard in der Sprache, zu der das Wort
@@ -355,6 +360,6 @@ in `Assets/dict/`, `Assets/emoji/keywords.<Sprache>.txt`. `LanguagesTests` prüf
 - Testsätze für alle Sprachen außer Deutsch und Englisch; mehr Alltagstext für die Sprachmodelle (für Griechisch,
   Vietnamesisch und Rumänisch gibt es bisher nur wenige tausend Sätze)
 - Die 13 neuen Sprachen auf echten Geräten prüfen, besonders Arabisch (Schreibrichtung) und Chinesisch
-- Chinesisch: durchgehende Vorschlagszeile statt Blättern, Lernen häufig gewählter Zeichen; Telex für Vietnamesisch
+- Chinesisch: gelernte Schriftzeichen in Sicherung und Synchronisation aufnehmen (`learning/zh.pinyin.tsv`)
 - F-Droid-Metadaten
 - Weitere Sprachen für die Oberfläche (Französisch, Spanisch, Italienisch)

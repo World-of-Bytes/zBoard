@@ -297,14 +297,19 @@ used. zBoard has no internet permission (release build).
   the keyboard opens and closes, at most every 15 minutes.
 - **Languages:** each of the 18 languages comes with its layout, a word list, a language model for prediction and
   emoji search. Turkish capitalizes i/İ and ı/I correctly; Arabic has no shift key and its own punctuation (، ؟);
-  Vietnamese has every vowel with tone and diacritic marks in the popup, and typing without them ("khong") suggests
-  or inserts the right spelling ("không"). That holds for every language ("dziekuje" → "dziękuję",
-  "ευχαριστω" → "ευχαριστώ"). There is no Telex input for Vietnamese yet.
+  typing without accents suggests or inserts the right spelling in every language ("dziekuje" → "dziękuję",
+  "ευχαριστω" → "ευχαριστώ", "khong" → "không").
+- **Vietnamese (Telex):** as in Gboard, marks and tones are typed with letters: aa → â, aw → ă, ee → ê, oo → ô,
+  ow → ơ, uw → ư, dd → đ; s, f, r, x, j set the tone ("tieengs" → "tiếng", "dduowcj" → "được"), z removes it. The
+  tone lands on the right vowel by itself ("toans" → "toán", "hoaf" → "hòa"). The same key again takes the change
+  back ("ass" → "as"); words of several syllables ("online") stay as typed. Can be turned off under
+  Settings → Languages; every character is still available by long press.
 - **Chinese (Pinyin):** type Pinyin without tone marks on QWERTY (ü as v); what you type is underlined in the text
   and the bar shows the simplified characters – words spelled exactly like that, whole sentences from the longest
   matching words ("womenshipengyou" → 我们是朋友), words you have started and shorter words for the beginning of your
-  input. "⋯" on the right shows more, space takes the first candidate, Enter keeps the letters. After a word is
-  inserted, zBoard predicts the next one. Emoji search understands Pinyin ("xiaolian" → 😀).
+  input. The row scrolls sideways with your finger; space takes the first (bold) candidate, Enter keeps the letters.
+  zBoard remembers your choices on the device: a candidate chosen once moves to second place, chosen twice to
+  first – whole sentences too. After a word is inserted, zBoard predicts the next one. Emoji search understands Pinyin ("xiaolian" → 😀).
 - **Multilingual typing:** Like Gboard, zBoard uses the dictionaries of all active languages at once (up to three); the
   space bar then shows e.g. “DE · EN”. An English word in a German sentence is not “corrected”, typos are corrected into
   the matching language, and what you write is learned in the language the word belongs to. If the previous word clearly
@@ -353,6 +358,6 @@ the 3000 most frequent words can be typed with the layout.
 - Test sentences for every language except German and English; more everyday text for the language models (Greek,
   Vietnamese and Romanian have only a few thousand sentences so far)
 - Checking the 13 new languages on real devices, especially Arabic (right-to-left) and Chinese
-- Chinese: a scrolling candidate row instead of paging, learning frequently chosen characters; Telex for Vietnamese
+- Chinese: include learned characters in backup and sync (`learning/zh.pinyin.tsv`)
 - F-Droid metadata
 - More user-interface languages (French, Spanish, Italian)
