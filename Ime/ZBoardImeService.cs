@@ -1260,20 +1260,41 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _keyboardView.Shift = _symbolsPage == 0 ? _shift : ShiftState.Off;
     }
 
+    ImageBackgroundDrawable? _imageBackground;
+
     void ApplyTheme()
     {
         bool systemDark = (Resources!.Configuration!.UiMode & UiMode.NightMask) == UiMode.NightYes;
-        var theme = _settings.Theme switch
-        {
-            ThemeMode.Light => KeyboardTheme.Light,
-            ThemeMode.Dark => KeyboardTheme.Dark,
-            // Wie Gboard: ab Android 12 standardmäßig Material-You-Farben passend zum Hintergrundbild
-            _ when OperatingSystem.IsAndroidVersionAtLeast(31) => KeyboardTheme.FromSystem(this, systemDark),
-            _ => systemDark ? KeyboardTheme.Dark : KeyboardTheme.Light,
-        };
+        var system = OperatingSystem.IsAndroidVersionAtLeast(31)
+            ? KeyboardTheme.FromSystem(this, systemDark) // wie Gboard: ab Android 12 Material You passend zum Hintergrundbild
+            : systemDark ? KeyboardTheme.Dark : KeyboardTheme.Light;
+        var image = _settings.Theme == ThemeMode.Image ? ThemeImage.Load(this) : null;
+        float dim = _settings.ThemeImageDim / 100f;
+        var theme = image != null
+            ? KeyboardTheme.FromImage(ThemeImage.Dimmed(image.Average, dim), system.Accent)
+            : _settings.Theme switch
+            {
+                ThemeMode.Light => KeyboardTheme.Light,
+                ThemeMode.Dark => KeyboardTheme.Dark,
+                _ => system,
+            };
+
         _keyboardView?.Theme = theme;
+        _keyboardView?.KeyBorders = _settings.KeyBorders;
         _suggestionBar?.Theme = theme;
         ApplyPanelTheme(theme);
+
+        // Das Bild liegt unter Leiste und Tasten (auch hinter der Navigationsleiste)
+        if (image == null) _imageBackground = null;
+        else if (_imageBackground == null || _imageBackground.Bitmap != image.Bitmap || _imageBackground.Dim != dim)
+        {
+            _imageBackground = new ImageBackgroundDrawable(image.Bitmap, dim);
+        }
+
+        if (_imageBackground != null) _inputRoot?.Background = _imageBackground;
+#if DEBUG || ZBOARD_TESTHOOKS
+        Android.Util.Log.Info("zBoardTest", $"THEME image={image != null} dark={ThemeImage.IsDark(theme.BarColor)} borders={_settings.KeyBorders}");
+#endif
     }
 
     // ---------- Hilfen ----------

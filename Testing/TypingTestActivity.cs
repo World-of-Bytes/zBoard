@@ -60,6 +60,32 @@ public sealed class TypingTestActivity : Activity
             new ZBoard.Settings.ZBoardSettings(this).PersonalDictionary = dictionary.Serialize();
         }
 
+        // Extra theme=image|plain, borders=true|false: Design für den Test (Bild = Farbverlauf von Blau nach Violett)
+        var settings = new ZBoard.Settings.ZBoardSettings(this);
+        switch (Intent?.GetStringExtra("theme"))
+        {
+            case "image":
+                using (var bitmap = Android.Graphics.Bitmap.CreateBitmap(400, 800, Android.Graphics.Bitmap.Config.Argb8888!)!)
+                {
+                    var canvas = new Android.Graphics.Canvas(bitmap);
+                    var paint = new Android.Graphics.Paint();
+                    paint.SetShader(new Android.Graphics.LinearGradient(0, 0, 0, 800,
+                        Android.Graphics.Color.ParseColor("#1A3A8F"), Android.Graphics.Color.ParseColor("#8F1A7A"),
+                        Android.Graphics.Shader.TileMode.Clamp!));
+                    canvas.DrawRect(0, 0, 400, 800, paint);
+                    ZBoard.Keyboard.ThemeImage.SaveBitmap(this, bitmap);
+                }
+
+                settings.Theme = ZBoard.Settings.ThemeMode.Image;
+                break;
+            case "plain":
+                ZBoard.Keyboard.ThemeImage.Delete(this);
+                settings.Theme = ZBoard.Settings.ThemeMode.System;
+                break;
+        }
+
+        if (Intent?.GetStringExtra("borders") is { } borders) settings.KeyBorders = borders != "false";
+
         // Klartext fürs Log, weil Android Passwörter in der Oberfläche maskiert
         field.TextChanged += (_, _) => Android.Util.Log.Info("zBoardTest", "FIELD " + field.Text);
         SetContentView(field);

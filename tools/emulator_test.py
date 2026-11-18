@@ -513,6 +513,28 @@ def main():
             text = field_text()
             check("Textbearbeitung: Pfeiltasten bewegen den Cursor", text == "Hxallo ", f"→ „{text}“")
 
+        # Eigenes Bild als Hintergrund, ohne Tastenrahmen; Tippen muss weiter funktionieren
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es theme image --es borders false")
+        time.sleep(3)
+        type_text(keys, "bild ")
+        time.sleep(0.8)
+        log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+        theme = re.findall(r"THEME (.*)$", log, re.M)
+        theme = theme[-1].strip() if theme else ""
+        check("Design: eigenes Bild, ohne Tastenrahmen", "image=True" in theme and "borders=False" in theme, f"→ {theme}")
+        path = screenshot(out_dir, "5a3-design-bild")
+        width, _, bpp, rows = read_png(path)
+        top, density = keyboard_top(kb.wait_for("de"))
+        # Farbverlauf sichtbar: oben in der Tastatur blauer, unten violetter
+        upper = rows[int(top + 10 * density)][4 * bpp:4 * bpp + 3]
+        lower = rows[int(top + 200 * density)][4 * bpp:4 * bpp + 3]
+        check("Design: Bild liegt unter den Tasten (Farbverlauf)", upper[2] > upper[0] and lower[0] > upper[0],
+              f"(oben {tuple(upper)}, unten {tuple(lower)})")
+        text = field_text()
+        check("Design: Tippen mit eigenem Bild", text == "Bild ", f"→ „{text}“")
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es theme plain --es borders true")
+        time.sleep(2)
+
         # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")
         time.sleep(3)

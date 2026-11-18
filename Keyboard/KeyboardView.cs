@@ -203,6 +203,18 @@ public sealed class KeyboardView : View
     /// <summary>Sprache des angezeigten Layouts; in der Auswahl über der Leertaste vorausgewählt.</summary>
     public string CurrentLanguage { get; set; } = string.Empty;
 
+    /// <summary>Tasten als Flächen zeichnen (Gboard: „Tastenrahmen“); aus: nur Beschriftung, Enter bleibt farbig.</summary>
+    public bool KeyBorders
+    {
+        get;
+        set
+        {
+            if (field == value) return;
+            field = value;
+            Invalidate();
+        }
+    } = true;
+
     /// <summary>Wischeingabe über die Buchstaben.</summary>
     public bool GlideEnabled { get; set; } = true;
 
@@ -365,12 +377,17 @@ public sealed class KeyboardView : View
             }
 
             bool pressed = _press is { Gliding: false } current && current.Key == pk && _popup == null;
-            _fill.Color = pressed ? Theme.KeyPressed : KeyColor(pk);
-            // Wie Gboard: Ebenen- und Enter-Taste als Pille
-            float r = pk.Key.Action is KeyAction.Enter or KeyAction.ToSymbols or KeyAction.ToAlpha
-                ? pk.Bounds.Height() / 2
-                : radius;
-            canvas.DrawRoundRect(pk.Bounds, r, r, _fill);
+            // Ohne Tastenrahmen wie bei Gboard nur Beschriftungen; Enter und die gedrückte Taste bleiben sichtbar
+            if (KeyBorders || pressed || pk.Key.Action == KeyAction.Enter)
+            {
+                _fill.Color = pressed ? Theme.KeyPressed : KeyColor(pk);
+                // Wie Gboard: Ebenen- und Enter-Taste als Pille
+                float r = pk.Key.Action is KeyAction.Enter or KeyAction.ToSymbols or KeyAction.ToAlpha
+                    ? pk.Bounds.Height() / 2
+                    : radius;
+                canvas.DrawRoundRect(pk.Bounds, r, r, _fill);
+            }
+
             DrawKeyLabel(canvas, pk);
         }
 
@@ -450,9 +467,11 @@ public sealed class KeyboardView : View
         };
 
         if (faded) _text.Alpha = FadedAlpha;
+        if (Theme.TextShadow) _text.SetShadowLayer(2.5f * _dp, 0, 1 * _dp, Color.Argb(150, 0, 0, 0));
 
         float baseline = b.CenterY() - (_text.Descent() + _text.Ascent()) / 2;
         canvas.DrawText(label, b.CenterX(), baseline, _text);
+        _text.ClearShadowLayer();
 
         // Zahlenhinweis oben rechts (wie die Gboard-Option "Zahlenhinweise")
         if (ShowDigitHints && _layout?.IsAlphabetic == true && key.IsCharacter

@@ -125,7 +125,7 @@ public partial class ZBoardImeService
     {
         var window = Window?.Window;
         if (window == null) return;
-        var bg = _theme.Background;
+        var bg = _theme.BarColor;
         bool light = (0.299 * bg.R + 0.587 * bg.G + 0.114 * bg.B) / 255 >= 0.5;
 
         window.AddFlags(WindowManagerFlags.DrawsSystemBarBackgrounds);
