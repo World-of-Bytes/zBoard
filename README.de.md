@@ -54,6 +54,8 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Spracheingabe | ✓ | ✓ über die Spracherkennung des Systems, standardmäßig nur offline |
 | Werkzeugleiste (Zwischenablage, Mikrofon, Einstellungen) | ✓ | ✓ über den Pfeil links in der Vorschlagsleiste |
 | Einhandmodus, Höhe, Zahlenreihe | ✓ | ✓ |
+| Schwebende Tastatur | ✓ | ✓ über die Werkzeugleiste, am Griff verschiebbar |
+| Geteilte Tastatur (Tablets, Foldables) | ✓ | ✓ ab 600 dp Bildschirmbreite, standardmäßig im Querformat |
 | Übersetzen | ✓ | ✓ über die Plugin-App „zBoard DeepL“ (eigener DeepL-API-Schlüssel) |
 | Synchronisation zwischen Geräten | gelernte Wörter über das Google-Konto | ✓ über die Plugin-App „zBoard Sync“: Einstellungen, gelernte Wörter, E-Mail-Adressen via Google Drive, OneDrive, Dropbox oder WebDAV (HiDrive, Nextcloud …) |
 | Google-Dienste | ✓ | nicht geplant |
@@ -299,6 +301,11 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
 - **Designs:** Neben hell, dunkel und Material You gibt es „Eigenes Bild“: Das gewählte Bild liegt hinter Leiste und
   Tasten, ein Regler dunkelt es ab, die Schrift wird passend hell oder dunkel. „Tastenrahmen“ aus zeichnet nur die
   Beschriftungen (wie bei Gboard). Das Bild bleibt auf dem Gerät und gehört nicht zu Sicherung und Synchronisation.
+- **Schwebende Tastatur:** Das Pfeilkreuz in der Werkzeugleiste macht die Tastatur schmaler und frei verschiebbar
+  (Griff unter den Tasten); die App darunter wird nicht verkleinert. Noch einmal antippen legt sie wieder unten an.
+- **Geteilte Tastatur:** Auf Bildschirmen ab 600 dp Breite (Tablets, aufgeklappte Foldables) rücken die
+  Tastenhälften an die Ränder, die Leertaste gibt es auf beiden Seiten. Einstellungen → Einstellungen → Layout:
+  aus, im Querformat (Standard) oder immer.
 - **Textbearbeitung:** Das Cursor-Symbol in der Werkzeugleiste ersetzt die Tasten durch Pfeiltasten (auch Zeilenanfang
   und -ende). „Auswählen“ lässt die Pfeile Text markieren; daneben Alles auswählen, Kopieren, Ausschneiden und
   Einfügen. Pfeile und Löschen wiederholen sich beim Halten, „ABC“ führt zurück zu den Tasten.
