@@ -11,6 +11,9 @@ public enum ThemeMode
 
     /// <summary>Material You: Farben aus dem Hintergrundbild (ab Android 12).</summary>
     Dynamic = 3,
+
+    /// <summary>Eigenes Bild als Hintergrund der Tastatur (Keyboard.ThemeImage); ohne Bild wie das System.</summary>
+    Image = 4,
 }
 
 public enum OneHandedMode
@@ -251,6 +254,20 @@ public sealed class ZBoardSettings
 
     /// <summary>Letzte Änderung an Einstellungen, die synchronisiert werden (Unix-ms).</summary>
     public long SettingsModifiedMs => _prefs.GetLong(BackupMerge.SettingsModifiedKey, 0);
+
+    /// <summary>Tasten als Flächen zeichnen (Gboard: „Tastenrahmen“); aus: nur die Beschriftung.</summary>
+    public bool KeyBorders
+    {
+        get => _prefs.GetBoolean("keyBorders", true);
+        set => PutBool("keyBorders", value);
+    }
+
+    /// <summary>Wie stark das eigene Hintergrundbild abgedunkelt wird, in Prozent (0–80).</summary>
+    public int ThemeImageDim
+    {
+        get => Math.Clamp(_prefs.GetInt("themeImageDim", 25), 0, 80);
+        set => PutInt("themeImageDim", Math.Clamp(value, 0, 80));
+    }
 
     public ThemeMode Theme
     {
