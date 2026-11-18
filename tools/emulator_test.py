@@ -162,11 +162,14 @@ def tap_text(text):
 def dismiss_system_dialogs():
     """Der Emulator zeigt gelegentlich „… isn't responding“ für System-Apps: mit „Wait“ schließen."""
     try:
-        for node in ui_nodes():
+        nodes = list(ui_nodes())
+        for node in nodes:
             if node.get("text") in ("Wait", "Warten"):
                 x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
                 shell(f"input tap {(x1 + x2) // 2} {(y1 + y2) // 2}")
-                print("Systemdialog geschlossen")
+                # Welche App gemeint ist, steht im Dialog („… isn't responding“)
+                texts = [n.get("text") for n in nodes if n.get("text")]
+                print("Systemdialog geschlossen:", " / ".join(texts)[:200])
                 time.sleep(1)
                 return True
     except Exception:  # noqa: BLE001
