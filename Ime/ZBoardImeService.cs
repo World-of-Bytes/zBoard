@@ -869,7 +869,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         var typed = _composing.ToString();
         long suggestStarted = Perf.Now;
         var result = engine.Suggest(typed, SentenceContext(), touches: Touches());
-        Perf.Log("suggest", Perf.Since(suggestStarted));
+        Perf.Log(typed.Length >= 10 ? "suggest-long" : "suggest", Perf.Since(suggestStarted));
         _currentSuggestions = result;
         bool autocorrectActive = _settings.AutoCorrect && _profile.AllowAutocorrect;
 

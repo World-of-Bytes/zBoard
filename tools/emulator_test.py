@@ -507,6 +507,10 @@ def main():
                 time.sleep(3)
                 print("Neu geladen:", loaded() > before,
                       "– Tastatur:", shell("settings get secure default_input_method", check=False).strip())
+
+            # Lange Wörter kosten je Tastendruck am meisten Rechenzeit (Messwert „suggest-long“: ab zehn Buchstaben)
+            type_text(None, "krankenversicherungskarte geschwindigkeitsbegrenzung zusammenhang entschuldigung ")
+            time.sleep(1)
         except Exception as e:  # noqa: BLE001
             print(f"Zeitmessung abgebrochen: {e}")
     except Exception as e:  # noqa: BLE001 – jeder Fehler ist ein Testfehler
