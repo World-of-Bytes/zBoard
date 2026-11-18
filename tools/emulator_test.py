@@ -521,8 +521,15 @@ def main():
                         data = base64.b64encode(f.read()).decode()
                     for i in range(0, len(data), 3000):  # lange Zeilen kürzt das Log
                         print(f"SCREENSHOT {name} {i // 3000} {data[i:i + 3000]}")
+        full_log = adb("logcat", "-d", check=False)
         with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as f:
-            f.write(adb("logcat", "-d", check=False))
+            f.write(full_log)
+        if not all(ok for _, ok, _ in results):
+            # Bei Fehlern die Zeilen, die meist die Ursache zeigen, gleich ins Protokoll des Laufs
+            wanted = r"ANR in|not responding|FATAL|AndroidRuntime|mono-rt|monodroid|DOTNET|zBoard\s*:|Unhandled|Exception"
+            noise = r"InputMethodEntryManager|GoogleInputMethodService|LatinCommon|SystemSubtypes|DictionarySuperpacks|ApkAssets|zBoardTest"
+            lines = [l for l in full_log.splitlines() if re.search(wanted, l) and not re.search(noise, l)]
+            print("Log (Auszug, Fehlersuche):\n" + "\n".join(l[:300] for l in lines[-150:]))
         write_summary(out_dir, results, perf_values())
 
     sys.exit(0 if results and all(ok for _, ok, _ in results) else 1)
