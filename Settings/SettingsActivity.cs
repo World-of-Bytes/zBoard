@@ -11,6 +11,7 @@ using ZBoard.Ime;
 using ZBoard.Keyboard;
 using ZBoard.Localization;
 using ZBoard.Plugins;
+using ZBoard.Suggestions;
 using ZBoard.Sync;
 using Color = Android.Graphics.Color;
 using Orientation = Android.Widget.Orientation;
@@ -44,7 +45,8 @@ public sealed class SettingsActivity : Activity
 
     const string Main = "main";
 
-    record Page(string Id, int Icon, string Title, Func<string?> Subtitle, Action<SettingsActivity> Build);
+    /// <param name="Parent">Seite, zu der „Zurück“ führt; nur Seiten unter der Startseite stehen dort in der Liste.</param>
+    record Page(string Id, int Icon, string Title, Func<string?> Subtitle, Action<SettingsActivity> Build, string Parent = Main);
 
     static readonly Page[] Pages =
     [
@@ -60,7 +62,11 @@ public sealed class SettingsActivity : Activity
         new("plugins", Resource.Drawable.ms_extension, L.T("Plugins", "Plugins"), () => null, a => a.BuildPlugins()),
         new("test", Resource.Drawable.ms_keyboard, L.T("Tastatur ausprobieren", "Try the keyboard"), () => null, a => a.BuildTest()),
         new("about", Resource.Drawable.ms_info, L.T("Über zBoard", "About zBoard"), () => null, a => a.BuildAbout()),
+        new("personal", Resource.Drawable.ms_menu_book, L.T("Persönliches Wörterbuch", "Personal dictionary"), () => null, a => a.BuildPersonal(), Parent: "dictionary"),
     ];
+
+    /// <summary>Wohin „Zurück“ von der aktuellen Seite führt.</summary>
+    string ParentPage => Pages.FirstOrDefault(p => p.Id == _page)?.Parent ?? Main;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -127,7 +133,7 @@ public sealed class SettingsActivity : Activity
     void GoBack()
     {
         if (_page == Main) Finish();
-        else ShowPage(Main);
+        else ShowPage(ParentPage);
     }
 
     // Ab Android 13 (bei targetSdk 36 Pflicht): Zurück-Geste über OnBackInvokedDispatcher.
@@ -151,7 +157,7 @@ public sealed class SettingsActivity : Activity
 #pragma warning disable CS0618, CS0672, CA1422 // bis Android 12 der klassische Weg
     public override void OnBackPressed()
     {
-        if (_page != Main) ShowPage(Main);
+        if (_page != Main) ShowPage(ParentPage);
         else base.OnBackPressed();
     }
 #pragma warning restore CS0618, CS0672, CA1422
@@ -171,7 +177,7 @@ public sealed class SettingsActivity : Activity
 
         BuildSetupCard();
 
-        foreach (var page in Pages)
+        foreach (var page in Pages.Where(p => p.Parent == Main))
         {
             string? subtitle = page.Id == "languages" ? LanguageSummary() : page.Subtitle();
             Row(page.Icon, page.Title, subtitle, () => ShowPage(page.Id));
@@ -361,6 +367,12 @@ public sealed class SettingsActivity : Activity
 
     void BuildDictionary()
     {
+        int personal = PersonalDictionary.Parse(_settings.PersonalDictionary).Entries.Count;
+        Row(Resource.Drawable.ms_menu_book, L.T("Persönliches Wörterbuch", "Personal dictionary"),
+            personal == 0
+                ? L.T("Eigene Wörter und Kürzel, z. B. „mfg“ für „Mit freundlichen Grüßen“", "Your own words and shortcuts, e.g. “brb” for “be right back”")
+                : L.T($"{personal} Einträge", personal == 1 ? "1 entry" : $"{personal} entries"),
+            () => ShowPage("personal"));
         Toggle(L.T("Aus meinen Eingaben lernen", "Learn from my typing"), L.T("Häufig verwendete Wörter und Wortfolgen vorschlagen", "Suggest words and phrases you use often"),
             _settings.LearnWords, (_, v) => _settings.LearnWords = v);
         Row(Resource.Drawable.ms_menu_book, L.T("Gelernte Wörter löschen", "Delete learned words"), null, () =>
@@ -401,6 +413,87 @@ public sealed class SettingsActivity : Activity
             + "zBoard learns no words in password, email and "
             + "address fields. It only remembers email addresses entered in email fields – not in incognito windows "
             + "or fields where the app forbids learning."));
+    }
+
+    // ---------- Persönliches Wörterbuch ----------
+
+    void BuildPersonal()
+    {
+        var dictionary = PersonalDictionary.Parse(_settings.PersonalDictionary);
+        Row(Resource.Drawable.ms_add, L.T("Hinzufügen", "Add"), L.T("Wort oder Text, auf Wunsch mit Kürzel", "A word or phrase, optionally with a shortcut"),
+            () => EditPersonalEntry(null));
+
+        foreach (var entry in dictionary.Entries)
+        {
+            var captured = entry;
+            Row(Resource.Drawable.ms_menu_book, entry.Word,
+                entry.HasShortcut ? L.T($"Kürzel: {entry.Shortcut}", $"Shortcut: {entry.Shortcut}") : null,
+                () => EditPersonalEntry(captured));
+        }
+
+        Note(L.T("Eigene Wörter schlägt zBoard beim Tippen vor und korrigiert sie nicht. Tippst du ein Kürzel, erscheint sein "
+                 + "Text in der Vorschlagsleiste; Antippen setzt ihn ein. Die Einträge gelten in allen Sprachen und gehören zu "
+                 + "den Einstellungen: Sicherung und Synchronisation nehmen sie mit.",
+            "zBoard suggests your own words as you type and never corrects them. When you type a shortcut, its text appears "
+            + "in the suggestion bar; tap it to insert. Entries apply to all languages and are part of the settings: backup "
+            + "and sync include them."));
+    }
+
+    void EditPersonalEntry(PersonalEntry? existing)
+    {
+        var form = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        form.SetPadding(Dp(24), Dp(8), Dp(24), 0);
+
+        var word = new EditText(this)
+        {
+            Hint = L.T("Wort oder Text", "Word or phrase"),
+            InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagNoSuggestions,
+            ContentDescription = "zboard-personal-word",
+        };
+        word.Text = existing?.Word ?? string.Empty;
+        form.AddView(word);
+
+        var shortcut = new EditText(this)
+        {
+            Hint = L.T("Kürzel (optional)", "Shortcut (optional)"),
+            InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextFlagNoSuggestions,
+            ContentDescription = "zboard-personal-shortcut",
+        };
+        shortcut.Text = existing?.Shortcut ?? string.Empty;
+        form.AddView(shortcut);
+
+        var builder = new AlertDialog.Builder(this)
+            .SetTitle(existing == null ? L.T("Eintrag hinzufügen", "Add entry") : L.T("Eintrag bearbeiten", "Edit entry"))!
+            .SetView(form)!
+            .SetPositiveButton(L.T("Speichern", "Save"), (_, _) =>
+            {
+                var entry = PersonalDictionary.Normalize(word.Text, shortcut.Text);
+                if (entry == null)
+                {
+                    Toast.MakeText(this,
+                        L.T("Nicht gespeichert: Das Wort darf nicht leer sein, das Kürzel nur aus Buchstaben und Ziffern bestehen.",
+                            "Not saved: the word must not be empty, and the shortcut may only contain letters and digits."),
+                        ToastLength.Long)!.Show();
+                    return;
+                }
+
+                var dictionary = PersonalDictionary.Parse(_settings.PersonalDictionary);
+                _settings.PersonalDictionary = dictionary.With(entry, replaces: existing).Serialize();
+                if (_page == "personal") ShowPage("personal");
+            })!
+            .SetNegativeButton(L.T("Abbrechen", "Cancel"), (_, _) => { })!;
+
+        if (existing != null)
+        {
+            builder.SetNeutralButton(L.T("Löschen", "Delete"), (_, _) =>
+            {
+                var dictionary = PersonalDictionary.Parse(_settings.PersonalDictionary);
+                _settings.PersonalDictionary = dictionary.Without(existing).Serialize();
+                if (_page == "personal") ShowPage("personal");
+            });
+        }
+
+        builder.Show();
     }
 
     // ---------- Sichern & wiederherstellen ----------
@@ -963,7 +1056,7 @@ public sealed class SettingsActivity : Activity
         back.SetImageResource(Resource.Drawable.ms_arrow_back);
         back.SetColorFilter(_colors.Text);
         back.SetPadding(Dp(12), Dp(12), Dp(12), Dp(12));
-        back.Click += (_, _) => ShowPage(Main);
+        back.Click += (_, _) => ShowPage(ParentPage);
         var lp = new LinearLayout.LayoutParams(Dp(48), Dp(48));
         lp.SetMargins(Dp(8), Dp(16), 0, 0);
         _content.AddView(back, lp);

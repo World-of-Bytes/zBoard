@@ -39,6 +39,7 @@ Finished versions: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Suggesting whole phrases ("freundlichen Grüßen") | ✓ | ✓ from what it has learned |
 | Suggestions for a word you tap in the text | ✓ | ✓ tapping replaces the whole word |
 | Suggesting email addresses | ✓ | ✓ remembered addresses and common providers after "@" |
+| Personal dictionary with shortcuts ("brb" → "be right back") | ✓ | ✓ own words and shortcuts for all languages, included in backup and sync |
 | Glide typing | ✓ | ✓ |
 | Chinese with Pinyin | ✓ | ✓ simplified characters, scrolling candidate row, learns the characters you choose |
 | Vietnamese with Telex | ✓ | ✓ can be turned off |
@@ -86,7 +87,7 @@ The user interface is bilingual: German if the system language is German, Englis
 ## Tests
 
 The logic that does not depend on Android (dictionary, autocorrect, language model, finger positions, compound
-words, spaces, prediction, phrases, learning, email addresses, glide typing, emoji, clipboard, layouts,
+words, spaces, prediction, phrases, learning, email addresses, personal dictionary, glide typing, emoji, clipboard, layouts,
 accented-character popup, backups, all 18 languages, Pinyin, Telex) has its own unit tests:
 
 ```bash
@@ -125,7 +126,7 @@ prepared form in the app's cache after loading it for the first time (`cache/dic
 | `Keyboard/` | layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
 | `Emoji/` | `EmojiCatalog` (data, search, skin tones), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `TouchTrace` (finger positions), `UserHistory`, `EmailMemory`, `KeyProximity`, `TextCase` (upper and lower case per language), `PinyinEngine` and `PinyinLearned` (Chinese), `Telex` (Vietnamese), `CandidateStrip` (layout of the candidate row), `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `TouchTrace` (finger positions), `UserHistory`, `EmailMemory`, `PersonalDictionary` (own words and shortcuts), `KeyProximity`, `TextCase` (upper and lower case per language), `PinyinEngine` and `PinyinLearned` (Chinese), `Telex` (Vietnamese), `CandidateStrip` (layout of the candidate row), `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (start screen), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (backup file: writing, reading, validation) |
 | `Assets/dict/` | word lists and language models per language |
@@ -310,6 +311,11 @@ used. zBoard has no internet permission (release build).
   “Email address” label above it): in single-line form fields zBoard therefore also suggests remembered addresses as soon
   as the field holds a single word of at least three letters that starts one of them, and remembers an address when the
   field ends up containing exactly one valid address.
+- **Personal dictionary:** under Settings → Dictionary → Personal dictionary you add your own words and shortcuts.
+  The bar suggests your own words (names, technical terms, “zBoard”) as you type; autocorrect leaves them alone and
+  applies the stored spelling (“zboard” → “zBoard”). When you type a shortcut (“brb”), the bar shows its text (“be
+  right back”); as in Gboard it is only inserted when you tap it. Entries apply to all languages and are part of the
+  settings – backup and sync include them.
 - **Clipboard:** history of the last hour, pinning (📌) keeps items permanently. Only pinned items are saved;
   content marked as sensitive (e.g. from password managers) and copies from password fields are never taken.
 - **Backup & restore:** Settings → Backup & restore saves your settings, learned words and phrases, remembered email

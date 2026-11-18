@@ -249,6 +249,17 @@ def bar_ink(path, keys):
     return ink(path, top - 44 * density, top - 10 * density)
 
 
+def bar_targets():
+    """Einträge der Leiste über der Tastatur (Vorschläge, Werkzeuge) mit Bildschirmposition, aus dem Log der Testversion."""
+    lines = re.findall(r"BAR (.*)$", adb("logcat", "-d", "-s", "zBoardTest:I", check=False), re.M)
+    targets = {}
+    for item in (lines[-1].split() if lines else []):
+        name, _, pos = item.rpartition("@")
+        x, y = pos.split(",")
+        targets[name] = (int(x), int(y))
+    return targets
+
+
 def crashes():
     log = adb("logcat", "-d", "-b", "crash", check=False)
     return [line for line in log.splitlines() if PACKAGE in line or "FATAL" in line]
@@ -436,6 +447,29 @@ def main():
               f"→ Feld „{text}“, Leiste „{last}“")
         ink = bar_ink(screenshot(out_dir, "5-suchleiste"), keys)
         check("Vorschlagsleiste sichtbar (Screenshot)", ink > 0.002, f"({ink:.2%} Schrift im Leistenbereich)")
+
+        # Persönliches Wörterbuch: Kürzel zeigt seinen Text in der Leiste, Antippen setzt ihn ein; ein eigenes Wort
+        # bekommt beim Leerzeichen die gespeicherte Schreibweise
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es personal 'mfg=Mit freundlichen Worten;=zBoard'")
+        time.sleep(3)
+        type_text(keys, "mfg")
+        time.sleep(1)
+        log = adb("logcat", "-d", "-s", "zBoardTest:I", check=False)
+        shown = re.findall(r"SUGGESTIONS (.*)$", log, re.M)
+        last = shown[-1].strip() if shown else ""
+        check("Persönliches Wörterbuch: Kürzel zeigt den Text", "Mit freundlichen Worten" in last, f"→ Leiste „{last}“")
+        slot = bar_targets().get("slot1")
+        if slot:
+            tap(slot)
+            time.sleep(0.8)
+        text = field_text()
+        check("Persönliches Wörterbuch: Antippen setzt den Text ein", text == "Mit freundlichen Worten ", f"→ „{text}“")
+        screenshot(out_dir, "5a-kuerzel")
+        type_text(keys, "zboard ")
+        text = field_text()
+        check("Persönliches Wörterbuch: eigene Schreibweise (zboard → zBoard)", text.endswith("Worten zBoard "), f"→ „{text}“")
+        shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es personal ';'")  # wieder leeren
+        time.sleep(2)
 
         # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")
