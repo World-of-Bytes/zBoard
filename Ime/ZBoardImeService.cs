@@ -93,6 +93,13 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _audio = GetSystemService(AudioService) as Android.Media.AudioManager;
         InitClipboard();
         Perf.Log("process-to-service", Perf.SinceProcessStart);
+
+        // Wörterbücher schon jetzt im Hintergrund laden, nicht erst, wenn die Tastatur aufgebaut ist: Nach einem
+        // Neustart des Dienstes sind die Vorschläge so früher wieder da.
+        foreach (var language in MultilingualEngine.ActiveLanguages(_settings.CurrentLanguage, _settings.Languages, _settings.MultilingualTyping))
+        {
+            EngineTask(language);
+        }
     }
 
     static string LearningFile(Context context, string language) =>
@@ -966,11 +973,11 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     void SetLanguage(string language)
     {
         _language = language;
-        _settings.CurrentLanguage = language;
+        if (_settings.CurrentLanguage != language) _settings.CurrentLanguage = language; // nicht bei jedem Öffnen schreiben
         EnsurePinyin();
         var languages = InputLanguages();
         long started = Perf.Now;
-        var tasks = languages.Select(l => Engines.GetOrAdd(l, lang => Task.Run(() => LoadEngine(lang)))).ToArray();
+        var tasks = languages.Select(EngineTask).ToArray();
         bool loading = tasks.Any(t => !t.IsCompleted);
         _engineTask = CombineEngines(languages, tasks);
         _engineTask.ContinueWith(
@@ -1056,6 +1063,10 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         Perf.Log($"warm-up-{language}", Perf.Since(started));
     }
+
+    /// <summary>Die Engine einer Sprache; beim ersten Mal beginnt das Laden im Hintergrund.</summary>
+    Task<SuggestionEngine> EngineTask(string language) =>
+        Engines.GetOrAdd(language, lang => Task.Run(() => LoadEngine(lang)));
 
     SuggestionEngine LoadEngine(string language)
     {

@@ -105,6 +105,17 @@ detail, in German: [tools/SuggestionEval/README.md](tools/SuggestionEval/README.
 dotnet run -c Release --project tools/SuggestionEval -- --lang de
 ```
 
+`tools/LoadBench` measures how long word lists and language models take to load (and how much memory). The emulator
+test also reloads the keyboard from scratch several times and reports the timings in its summary (service start,
+loading per language, time per suggestion):
+
+```bash
+dotnet run -c Release --project tools/LoadBench -- de en
+```
+
+So that suggestions are back quickly after the keyboard has been reloaded, zBoard stores each word list in a
+prepared form in the app's cache after loading it for the first time (`cache/dict/`; rebuilt after an update).
+
 ## Structure
 
 | Folder | Contents |
@@ -122,7 +133,7 @@ dotnet run -c Release --project tools/SuggestionEval -- --lang de
 | `plugin-apps/DeepL/` | plugin app "zBoard DeepL" (a separate app with internet permission) |
 | `Sync/` | `SyncManager` (sync through a plugin), `SyncFileProvider` (hands the file to the plugin) |
 | `plugin-apps/Sync/` | plugin app "zBoard Sync" (Google Drive, OneDrive, Dropbox, WebDAV); provider setup in its README |
-| `tools/` | `build_dictionaries.py` (word lists), `NgramBuilder` (language models), `SuggestionEval` (suggestion measurement), `build_emoji.py` (emoji data), `emulator_test.py` |
+| `tools/` | `build_dictionaries.py` (word lists), `NgramBuilder` (language models), `SuggestionEval` (suggestion measurement), `LoadBench` (loading times), `build_emoji.py` (emoji data), `emulator_test.py` |
 | `tests/` | unit tests for the platform-independent logic |
 
 ## Dictionaries
