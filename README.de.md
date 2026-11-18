@@ -46,7 +46,7 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Cursor per Leertaste, Wort-Löschen per Wischen | ✓ | ✓ |
 | Textbearbeitung (Pfeiltasten, Markieren, Kopieren, Ausschneiden, Einfügen) | ✓ | ✓ über die Werkzeugleiste |
 | Tastenvorschau, Vibration, Ton | ✓ | ✓ |
-| Designs | ✓ | hell, dunkel, Material You (Farben aus dem Hintergrundbild) |
+| Designs | ✓ | hell, dunkel, Material You (Farben aus dem Hintergrundbild), eigenes Bild (abdunkelbar), Tastenrahmen an/aus |
 | Emoji-Tastatur | ✓ | ✓ mit Kategorien, Hauttönen, „Zuletzt verwendet“ und Suche in allen 18 Sprachen |
 | Zwischenablage-Verlauf | ✓ | ✓ eine Stunde, Anheften, vertrauliche Inhalte ausgenommen |
 | Sichern & wiederherstellen (Einstellungen, gelernte Wörter, E-Mail-Adressen, angeheftete Zwischenablage) | teilweise: gelernte Wörter nur per Synchronisation mit dem Google-Konto, Export des persönlichen Wörterbuchs; keine Sicherung der Einstellungen | ✓ als ZIP-Datei, die du ablegst, wo du willst – ohne Konto |
@@ -296,6 +296,9 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   Sie erscheint im leeren Feld und wenn es nichts vorzuschlagen gibt; sonst öffnet sie der Pfeil links in der
   Vorschlagsleiste, und der Pfeil dort oder das Weitertippen führt zurück zu den Vorschlägen. Eben kopierter Text
   erscheint dort 90 Sekunden lang als Vorschlag.
+- **Designs:** Neben hell, dunkel und Material You gibt es „Eigenes Bild“: Das gewählte Bild liegt hinter Leiste und
+  Tasten, ein Regler dunkelt es ab, die Schrift wird passend hell oder dunkel. „Tastenrahmen“ aus zeichnet nur die
+  Beschriftungen (wie bei Gboard). Das Bild bleibt auf dem Gerät und gehört nicht zu Sicherung und Synchronisation.
 - **Textbearbeitung:** Das Cursor-Symbol in der Werkzeugleiste ersetzt die Tasten durch Pfeiltasten (auch Zeilenanfang
   und -ende). „Auswählen“ lässt die Pfeile Text markieren; daneben Alles auswählen, Kopieren, Ausschneiden und
   Einfügen. Pfeile und Löschen wiederholen sich beim Halten, „ABC“ führt zurück zu den Tasten.

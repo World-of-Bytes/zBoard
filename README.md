@@ -46,7 +46,7 @@ Finished versions: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Cursor control via space bar, deleting words by swiping | ✓ | ✓ |
 | Text editing (arrow keys, select, copy, cut, paste) | ✓ | ✓ from the toolbar |
 | Key preview, vibration, sound | ✓ | ✓ |
-| Themes | ✓ | light, dark, Material You (colours from the wallpaper) |
+| Themes | ✓ | light, dark, Material You (colours from the wallpaper), your own image (can be darkened), key borders on/off |
 | Emoji keyboard | ✓ | ✓ with categories, skin tones, "recently used" and search in all 18 languages |
 | Clipboard history | ✓ | ✓ one hour, pinning, sensitive content excluded |
 | Backup & restore (settings, learned words, email addresses, pinned clips) | partly: learned words only via sync with the Google account, personal dictionary export; no settings backup | ✓ as a ZIP file you store wherever you like, no account needed |
@@ -296,6 +296,9 @@ used. zBoard has no internet permission (release build).
   empty field and when there is nothing to suggest; otherwise the arrow at the left of the suggestion bar opens it,
   and the arrow there, or simply typing on, brings the suggestions back. Text you have just copied appears there as
   a suggestion for 90 seconds.
+- **Themes:** besides light, dark and Material You there is "My image": the chosen picture sits behind the bar and the
+  keys, a slider darkens it, and the labels turn light or dark to match. "Key borders" off draws only the labels (as
+  in Gboard). The image stays on the device and is not part of backup and sync.
 - **Text editing:** the cursor icon in the toolbar replaces the keys with arrow keys (including start and end of
   line). "Select" makes the arrows select text; next to them are Select all, Copy, Cut and Paste. Arrows and delete
   repeat while held, "ABC" returns to the keys.
