@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using System.Text;
+
 namespace ZBoard.Suggestions;
 
 /// <summary>
@@ -10,11 +13,17 @@ public sealed class WordDictionary
     const int TopK = 6;
     const int CachedPrefixLength = 2;
 
-    Dictionary<string, List<(string Word, int Freq)>>? _builder = new(StringComparer.Ordinal);
+    // Aufbau (bis BuildTopLists): je Schlüssel ein Platz. Fast jeder Schlüssel hat genau eine Schreibweise; nur für
+    // die übrigen gibt es eine Liste. Das spart beim Laden von 100 000+ Wörtern ebenso viele kleine Listen.
+    Dictionary<string, int>? _slots = new(StringComparer.Ordinal);
+    List<string> _slotKeys = [];
+    List<(string Word, int Freq)> _slotFirst = [];
+    Dictionary<int, List<(string Word, int Freq)>> _slotForms = [];
 
     string[] _keys = [];      // kleingeschrieben, ordinal sortiert, eindeutig
-    int[] _freq = [];            // höchste Häufigkeit je Schlüssel
-    string[][] _forms = []; // Schreibweisen je Schlüssel, häufigste zuerst
+    int[] _freq = [];         // höchste Häufigkeit je Schlüssel
+    string[] _top = [];       // häufigste Schreibweise je Schlüssel
+    string[]?[] _forms = [];  // alle Schreibweisen, häufigste zuerst; null, wenn es nur eine gibt
     readonly Dictionary<string, (string Word, int Freq)[]> _prefixTop = new(StringComparer.Ordinal);
 
     public int Count => _keys.Length;
@@ -47,85 +56,344 @@ public sealed class WordDictionary
     public static WordDictionary Load(Stream stream, long? normalizeTo = null, string? language = null)
     {
         var dict = new WordDictionary { Language = language };
-        using var reader = new StreamReader(stream);
-        string? line;
-        while ((line = reader.ReadLine()) != null)
+
+        // Die ganze Datei auf einmal lesen und umwandeln: Zeile für Zeile über einen StreamReader entsteht je Zeile
+        // eine Zeichenkette, die sofort wieder weggeworfen wird.
+        var bytes = ReadAll(stream);
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) bytes = bytes[3..];
+        var chars = new char[Encoding.UTF8.GetMaxCharCount(bytes.Length)];
+        ReadOnlySpan<char> text = chars.AsSpan(0, Encoding.UTF8.GetChars(bytes, chars));
+        dict.Reserve(text.Length / 12);
+
+        while (text.Length > 0)
         {
+            int end = text.IndexOfAny('\n', '\r');
+            var line = end < 0 ? text : text[..end];
+            text = end < 0 ? default : text[(end + 1)..];
             if (line.Length == 0 || line[0] == '#') continue;
 
             int tab = line.IndexOf('\t');
             if (tab < 0) tab = line.IndexOf(' ');
-            string word = tab < 0 ? line.Trim() : line[..tab].Trim();
-            int freq = tab >= 0 && int.TryParse(line.AsSpan(tab + 1).Trim(), out var f) ? f : 1;
-            if (word.Length > 0) dict.Add(word, freq);
+            var word = (tab < 0 ? line : line[..tab]).Trim();
+            int freq = tab >= 0 && int.TryParse(line[(tab + 1)..].Trim(), out var f) ? f : 1;
+            if (word.Length > 0) dict.Add(new string(word), freq);
         }
 
         dict.BuildTopLists(normalizeTo);
         return dict;
     }
 
+    /// <summary>Liest den Rest des Streams; ohne Kopie, wenn er schon ganz im Speicher liegt.</summary>
+    static ReadOnlySpan<byte> ReadAll(Stream stream)
+    {
+        if (stream is MemoryStream memory && memory.TryGetBuffer(out var segment))
+        {
+            return segment.AsSpan((int)memory.Position);
+        }
+
+        var buffer = new MemoryStream(stream.CanSeek ? (int)Math.Max(0, stream.Length - stream.Position) : 2 << 20);
+        stream.CopyTo(buffer);
+        return buffer.GetBuffer().AsSpan(0, (int)buffer.Length);
+    }
+
+    void Reserve(int words)
+    {
+        _slots?.EnsureCapacity(words);
+        _slotKeys.EnsureCapacity(words);
+        _slotFirst.EnsureCapacity(words);
+    }
+
     /// <summary>Fügt eine Schreibweise hinzu. Muss vor <see cref="BuildTopLists"/> aufgerufen werden.</summary>
     public void Add(string word, int freq)
     {
-        if (_builder == null) throw new InvalidOperationException("Wörterbuch ist bereits fertig aufgebaut.");
+        if (_slots == null) throw new InvalidOperationException("Wörterbuch ist bereits fertig aufgebaut.");
 
         var key = Lower(word);
-        if (!_builder.TryGetValue(key, out var forms))
+        ref int slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_slots, key, out bool known);
+        if (!known)
         {
-            forms = new List<(string, int)>(1);
-            _builder[key] = forms;
+            slot = _slotKeys.Count;
+            _slotKeys.Add(key);
+            _slotFirst.Add((word, freq));
+            return;
         }
 
-        int existing = forms.FindIndex(x => x.Word == word);
-        if (existing < 0) forms.Add((word, freq));
-        else if (freq > forms[existing].Freq) forms[existing] = (word, freq);
+        if (_slotForms.TryGetValue(slot, out var forms))
+        {
+            int existing = forms.FindIndex(x => x.Word == word);
+            if (existing < 0) forms.Add((word, freq));
+            else if (freq > forms[existing].Freq) forms[existing] = (word, freq);
+            return;
+        }
+
+        var first = _slotFirst[slot];
+        if (first.Word != word) _slotForms[slot] = [first, (word, freq)];
+        else if (freq > first.Freq) _slotFirst[slot] = (word, freq);
     }
 
     /// <summary>Schließt den Aufbau ab: sortiert und berechnet die Vorschlagslisten für kurze Präfixe.</summary>
     /// <param name="normalizeTo">Häufigkeiten so skalieren, dass ihre Summe diesem Wert entspricht; null lässt sie unverändert.</param>
     public void BuildTopLists(long? normalizeTo = null)
     {
-        if (_builder == null) return;
+        if (_slots == null) return;
 
-        long total = _builder.Values.Sum(forms => forms.Sum(x => (long)x.Freq));
+        int count = _slotKeys.Count;
+        var first = CollectionsMarshal.AsSpan(_slotFirst);
+
+        long Total(Span<(string Word, int Freq)> single)
+        {
+            long sum = 0;
+            for (int slot = 0; slot < single.Length; slot++)
+            {
+                if (!_slotForms.ContainsKey(slot)) sum += single[slot].Freq;
+            }
+
+            foreach (var forms in _slotForms.Values)
+            {
+                foreach (var form in forms) sum += form.Freq;
+            }
+
+            return sum;
+        }
+
+        long total = Total(first);
         if (normalizeTo is > 0 && total > 0)
         {
             double factor = (double)normalizeTo.Value / total;
-            foreach (var forms in _builder.Values)
+            int Scale(int freq) => (int)Math.Clamp(Math.Round(freq * factor), 1, int.MaxValue);
+
+            for (int slot = 0; slot < count; slot++) first[slot].Freq = Scale(first[slot].Freq);
+            foreach (var forms in _slotForms.Values)
             {
-                for (int k = 0; k < forms.Count; k++)
-                {
-                    forms[k] = (forms[k].Word, (int)Math.Clamp(Math.Round(forms[k].Freq * factor), 1, int.MaxValue));
-                }
+                for (int k = 0; k < forms.Count; k++) forms[k] = (forms[k].Word, Scale(forms[k].Freq));
             }
 
-            total = _builder.Values.Sum(forms => forms.Sum(x => (long)x.Freq));
+            total = Total(first);
         }
 
         TotalFrequency = total;
 
-        var keys = _builder.Keys.ToArray();
-        Array.Sort(keys, StringComparer.Ordinal);
+        var keys = _slotKeys.ToArray();
+        var slots = new int[count];
+        for (int i = 0; i < count; i++) slots[i] = i;
+        keys.AsSpan().Sort(slots.AsSpan(), new OrdinalComparer());
 
         _keys = keys;
-        _freq = new int[keys.Length];
-        _forms = new string[keys.Length][];
-        for (int i = 0; i < keys.Length; i++)
+        _freq = new int[count];
+        _top = new string[count];
+        _forms = new string[count][];
+        for (int i = 0; i < count; i++)
         {
-            var forms = _builder[keys[i]].OrderByDescending(x => x.Freq).ToArray();
+            int slot = slots[i];
+            if (!_slotForms.TryGetValue(slot, out var forms))
+            {
+                (_top[i], _freq[i]) = first[slot];
+                continue;
+            }
+
+            // Häufigste zuerst; bei gleicher Häufigkeit bleibt die Reihenfolge der Wortliste.
+            for (int a = 1; a < forms.Count; a++)
+            {
+                var moved = forms[a];
+                int b = a;
+                for (; b > 0 && forms[b - 1].Freq < moved.Freq; b--) forms[b] = forms[b - 1];
+                forms[b] = moved;
+            }
+
+            var words = new string[forms.Count];
+            for (int k = 0; k < words.Length; k++) words[k] = forms[k].Word;
+            _forms[i] = words;
+            _top[i] = words[0];
             _freq[i] = forms[0].Freq;
-            _forms[i] = forms.Select(x => x.Word).ToArray();
         }
 
-        _builder = null;
+        (_slots, _slotKeys, _slotFirst, _slotForms) = (null, [], [], []);
+        BuildPrefixTop();
+    }
 
-        // Für ein- und zweibuchstabige Präfixe sind die Bereiche groß: einmal vorberechnen.
-        var prefixes = _keys.Where(k => k.Length >= 1).Select(k => k[..1])
-            .Concat(_keys.Where(k => k.Length >= 2).Select(k => k[..2]))
-            .Distinct(StringComparer.Ordinal);
-        foreach (var prefix in prefixes)
+    readonly struct OrdinalComparer : IComparer<string>
+    {
+        public int Compare(string? x, string? y) => string.CompareOrdinal(x, y);
+    }
+
+    /// <summary>
+    /// Für ein- und zweibuchstabige Präfixe sind die Bereiche groß: einmal vorberechnen. Wörter mit demselben Anfang
+    /// stehen in der sortierten Liste hintereinander, ein Durchgang genügt.
+    /// </summary>
+    void BuildPrefixTop()
+    {
+        _prefixTop.Clear();
+        for (int length = 1; length <= CachedPrefixLength; length++)
         {
-            _prefixTop[prefix] = ScanTop(prefix);
+            int i = 0;
+            while (i < _keys.Length)
+            {
+                var key = _keys[i];
+                if (key.Length < length)
+                {
+                    i++;
+                    continue;
+                }
+
+                var prefix = key.AsSpan(0, length);
+                int end = i + 1;
+                while (end < _keys.Length && _keys[end].AsSpan().StartsWith(prefix, StringComparison.Ordinal)) end++;
+                _prefixTop[key[..length]] = ScanTop(i, end);
+                i = end;
+            }
+        }
+    }
+
+    // ---------- Vorbereitete Fassung (Zwischenspeicher auf dem Gerät) ----------
+
+    const uint CompiledMagic = 0x4457425A; // "ZBWD"
+    const int CompiledVersion = 1;
+
+    /// <summary>
+    /// Schreibt das fertig aufgebaute Wörterbuch so, dass <see cref="LoadCompiled"/> es ohne Auswerten, Normieren und
+    /// Sortieren wieder einlesen kann. Die Tastatur legt diese Fassung nach dem ersten Laden einer Wortliste ab; jeder
+    /// weitere Start lädt daraus um ein Vielfaches schneller.
+    /// </summary>
+    /// <remarks>
+    /// Format (Little Endian): "ZBWD", Version, Summe der Häufigkeiten (long), Zahl der Schlüssel, Zahl der weiteren
+    /// Schreibweisen, Zahl der Zeichen, Länge des UTF-8-Texts; dann je Schlüssel Häufigkeit (int), Länge (ushort) und
+    /// Zahl der Schreibweisen (ushort; 0 = nur der Schlüssel selbst), die Längen der Schreibweisen (ushort) und der
+    /// Text: alle Schlüssel, danach alle Schreibweisen, hintereinander als UTF-8.
+    /// </remarks>
+    public void Save(Stream stream)
+    {
+        if (_slots != null) throw new InvalidOperationException("Wörterbuch ist noch nicht fertig aufgebaut.");
+
+        int count = _keys.Length;
+        var formCounts = new ushort[count];
+        var keyLengths = new ushort[count];
+        List<ushort> formLengths = [];
+        var text = new StringBuilder();
+        for (int i = 0; i < count; i++)
+        {
+            keyLengths[i] = checked((ushort)_keys[i].Length);
+            text.Append(_keys[i]);
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            // Dieselbe Zeichenkette wie der Schlüssel (kleingeschriebenes Wort ohne zweite Form): nichts ablegen.
+            if (_forms[i] == null && _top[i] == _keys[i]) continue;
+            var forms = _forms[i] ?? [_top[i]];
+            formCounts[i] = checked((ushort)forms.Length);
+            foreach (var form in forms)
+            {
+                formLengths.Add(checked((ushort)form.Length));
+                text.Append(form);
+            }
+        }
+
+        var utf8 = Encoding.UTF8.GetBytes(text.ToString());
+        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
+        writer.Write(CompiledMagic);
+        writer.Write(CompiledVersion);
+        writer.Write(TotalFrequency);
+        writer.Write(count);
+        writer.Write(formLengths.Count);
+        writer.Write(text.Length);
+        writer.Write(utf8.Length);
+        writer.Write(MemoryMarshal.AsBytes(_freq.AsSpan()));
+        writer.Write(MemoryMarshal.AsBytes(keyLengths.AsSpan()));
+        writer.Write(MemoryMarshal.AsBytes(formCounts.AsSpan()));
+        writer.Write(MemoryMarshal.AsBytes(CollectionsMarshal.AsSpan(formLengths)));
+        writer.Write(utf8);
+    }
+
+    /// <summary>Liest eine mit <see cref="Save"/> geschriebene Fassung.</summary>
+    /// <exception cref="InvalidDataException">Die Daten sind keine (vollständige) Fassung dieser Version.</exception>
+    public static WordDictionary LoadCompiled(Stream stream, string? language = null)
+    {
+        if (!BitConverter.IsLittleEndian) throw new InvalidDataException("Nur für Little-Endian-Geräte.");
+
+        var data = ReadAll(stream);
+        const int Header = 32;
+        if (data.Length < Header || MemoryMarshal.Read<uint>(data) != CompiledMagic
+            || MemoryMarshal.Read<int>(data[4..]) != CompiledVersion)
+        {
+            throw new InvalidDataException("Kein vorbereitetes zBoard-Wörterbuch dieser Version.");
+        }
+
+        long total = MemoryMarshal.Read<long>(data[8..]);
+        int count = MemoryMarshal.Read<int>(data[16..]);
+        int formCount = MemoryMarshal.Read<int>(data[20..]);
+        int charCount = MemoryMarshal.Read<int>(data[24..]);
+        int utf8Length = MemoryMarshal.Read<int>(data[28..]);
+        long expected = Header + 8L * count + 2L * formCount + utf8Length;
+        if (count < 0 || formCount < 0 || charCount < 0 || utf8Length < 0 || data.Length != expected)
+        {
+            throw new InvalidDataException("Vorbereitetes Wörterbuch ist unvollständig.");
+        }
+
+        data = data[Header..];
+        var freq = new int[count];
+        var keyLengths = new ushort[count];
+        var formCounts = new ushort[count];
+        var formLengths = new ushort[formCount];
+        data = Take(data, MemoryMarshal.AsBytes(freq.AsSpan()));
+        data = Take(data, MemoryMarshal.AsBytes(keyLengths.AsSpan()));
+        data = Take(data, MemoryMarshal.AsBytes(formCounts.AsSpan()));
+        data = Take(data, MemoryMarshal.AsBytes(formLengths.AsSpan()));
+
+        var chars = new char[charCount];
+        if (Encoding.UTF8.GetChars(data, chars) != charCount) throw new InvalidDataException("Vorbereitetes Wörterbuch ist beschädigt.");
+        ReadOnlySpan<char> text = chars;
+
+        var keys = new string[count];
+        var top = new string[count];
+        var forms = new string[count][];
+        try
+        {
+            int pos = 0;
+            for (int i = 0; i < count; i++)
+            {
+                keys[i] = new string(text.Slice(pos, keyLengths[i]));
+                pos += keyLengths[i];
+            }
+
+            int next = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int n = formCounts[i];
+                if (n == 0)
+                {
+                    top[i] = keys[i];
+                    continue;
+                }
+
+                var words = new string[n];
+                for (int k = 0; k < n; k++)
+                {
+                    int length = formLengths[next++];
+                    words[k] = new string(text.Slice(pos, length));
+                    pos += length;
+                }
+
+                top[i] = words[0];
+                if (n > 1) forms[i] = words;
+            }
+
+            if (pos != charCount || next != formCount) throw new InvalidDataException("Vorbereitetes Wörterbuch ist beschädigt.");
+        }
+        catch (Exception e) when (e is ArgumentOutOfRangeException or IndexOutOfRangeException)
+        {
+            throw new InvalidDataException("Vorbereitetes Wörterbuch ist beschädigt.", e);
+        }
+
+        var dict = new WordDictionary { Language = language };
+        (dict._slots, dict._keys, dict._freq, dict._top, dict._forms) = (null, keys, freq, top, forms);
+        dict.TotalFrequency = total;
+        dict.BuildPrefixTop();
+        return dict;
+
+        static ReadOnlySpan<byte> Take(ReadOnlySpan<byte> source, Span<byte> target)
+        {
+            source[..target.Length].CopyTo(target);
+            return source[target.Length..];
         }
     }
 
@@ -133,7 +401,7 @@ public sealed class WordDictionary
     public (string Word, int Freq)? Lookup(string word)
     {
         int i = IndexOf(Lower(word));
-        return i < 0 ? null : (_forms[i][0], _freq[i]);
+        return i < 0 ? null : (_top[i], _freq[i]);
     }
 
     public bool Contains(string word) => IndexOf(Lower(word)) >= 0;
@@ -142,7 +410,7 @@ public sealed class WordDictionary
     public IReadOnlyList<string> Forms(string word)
     {
         int i = IndexOf(Lower(word));
-        return i < 0 ? [] : _forms[i];
+        return i < 0 ? [] : _forms[i] ?? [_top[i]];
     }
 
     /// <summary>Alle Einträge mit diesem Präfix: Schlüssel (klein), häufigste Schreibweise, Häufigkeit.</summary>
@@ -151,7 +419,7 @@ public sealed class WordDictionary
         var lower = Lower(prefix);
         int lo = LowerBound(lower);
         int hi = LowerBound(lower + char.MaxValue);
-        for (int i = lo; i < hi; i++) yield return (_keys[i], _forms[i][0], _freq[i]);
+        for (int i = lo; i < hi; i++) yield return (_keys[i], _top[i], _freq[i]);
     }
 
     /// <summary>Häufigste Wörter, die mit <paramref name="prefix"/> beginnen (inkl. des Präfix selbst).</summary>
@@ -159,13 +427,12 @@ public sealed class WordDictionary
     {
         var lower = Lower(prefix);
         if (lower.Length <= CachedPrefixLength && _prefixTop.TryGetValue(lower, out var cached)) return cached;
-        return ScanTop(lower);
+        return ScanTop(LowerBound(lower), LowerBound(lower + char.MaxValue));
     }
 
-    (string Word, int Freq)[] ScanTop(string lowerPrefix)
+    /// <summary>Die häufigsten Wörter im Bereich [<paramref name="lo"/>, <paramref name="hi"/>) der sortierten Liste.</summary>
+    (string Word, int Freq)[] ScanTop(int lo, int hi)
     {
-        int lo = LowerBound(lowerPrefix);
-        int hi = LowerBound(lowerPrefix + char.MaxValue);
         var best = new List<(string Word, int Freq)>(TopK + 1);
 
         for (int i = lo; i < hi; i++)
@@ -175,7 +442,7 @@ public sealed class WordDictionary
 
             int pos = best.FindIndex(x => x.Freq < f);
             if (pos < 0) pos = best.Count;
-            best.Insert(pos, (_forms[i][0], f));
+            best.Insert(pos, (_top[i], f));
             if (best.Count > TopK) best.RemoveAt(TopK);
         }
 
@@ -265,7 +532,7 @@ public sealed class WordDictionary
 
             if (key.Length <= maxLen && rows[key.Length][n] <= maxDistance)
             {
-                results.Add((_forms[i][0], _freq[i], rows[key.Length][n]));
+                results.Add((_top[i], _freq[i], rows[key.Length][n]));
             }
 
             validPrefix = key[..limit];
