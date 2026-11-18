@@ -494,6 +494,8 @@ def main():
                 before = len(perf_values().get("engines-ready", []))
                 shell(f"am force-stop {PACKAGE}")
                 time.sleep(2)
+                shell(f"ime enable {IME}", check=False)  # Android wählt eine beendete Tastatur ab
+                shell(f"ime set {IME}", check=False)
                 shell(f"am start -W -S -n {TEST_ACTIVITY}")
                 end = time.time() + 90
                 while time.time() < end and len(perf_values().get("engines-ready", [])) <= before:
