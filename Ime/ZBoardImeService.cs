@@ -1167,7 +1167,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             Directory.CreateDirectory(dir);
 
             // Erst fertig schreiben, dann umbenennen: Eine halb geschriebene Datei wird nie gelesen.
-            string temp = $"{file}.{Environment.CurrentManagedThreadId}.tmp";
+            string temp = $"{file}.{System.Environment.CurrentManagedThreadId}.tmp";
             using (var stream = File.Create(temp)) dictionary.Save(stream);
             File.Move(temp, file, overwrite: true);
 
