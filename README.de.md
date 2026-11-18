@@ -105,7 +105,8 @@ Wie gut Vorschläge und Autokorrektur sind, misst `tools/SuggestionEval` mit sim
 dotnet run -c Release --project tools/SuggestionEval -- --lang de
 ```
 
-Wie lange Wortlisten und Sprachmodelle zum Laden brauchen (und wie viel Speicher), misst `tools/LoadBench`. Der
+Wie lange Wortlisten und Sprachmodelle zum Laden brauchen (und wie viel Speicher) und wie viel Rechenzeit ein
+Tastendruck beim Tippen kostet, misst `tools/LoadBench`. Der
 Emulator-Test lädt die Tastatur außerdem mehrmals ganz neu und zeigt die Zeiten in seiner Zusammenfassung
 (Start des Dienstes, Laden je Sprache, Zeit je Vorschlag):
 
@@ -133,7 +134,7 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
 | `Sync/` | `SyncManager` (Abgleich über ein Plugin), `SyncFileProvider` (Datei-Übergabe an das Plugin) |
 | `plugin-apps/Sync/` | Plugin-App „zBoard Sync“ (Google Drive, OneDrive, Dropbox, WebDAV); Einrichtung der Anbieter in der README dort |
-| `tools/` | `build_dictionaries.py` (Wortlisten), `NgramBuilder` (Sprachmodelle), `SuggestionEval` (Vorschlagsmessung), `LoadBench` (Ladezeiten), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
+| `tools/` | `build_dictionaries.py` (Wortlisten), `NgramBuilder` (Sprachmodelle), `SuggestionEval` (Vorschlagsmessung), `LoadBench` (Ladezeiten, Zeit je Tastendruck), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
 ## Wörterbücher

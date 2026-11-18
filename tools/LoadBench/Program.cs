@@ -3,7 +3,8 @@ using ZBoard.Keyboard;
 using ZBoard.Suggestions;
 
 // Aufruf: dotnet run -c Release --project tools/LoadBench -- de en
-// Misst das Laden einer Sprache so, wie es ZBoardImeService.LoadEngine tut: Wortliste, Sprachmodell, Engine.
+// Misst das Laden einer Sprache so, wie es ZBoardImeService.LoadEngine tut: Wortliste, Sprachmodell, Engine –
+// und danach die Rechenzeit je Tastendruck beim Tippen.
 // Jeder Lauf liest die Dateien neu von der Platte. „vorbereitet“ ist die Fassung, die die App nach dem ersten Laden
 // im Zwischenspeicher ablegt (WordDictionary.Save / LoadCompiled).
 
@@ -30,6 +31,47 @@ foreach (string language in languages)
     engine.Suggest("ha", WordContext.None);
     engine.Suggest("hallp", WordContext.None);
     Console.WriteLine($"{language,-8}{"1. Vorschlag",-16}{sw.Elapsed.TotalMilliseconds,10:F1}ms");
+}
+
+// Rechenzeit je Tastendruck: tippt den Beispieltext der Vorschlagsmessung Buchstabe für Buchstabe (mit Satzkontext),
+// je Sprache allein und alle angegebenen Sprachen zusammen (mehrsprachige Eingabe).
+var engines = languages.Select(l => (Language: l, Engine: LoadEngine(l))).ToList();
+Console.WriteLine();
+Console.WriteLine($"{"Tippen",-10}{"Tastendrücke",14}{"Mittel",10}{"95 %",10}{"99 %",10}{"größter",10}");
+foreach (var (language, engine) in engines) Typing(language, new MultilingualEngine(language, engine), language);
+if (engines.Count > 1) Typing(string.Join("+", languages), new MultilingualEngine(engines), languages[0]);
+
+void Typing(string label, MultilingualEngine engine, string textLanguage)
+{
+    string sample = Path.Combine(FindRepoRoot(), "tools", "SuggestionEval", "samples", $"{textLanguage}.txt");
+    if (!File.Exists(sample)) return;
+
+    var times = new List<double>();
+    for (int round = 0; round < 3; round++) // die letzte Runde zählt (davor übersetzt die Laufzeit den Code)
+    {
+        times.Clear();
+        foreach (string line in File.ReadLines(sample))
+        {
+            var before = new System.Text.StringBuilder();
+            foreach (string word in line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string letters = word.Trim('.', ',', '!', '?', ';', ':', '"', '(', ')', '„', '“');
+                var context = WordContext.FromText(before.ToString());
+                for (int length = 1; length <= letters.Length; length++)
+                {
+                    var sw = Stopwatch.StartNew();
+                    engine.Suggest(letters[..length], context);
+                    times.Add(sw.Elapsed.TotalMilliseconds);
+                }
+
+                before.Append(word).Append(' ');
+            }
+        }
+    }
+
+    times.Sort();
+    double At(double share) => times[Math.Min(times.Count - 1, (int)(times.Count * share))];
+    Console.WriteLine($"{label,-10}{times.Count,14}{times.Average(),8:F2}ms{At(0.95),8:F2}ms{At(0.99),8:F2}ms{times[^1],8:F1}ms");
 }
 
 void Measure(string language, string step, Func<object> action)

@@ -105,7 +105,8 @@ detail, in German: [tools/SuggestionEval/README.md](tools/SuggestionEval/README.
 dotnet run -c Release --project tools/SuggestionEval -- --lang de
 ```
 
-`tools/LoadBench` measures how long word lists and language models take to load (and how much memory). The emulator
+`tools/LoadBench` measures how long word lists and language models take to load (and how much memory), and the
+computing time per keystroke while typing. The emulator
 test also reloads the keyboard from scratch several times and reports the timings in its summary (service start,
 loading per language, time per suggestion):
 
@@ -133,7 +134,7 @@ prepared form in the app's cache after loading it for the first time (`cache/dic
 | `plugin-apps/DeepL/` | plugin app "zBoard DeepL" (a separate app with internet permission) |
 | `Sync/` | `SyncManager` (sync through a plugin), `SyncFileProvider` (hands the file to the plugin) |
 | `plugin-apps/Sync/` | plugin app "zBoard Sync" (Google Drive, OneDrive, Dropbox, WebDAV); provider setup in its README |
-| `tools/` | `build_dictionaries.py` (word lists), `NgramBuilder` (language models), `SuggestionEval` (suggestion measurement), `LoadBench` (loading times), `build_emoji.py` (emoji data), `emulator_test.py` |
+| `tools/` | `build_dictionaries.py` (word lists), `NgramBuilder` (language models), `SuggestionEval` (suggestion measurement), `LoadBench` (loading times, time per keystroke), `build_emoji.py` (emoji data), `emulator_test.py` |
 | `tests/` | unit tests for the platform-independent logic |
 
 ## Dictionaries
