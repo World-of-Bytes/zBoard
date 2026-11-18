@@ -14,7 +14,7 @@ using ZBoard.Localization;
 
 namespace ZBoard.Ime;
 
-/// <summary>Werkzeugleiste, Emoji-Tastatur mit Suche, Zwischenablage-Verlauf und Einhandmodus.</summary>
+/// <summary>Werkzeugleiste, Emoji-Tastatur mit Suche, Zwischenablage-Verlauf, Textbearbeitung und Einhandmodus.</summary>
 public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPanelListener
 {
     const long ClipChipMaxAgeMs = 90_000;
@@ -24,6 +24,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
     static readonly IReadOnlyList<ToolbarItem> Toolbar =
     [
         new("clipboard", Resource.Drawable.ms_content_paste),
+        new("textedit", Resource.Drawable.ms_text_select_move_forward_character),
         new("onehanded", Resource.Drawable.ms_back_hand),
         new("settings", Resource.Drawable.ms_settings),
         new("voice", Resource.Drawable.ms_mic, Trailing: true),
@@ -70,6 +71,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _keyboardView = new KeyboardView(this) { Listener = this };
         _emojiPanel = new EmojiPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
         _clipboardPanel = new ClipboardPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
+        _textEditPanel = new TextEditPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
 
         _emojiCatalogLanguage = null; // neues Panel braucht den Katalog erneut
 
@@ -81,6 +83,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost.AddView(_keyboardView);
         _panelHost.AddView(_emojiPanel);
         _panelHost.AddView(_clipboardPanel);
+        _panelHost.AddView(_textEditPanel);
         ApplyOneHanded();
 
         root.AddView(_suggestionBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, (int)(48 * dp)));
@@ -124,6 +127,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost?.SetBackgroundColor(theme.Background);
         _emojiPanel?.Theme = theme;
         _clipboardPanel?.ApplyTheme(theme);
+        _textEditPanel?.Theme = theme;
         ApplyNavigationBarStyle();
     }
 
@@ -132,6 +136,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _keyboardView?.Visibility = ViewStates.Visible;
         _emojiPanel?.Visibility = ViewStates.Gone;
         _clipboardPanel?.Visibility = ViewStates.Gone;
+        _textEditPanel?.Visibility = ViewStates.Gone;
     }
 
     /// <summary>Panels so hoch wie die Tastatur, damit nichts springt.</summary>
@@ -197,6 +202,9 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
                 break;
             case "clipboard":
                 ShowClipboardPanel();
+                break;
+            case "textedit":
+                ShowTextEditPanel();
                 break;
             case "voice":
                 StartVoice();
@@ -294,6 +302,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _emojiPanel.ShowStart();
         _keyboardView.Visibility = ViewStates.Gone;
         _clipboardPanel?.Visibility = ViewStates.Gone;
+        _textEditPanel?.Visibility = ViewStates.Gone;
         _emojiPanel.Visibility = ViewStates.Visible;
         ShowToolbar();
     }
@@ -437,6 +446,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         RefreshClipboardPanel();
         _keyboardView.Visibility = ViewStates.Gone;
         _emojiPanel?.Visibility = ViewStates.Gone;
+        _textEditPanel?.Visibility = ViewStates.Gone;
         _clipboardPanel.Visibility = ViewStates.Visible;
     }
 

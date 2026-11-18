@@ -260,6 +260,17 @@ def bar_targets():
     return targets
 
 
+def edit_buttons():
+    """Schaltflächen der Textbearbeitung mit Bildschirmposition, aus dem Log der Testversion."""
+    lines = re.findall(r"EDIT (.*)$", adb("logcat", "-d", "-s", "zBoardTest:I", check=False), re.M)
+    buttons = {}
+    for item in (lines[-1].split() if lines else []):
+        name, _, pos = item.rpartition("@")
+        x, y = pos.split(",")
+        buttons[name] = (int(x), int(y))
+    return buttons
+
+
 def crashes():
     log = adb("logcat", "-d", "-b", "crash", check=False)
     return [line for line in log.splitlines() if PACKAGE in line or "FATAL" in line]
@@ -470,6 +481,37 @@ def main():
         check("Persönliches Wörterbuch: eigene Schreibweise (zboard → zBoard)", text.endswith("Worten zBoard "), f"→ „{text}“")
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es personal ';'")  # wieder leeren
         time.sleep(2)
+
+        # Textbearbeitung: über die Werkzeugleiste öffnen, alles auswählen, ausschneiden, einfügen, Cursor an den Anfang
+        type_text(keys, "hallo ")
+        time.sleep(0.5)
+        for target in ("toolbar-open", "textedit"):
+            pos = bar_targets().get(target)
+            if pos:
+                tap(pos)
+                time.sleep(0.8)
+        edit = edit_buttons()
+        check("Textbearbeitung öffnet sich", "SelectAll" in edit, f"({len(edit)} Schaltflächen)")
+        if edit:
+            screenshot(out_dir, "5a2-textbearbeitung")
+            tap(edit["SelectAll"])
+            tap(edit["Cut"])
+            time.sleep(0.8)
+            text = field_text()
+            # Leeres Feld: uiautomator meldet dann den Hinweistext
+            check("Textbearbeitung: alles auswählen und ausschneiden", text in ("", "Testfeld"), f"→ „{text}“")
+            tap(edit["Paste"])
+            time.sleep(0.8)
+            text = field_text()
+            check("Textbearbeitung: einfügen", text == "Hallo ", f"→ „{text}“")
+            tap(edit["Home"])
+            tap(edit["Right"])
+            tap(edit["Close"])
+            time.sleep(0.8)
+            tap(kb.wait_for("de")["x"])
+            time.sleep(0.5)
+            text = field_text()
+            check("Textbearbeitung: Pfeiltasten bewegen den Cursor", text == "Hxallo ", f"→ „{text}“")
 
         # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")

@@ -18,6 +18,7 @@ public sealed partial class ZBoardImeService
     static readonly IReadOnlyList<ToolbarItem> ToolbarWithPlugins =
     [
         new("clipboard", Resource.Drawable.ms_content_paste),
+        new("textedit", Resource.Drawable.ms_text_select_move_forward_character),
         new("onehanded", Resource.Drawable.ms_back_hand),
         new("plugins", Resource.Drawable.ms_extension),
         new("settings", Resource.Drawable.ms_settings),
