@@ -44,6 +44,7 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Chinesisch mit Pinyin | ✓ | ✓ vereinfachte Schriftzeichen, durchgehende Vorschlagszeile, lernt die gewählten Zeichen |
 | Vietnamesisch mit Telex | ✓ | ✓ abschaltbar |
 | Cursor per Leertaste, Wort-Löschen per Wischen | ✓ | ✓ |
+| Textbearbeitung (Pfeiltasten, Markieren, Kopieren, Ausschneiden, Einfügen) | ✓ | ✓ über die Werkzeugleiste |
 | Tastenvorschau, Vibration, Ton | ✓ | ✓ |
 | Designs | ✓ | hell, dunkel, Material You (Farben aus dem Hintergrundbild) |
 | Emoji-Tastatur | ✓ | ✓ mit Kategorien, Hauttönen, „Zuletzt verwendet“ und Suche in allen 18 Sprachen |
@@ -123,7 +124,7 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | Ordner | Inhalt |
 | --- | --- |
 | `Ime/` | `ZBoardImeService` (Herzstück), `EditorProfile` (Eigenschaften des Eingabefelds), `TextBoundaries` |
-| `Keyboard/` | Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
+| `Keyboard/` | `TextEditPanelView` (Textbearbeitung), Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `PersonalDictionary` (eigene Wörter und Kürzel), `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
@@ -291,10 +292,13 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
 - **Emoji:** Taste ☺ links neben dem Komma. Unten Kategorien, 🕘 zuletzt verwendet, 🔍 Suche. Bei der Suche schreibt
   die Tastatur in das Suchfeld der Leiste („Daumen“, „gut“, „lachen“); Treffer erscheinen daneben. Langer Druck auf
   Personen-Emoji zeigt die Hauttöne. Emoji, die die Schrift des Geräts nicht kennt, werden ausgeblendet.
-- **Werkzeugleiste:** 📋 Zwischenablage, 🎤 Spracheingabe, ✋ Einhandmodus (rechts → links → aus), ⚙ Einstellungen.
+- **Werkzeugleiste:** 📋 Zwischenablage, Textbearbeitung, 🎤 Spracheingabe, ✋ Einhandmodus (rechts → links → aus), ⚙ Einstellungen.
   Sie erscheint im leeren Feld und wenn es nichts vorzuschlagen gibt; sonst öffnet sie der Pfeil links in der
   Vorschlagsleiste, und der Pfeil dort oder das Weitertippen führt zurück zu den Vorschlägen. Eben kopierter Text
   erscheint dort 90 Sekunden lang als Vorschlag.
+- **Textbearbeitung:** Das Cursor-Symbol in der Werkzeugleiste ersetzt die Tasten durch Pfeiltasten (auch Zeilenanfang
+  und -ende). „Auswählen“ lässt die Pfeile Text markieren; daneben Alles auswählen, Kopieren, Ausschneiden und
+  Einfügen. Pfeile und Löschen wiederholen sich beim Halten, „ABC“ führt zurück zu den Tasten.
 - **Sonderzeichen:** langer Druck auf einen Buchstaben. Wie bei Gboard erscheinen die Zeichen im Raster über dem Finger,
   das häufigste (ö auf o, ä auf a, é auf e im Französischen …) ist vorausgewählt.
 - **Plugins:** Funktionen mit Internet als eigene Apps, z. B. **zBoard DeepL** zum Übersetzen

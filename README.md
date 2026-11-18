@@ -44,6 +44,7 @@ Finished versions: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Chinese with Pinyin | ✓ | ✓ simplified characters, scrolling candidate row, learns the characters you choose |
 | Vietnamese with Telex | ✓ | ✓ can be turned off |
 | Cursor control via space bar, deleting words by swiping | ✓ | ✓ |
+| Text editing (arrow keys, select, copy, cut, paste) | ✓ | ✓ from the toolbar |
 | Key preview, vibration, sound | ✓ | ✓ |
 | Themes | ✓ | light, dark, Material You (colours from the wallpaper) |
 | Emoji keyboard | ✓ | ✓ with categories, skin tones, "recently used" and search in all 18 languages |
@@ -123,7 +124,7 @@ prepared form in the app's cache after loading it for the first time (`cache/dic
 | Folder | Contents |
 | --- | --- |
 | `Ime/` | `ZBoardImeService` (the heart of it), `EditorProfile` (properties of the input field), `TextBoundaries` |
-| `Keyboard/` | layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
+| `Keyboard/` | `TextEditPanelView` (text editing), layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
 | `Emoji/` | `EmojiCatalog` (data, search, skin tones), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `TouchTrace` (finger positions), `UserHistory`, `EmailMemory`, `PersonalDictionary` (own words and shortcuts), `KeyProximity`, `TextCase` (upper and lower case per language), `PinyinEngine` and `PinyinLearned` (Chinese), `Telex` (Vietnamese), `CandidateStrip` (layout of the candidate row), `SuggestionBarView` |
@@ -291,10 +292,13 @@ used. zBoard has no internet permission (release build).
 - **Emoji:** the ☺ key left of the comma. Categories at the bottom, 🕘 recently used, 🔍 search. While searching, the
   keyboard types into the search field in the bar ("thumbs", "good", "laugh"); matches appear next to it. Long-pressing
   people emoji shows the skin tones. Emoji the device's font does not know are hidden.
-- **Toolbar:** 📋 clipboard, 🎤 voice typing, ✋ one-handed mode (right → left → off), ⚙ settings. It appears in an
+- **Toolbar:** 📋 clipboard, text editing, 🎤 voice typing, ✋ one-handed mode (right → left → off), ⚙ settings. It appears in an
   empty field and when there is nothing to suggest; otherwise the arrow at the left of the suggestion bar opens it,
   and the arrow there, or simply typing on, brings the suggestions back. Text you have just copied appears there as
   a suggestion for 90 seconds.
+- **Text editing:** the cursor icon in the toolbar replaces the keys with arrow keys (including start and end of
+  line). "Select" makes the arrows select text; next to them are Select all, Copy, Cut and Paste. Arrows and delete
+  repeat while held, "ABC" returns to the keys.
 - **Accented characters:** long-press a letter. As in Gboard, the characters appear in a grid above your finger,
   with the most frequent one (ö on o, ä on a, é on e in French …) preselected.
 - **Plugins:** online features as separate apps, e.g. **zBoard DeepL** for translating (`plugin-apps/DeepL`).
