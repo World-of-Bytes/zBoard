@@ -104,7 +104,7 @@ public sealed partial class ZBoardImeService : IHandwritingListener
             _pluginClient ??= new PluginClient(this);
             result = await _pluginClient.RecognizeInkAsync(plugin, strokes, panel.WriteWidth, panel.WriteHeight, _language, InkPreContext());
         }
-        catch (Exception e) when (e is OperationCanceledException or Java.Lang.Exception)
+        catch (Exception e) when (e is System.OperationCanceledException or Java.Lang.Exception)
         {
             result = new InkResult([], null, false);
         }
