@@ -163,6 +163,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _symbolsPage = _profile.IsNumeric ? NumpadPage : 0;
 
         ReloadRestoredData();
+        StartPersonal();
         StartPanels();
         RefreshSystemBarPadding();
         UpdatePopupSpace(); // Platz für Popups über der Tastatur (falls Android das Fenster neu aufgebaut hat)
@@ -582,7 +583,16 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             return;
         }
 
-        if (mayCorrect)
+        if (mayCorrect && _personal.Word(typed) is { } own)
+        {
+            // Eigenes Wort: nie korrigieren, nur die gespeicherte Schreibweise einsetzen ("zboard" → "zBoard")
+            if (own != typed)
+            {
+                final = own;
+                _lastCorrection = new Correction(typed, own, separator);
+            }
+        }
+        else if (mayCorrect && !_personal.IsShortcut(typed)) // ein Kürzel bleibt stehen, bis sein Text angetippt wird
         {
             var result = Engine?.Suggest(typed, context, touches: Touches());
             if (result?.AutoCorrection is { } corrected && corrected != typed)
@@ -621,6 +631,12 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         if (PickChinese(slot)) return;
+
+        if (slot.IsShortcut)
+        {
+            PickShortcut(slot);
+            return;
+        }
 
         MarkEdit();
 
@@ -844,6 +860,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             ShowPinyinCandidates();
             return;
         }
+
+        // Persönliches Wörterbuch: eigene Wörter und Kürzel, auch solange die Wortlisten noch laden
+        if (_composing.Length > 0 && !_glideActive && _profile.AllowSuggestions && ShowPersonalSuggestions(_composing.ToString())) return;
 
         var engine = Engine;
         if (engine == null || !_profile.AllowSuggestions)

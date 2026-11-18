@@ -39,6 +39,7 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Ganze Wortfolgen vorschlagen („freundlichen Grüßen“) | ✓ | ✓ aus Gelerntem |
 | Vorschläge für ein angetipptes Wort im Text | ✓ | ✓ Antippen ersetzt das ganze Wort |
 | E-Mail-Adressen vorschlagen | ✓ | ✓ gemerkte Adressen und bekannte Anbieter nach „@“ |
+| Persönliches Wörterbuch mit Kürzeln („mfg“ → „Mit freundlichen Grüßen“) | ✓ | ✓ eigene Wörter und Kürzel für alle Sprachen, in Sicherung und Synchronisation enthalten |
 | Wischeingabe (Glide Typing) | ✓ | ✓ |
 | Chinesisch mit Pinyin | ✓ | ✓ vereinfachte Schriftzeichen, durchgehende Vorschlagszeile, lernt die gewählten Zeichen |
 | Vietnamesisch mit Telex | ✓ | ✓ abschaltbar |
@@ -86,7 +87,7 @@ Die Oberfläche ist zweisprachig: Deutsch, wenn das System auf Deutsch steht, so
 ## Tests
 
 Die Logik ohne Android (Wörterbuch, Autokorrektur, Sprachmodell, Fingerpositionen, zusammengesetzte Wörter,
-Leerzeichen, Vorhersage, Wortfolgen, Lernen, E-Mail-Adressen, Wischeingabe, Emoji, Zwischenablage, Layouts,
+Leerzeichen, Vorhersage, Wortfolgen, Lernen, E-Mail-Adressen, persönliches Wörterbuch, Wischeingabe, Emoji, Zwischenablage, Layouts,
 Sonderzeichen-Popup, Sicherungen, alle 18 Sprachen, Pinyin, Telex) hat eigene Unit-Tests:
 
 ```bash
@@ -125,7 +126,7 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | `Keyboard/` | Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `PersonalDictionary` (eigene Wörter und Kürzel), `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (Sicherungsdatei: Schreiben, Lesen, Prüfen) |
 | `Assets/dict/` | Wortlisten und Sprachmodelle pro Sprache |
@@ -310,6 +311,11 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   (nur eine Beschriftung „E-Mail-Adresse“ darüber): In einzeiligen Formularfeldern schlägt zBoard deshalb gemerkte
   Adressen auch vor, sobald das Feld nur ein Wort von mindestens drei Buchstaben enthält, mit dem eine gemerkte Adresse
   beginnt, und merkt sich Adressen, wenn am Ende genau eine gültige Adresse im Feld steht.
+- **Persönliches Wörterbuch:** Unter Einstellungen → Wörterbuch → Persönliches Wörterbuch legst du eigene Wörter und
+  Kürzel an. Eigene Wörter (Namen, Fachbegriffe, „zBoard“) schlägt die Leiste beim Tippen vor; die Autokorrektur lässt
+  sie stehen und setzt die gespeicherte Schreibweise ein („zboard“ → „zBoard“). Tippst du ein Kürzel („mfg“), zeigt die
+  Leiste seinen Text („Mit freundlichen Grüßen“); wie bei Gboard setzt ihn erst das Antippen ein. Die Einträge gelten in
+  allen Sprachen und gehören zu den Einstellungen – Sicherung und Synchronisation nehmen sie mit.
 - **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
   gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
   werden nie übernommen.

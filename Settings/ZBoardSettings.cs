@@ -109,6 +109,16 @@ public sealed class ZBoardSettings
         set => PutBool("rememberEmails", value);
     }
 
+    /// <summary>
+    /// Persönliches Wörterbuch (eigene Wörter und Kürzel), Format siehe <c>Suggestions.PersonalDictionary</c>. Gehört zu
+    /// den Einstellungen und ist damit in Sicherung und Synchronisation enthalten.
+    /// </summary>
+    public string PersonalDictionary
+    {
+        get => _prefs.GetString("personalDictionary", string.Empty) ?? string.Empty;
+        set => PutString("personalDictionary", value);
+    }
+
     /// <summary>Vom Nutzer freigeschaltete Plugins (Paketnamen). Nur diese bekommen auf Wunsch Text zu sehen.</summary>
     public IReadOnlySet<string> EnabledPlugins
     {

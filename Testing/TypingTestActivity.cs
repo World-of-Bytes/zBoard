@@ -10,7 +10,7 @@ namespace ZBoard.Testing;
 /// <summary>
 /// Nur in Debug-Builds: ein einzelnes Eingabefeld, in das der Emulator-Test (tools/emulator_test.py) tippt.
 /// Mit dem Extra <c>search=true</c> verhält sich das Feld wie eine Suchleiste mit eigener Vorschlagsliste
-/// (NO_SUGGESTIONS + AUTO_COMPLETE, Enter = Suchen), wie z. B. in der Google-App.
+/// (NO_SUGGESTIONS + AUTO_COMPLETE, Enter = Suchen), wie z. B. in der Google-App. Weitere Extras stehen unten.
 /// </summary>
 [Activity(
     Name = "de.World_of_Bytes.zBoard.TypingTestActivity",
@@ -46,6 +46,20 @@ public sealed class TypingTestActivity : Activity
                 field.Hint = "PIN";
                 break;
         }
+        // Extra personal="kürzel=Text;=Wort": persönliches Wörterbuch für den Test setzen (leer = leeren)
+        if (Intent?.GetStringExtra("personal") is { } personal)
+        {
+            var dictionary = ZBoard.Suggestions.PersonalDictionary.Empty;
+            foreach (var item in personal.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = item.IndexOf('=');
+                var entry = ZBoard.Suggestions.PersonalDictionary.Normalize(eq < 0 ? item : item[(eq + 1)..], eq < 0 ? null : item[..eq]);
+                if (entry != null) dictionary = dictionary.With(entry);
+            }
+
+            new ZBoard.Settings.ZBoardSettings(this).PersonalDictionary = dictionary.Serialize();
+        }
+
         // Klartext fürs Log, weil Android Passwörter in der Oberfläche maskiert
         field.TextChanged += (_, _) => Android.Util.Log.Info("zBoardTest", "FIELD " + field.Text);
         SetContentView(field);
