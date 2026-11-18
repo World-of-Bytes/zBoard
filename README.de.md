@@ -14,7 +14,7 @@ Anders als Gboard arbeitet zBoard vollständig offline und ohne Internetberechti
 lernt, bleibt auf dem Gerät. Funktionen, die Internet brauchen (etwa Übersetzen mit DeepL), kommen als eigene
 Plugin-Apps dazu – nur wer sie installiert, gibt ihnen Internetzugriff. Geschrieben ist zBoard in C# mit .NET 10 for Android.
 
-Stand: **Version 0.13.0**, alle fünf Meilensteine umgesetzt – Testphase auf echten Geräten. Die 13 Sprachen, die mit
+Stand: **Version 1.0.0**, alle fünf Meilensteine umgesetzt – Testphase auf echten Geräten. Die 13 Sprachen, die mit
 0.13.0 dazugekommen sind, sind durch Unit-Tests geprüft, aber noch auf keinem echten Gerät ausprobiert.
 Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases).
 
