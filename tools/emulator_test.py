@@ -526,8 +526,9 @@ def main():
             f.write(full_log)
         if not all(ok for _, ok, _ in results):
             # Bei Fehlern die Zeilen, die meist die Ursache zeigen, gleich ins Protokoll des Laufs
-            wanted = r"ANR in|not responding|FATAL|AndroidRuntime|mono-rt|monodroid|DOTNET|zBoard\s*:|Unhandled|Exception"
-            noise = r"InputMethodEntryManager|GoogleInputMethodService|LatinCommon|SystemSubtypes|DictionarySuperpacks|ApkAssets|zBoardTest"
+            # (z. B. „ANR in …“: Der Emulator meldet gelegentlich eine System-App als nicht reagierend; dann kommt kein Tippen an)
+            wanted = r"ANR in|not responding|Input dispatching timed out|FATAL EXCEPTION|mono-rt|zBoard\s*:|Unhandled"
+            noise = r"zBoardTest"
             lines = [l for l in full_log.splitlines() if re.search(wanted, l) and not re.search(noise, l)]
             print("Log (Auszug, Fehlersuche):\n" + "\n".join(l[:300] for l in lines[-150:]))
         write_summary(out_dir, results, perf_values())
