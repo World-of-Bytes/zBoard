@@ -67,12 +67,13 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _suggestionBar.ToolbarPicked += OnToolbarPicked;
         _suggestionBar.SuggestionLongPressed += OnSuggestionLongPressed;
         _suggestionBar.EmojiPicked += InsertEmoji;
-        _suggestionBar.CandidatePicked += OnPinyinCandidatePicked;
+        _suggestionBar.CandidatePicked += OnCandidatePicked;
 
         _keyboardView = new KeyboardView(this) { Listener = this };
         _emojiPanel = new EmojiPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
         _clipboardPanel = new ClipboardPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
         _textEditPanel = new TextEditPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
+        _handwritingPanel = new HandwritingPanelView(this) { Listener = this, Visibility = ViewStates.Gone };
 
         _emojiCatalogLanguage = null; // neues Panel braucht den Katalog erneut
 
@@ -85,6 +86,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _panelHost.AddView(_emojiPanel);
         _panelHost.AddView(_clipboardPanel);
         _panelHost.AddView(_textEditPanel);
+        _panelHost.AddView(_handwritingPanel);
         ApplyOneHanded();
 
         root.AddView(_suggestionBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, (int)(48 * dp)));
@@ -132,6 +134,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _emojiPanel?.Theme = theme;
         _clipboardPanel?.ApplyTheme(theme);
         _textEditPanel?.Theme = theme;
+        _handwritingPanel?.Theme = theme;
         _floatingHandle?.Color = theme.HintText;
         ApplyNavigationBarStyle();
     }
@@ -142,6 +145,8 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _emojiPanel?.Visibility = ViewStates.Gone;
         _clipboardPanel?.Visibility = ViewStates.Gone;
         _textEditPanel?.Visibility = ViewStates.Gone;
+        if (HandwritingOpen) ResetInk();
+        _handwritingPanel?.Visibility = ViewStates.Gone;
     }
 
     /// <summary>Panels so hoch wie die Tastatur, damit nichts springt.</summary>
@@ -210,6 +215,9 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
                 break;
             case "textedit":
                 ShowTextEditPanel();
+                break;
+            case "handwriting":
+                ShowHandwritingPanel();
                 break;
             case "voice":
                 StartVoice();
@@ -312,6 +320,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _keyboardView.Visibility = ViewStates.Gone;
         _clipboardPanel?.Visibility = ViewStates.Gone;
         _textEditPanel?.Visibility = ViewStates.Gone;
+        _handwritingPanel?.Visibility = ViewStates.Gone;
         _emojiPanel.Visibility = ViewStates.Visible;
         ShowToolbar();
     }
@@ -456,6 +465,7 @@ public sealed partial class ZBoardImeService : IEmojiPanelListener, IClipboardPa
         _keyboardView.Visibility = ViewStates.Gone;
         _emojiPanel?.Visibility = ViewStates.Gone;
         _textEditPanel?.Visibility = ViewStates.Gone;
+        _handwritingPanel?.Visibility = ViewStates.Gone;
         _clipboardPanel.Visibility = ViewStates.Visible;
     }
 
