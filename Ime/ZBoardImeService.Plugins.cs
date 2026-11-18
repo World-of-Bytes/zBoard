@@ -20,6 +20,7 @@ public sealed partial class ZBoardImeService
         new("clipboard", Resource.Drawable.ms_content_paste),
         new("textedit", Resource.Drawable.ms_text_select_move_forward_character),
         new("onehanded", Resource.Drawable.ms_back_hand),
+        new("floating", Resource.Drawable.ms_open_with),
         new("plugins", Resource.Drawable.ms_extension),
         new("settings", Resource.Drawable.ms_settings),
         new("voice", Resource.Drawable.ms_mic, Trailing: true),

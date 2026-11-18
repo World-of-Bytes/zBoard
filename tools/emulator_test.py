@@ -535,6 +535,44 @@ def main():
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es theme plain --es borders true")
         time.sleep(2)
 
+        # Schwebende Tastatur: über die Werkzeugleiste ein, schmaler, am Griff verschieben, Tippen geht weiter
+        before = kb.wait_for("de")
+        width_before = before["p"][0] - before["q"][0]
+        type_text(keys, "frei ")
+        for target in ("toolbar-open", "floating"):
+            pos = bar_targets().get(target)
+            if pos:
+                tap(pos)
+                time.sleep(1)
+        time.sleep(1)
+        floating = kb.wait_for("de", timeout=20)
+        width_after = floating["p"][0] - floating["q"][0]
+        check("Schwebende Tastatur: schmaler", width_after < width_before * 0.9, f"(q–p {width_before} → {width_after} px)")
+        handles = re.findall(r"FLOATING handle@(\d+),(\d+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
+        if handles:
+            hx, hy = map(int, handles[-1])
+            shell(f"input swipe {hx} {hy} {hx} {hy - 500} 600")
+            time.sleep(1.5)
+            moved = kb.wait_for("de", timeout=20)
+            dy = floating["q"][1] - moved["q"][1]
+            check("Schwebende Tastatur: am Griff verschieben", dy > 300, f"(um {dy} px nach oben)")
+            screenshot(out_dir, "5a4-schwebend")
+            for ch in "gut":
+                tap(moved[ch])
+            tap(moved["Space"])
+            time.sleep(0.8)
+            text = field_text()
+            check("Schwebende Tastatur: Tippen", text.endswith("gut "), f"→ „{text}“")
+        else:
+            check("Schwebende Tastatur: Griff", False, "(keine Lage im Log)")
+        for target in ("toolbar-open", "floating"):
+            pos = bar_targets().get(target)
+            if pos:
+                tap(pos)
+                time.sleep(1)
+        docked = kb.wait_for("de", timeout=20)
+        check("Schwebende Tastatur: wieder unten", docked["p"][0] - docked["q"][0] >= width_before * 0.95)
+
         # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")
         time.sleep(3)
@@ -566,6 +604,26 @@ def main():
         plain = plain[-1].strip() if plain else ""
         check("PIN-Feld: Ziffernfeld", "a" not in pad and plain == "12", f"→ „{plain}“")
         screenshot(out_dir, "5c-pin")
+
+        # Geteilte Tastatur: im Querformat (Emulator 914 dp breit) mit Lücke zwischen den Hälften
+        try:
+            shell("settings put system accelerometer_rotation 0")
+            shell("settings put system user_rotation 1")
+            shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY}")
+            time.sleep(4)
+            KEYBOARD.layouts.clear()
+            adb("logcat", "-c", check=False)
+            shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY}")
+            split = KEYBOARD.wait_for("de", timeout=40)
+            gap = split["z"][0] - split["t"][0]
+            step = split["t"][0] - split["r"][0]
+            screenshot(out_dir, "5d-geteilt")
+            check("Geteilte Tastatur im Querformat", gap > 3 * step, f"(t→z {gap} px, eine Taste {step} px)")
+        except Exception as e:  # noqa: BLE001
+            check("Geteilte Tastatur im Querformat", False, str(e))
+        finally:
+            shell("settings put system user_rotation 0", check=False)
+            time.sleep(2)
 
         # Einstellungen öffnen (Startseite und eine Unterseite)
         shell("input keyevent KEYCODE_BACK", check=False)

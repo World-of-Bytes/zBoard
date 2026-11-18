@@ -16,6 +16,18 @@ public enum ThemeMode
     Image = 4,
 }
 
+/// <summary>Geteilte Tastatur für breite Bildschirme (Tablets, aufgeklappte Foldables).</summary>
+public enum SplitMode
+{
+    Off = 0,
+
+    /// <summary>Im Querformat, wenn der Bildschirm mindestens 600 dp breit ist.</summary>
+    Auto = 1,
+
+    /// <summary>Immer, wenn der Bildschirm mindestens 600 dp breit ist.</summary>
+    On = 2,
+}
+
 public enum OneHandedMode
 {
     Off = 0,
@@ -181,6 +193,32 @@ public sealed class ZBoardSettings
     {
         get => Math.Clamp(_prefs.GetInt("heightPercent", 100), 80, 130);
         set => PutInt("heightPercent", Math.Clamp(value, 80, 130));
+    }
+
+    public SplitMode Split
+    {
+        get => (SplitMode)_prefs.GetInt("splitLayout", (int)SplitMode.Auto);
+        set => PutInt("splitLayout", (int)value);
+    }
+
+    /// <summary>Schwebende Tastatur (frei verschiebbar, kleiner). Gerätebezogen, wie die Lage.</summary>
+    public bool Floating
+    {
+        get => _prefs.GetBoolean("floating", false);
+        set => PutBool("floating", value);
+    }
+
+    /// <summary>Lage der schwebenden Tastatur: linke Kante und Unterkante als Anteil des freien Platzes (0–1).</summary>
+    public float FloatingX
+    {
+        get => Math.Clamp(_prefs.GetFloat("floatingX", 0.5f), 0f, 1f);
+        set => Apply("floatingX", e => e.PutFloat("floatingX", Math.Clamp(value, 0f, 1f)));
+    }
+
+    public float FloatingY
+    {
+        get => Math.Clamp(_prefs.GetFloat("floatingY", 0.85f), 0f, 1f);
+        set => Apply("floatingY", e => e.PutFloat("floatingY", Math.Clamp(value, 0f, 1f)));
     }
 
     public OneHandedMode OneHanded
