@@ -57,6 +57,7 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Schwebende Tastatur | ✓ | ✓ über die Werkzeugleiste, am Griff verschiebbar |
 | Geteilte Tastatur (Tablets, Foldables) | ✓ | ✓ ab 600 dp Bildschirmbreite, standardmäßig im Querformat |
 | Übersetzen | ✓ | ✓ über die Plugin-App „zBoard DeepL“ (eigener DeepL-API-Schlüssel) |
+| Handschrift | ✓ | ✓ über die Plugin-App „zBoard Pen“ (Google ML Kit, Erkennung auf dem Gerät) |
 | Synchronisation zwischen Geräten | gelernte Wörter über das Google-Konto | ✓ über die Plugin-App „zBoard Sync“: Einstellungen, gelernte Wörter, E-Mail-Adressen via Google Drive, OneDrive, Dropbox oder WebDAV (HiDrive, Nextcloud …) |
 | Google-Dienste | ✓ | nicht geplant |
 
@@ -126,7 +127,7 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | Ordner | Inhalt |
 | --- | --- |
 | `Ime/` | `ZBoardImeService` (Herzstück), `EditorProfile` (Eigenschaften des Eingabefelds), `TextBoundaries` |
-| `Keyboard/` | `TextEditPanelView` (Textbearbeitung), Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
+| `Keyboard/` | `HandwritingPanelView` (Schreibfläche), `TextEditPanelView` (Textbearbeitung), Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `PersonalDictionary` (eigene Wörter und Kürzel), `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
@@ -136,6 +137,7 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
 | `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
 | `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
+| `plugin-apps/Pen/` | Plugin-App „zBoard Pen“ (Handschrift mit Google ML Kit) |
 | `Sync/` | `SyncManager` (Abgleich über ein Plugin), `SyncFileProvider` (Datei-Übergabe an das Plugin) |
 | `plugin-apps/Sync/` | Plugin-App „zBoard Sync“ (Google Drive, OneDrive, Dropbox, WebDAV); Einrichtung der Anbieter in der README dort |
 | `tools/` | `build_dictionaries.py` (Wortlisten), `NgramBuilder` (Sprachmodelle), `SuggestionEval` (Vorschlagsmessung), `LoadBench` (Ladezeiten, Zeit je Tastendruck), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
@@ -311,6 +313,10 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   Einfügen. Pfeile und Löschen wiederholen sich beim Halten, „ABC“ führt zurück zu den Tasten.
 - **Sonderzeichen:** langer Druck auf einen Buchstaben. Wie bei Gboard erscheinen die Zeichen im Raster über dem Finger,
   das häufigste (ö auf o, ä auf a, é auf e im Französischen …) ist vorausgewählt.
+- **Handschrift:** Mit der Plugin-App **zBoard Pen** erscheint in der Werkzeugleiste ein Stift. Er öffnet eine
+  Schreibfläche; das erkannte Wort steht unterstrichen im Feld, Alternativen in der Leiste. Nach einer kurzen Pause
+  beginnt das nächste Wort, Löschen verwirft das gerade geschriebene, „ABC“ führt zurück zur Tastatur. Erkannt wird
+  mit Google ML Kit auf dem Gerät; Internet braucht zBoard Pen nur für die Schriftmodelle (je Sprache etwa 20 MB).
 - **Plugins:** Funktionen mit Internet als eigene Apps, z. B. **zBoard DeepL** zum Übersetzen
   (`plugin-apps/DeepL`). zBoard selbst bleibt ohne Internet; einschalten unter Einstellungen → Plugins, benutzen über
   das Puzzle-Symbol in der Leiste. Schnittstelle für eigene Plugins: [docs/PLUGINS.de.md](docs/PLUGINS.de.md).

@@ -86,6 +86,12 @@ public sealed class TypingTestActivity : Activity
 
         if (Intent?.GetStringExtra("borders") is { } borders) settings.KeyBorders = borders != "false";
 
+        // Extra plugins=paket1,paket2: diese Plugins freischalten (ohne den Dialog der Einstellungen)
+        if (Intent?.GetStringExtra("plugins") is { } plugins)
+        {
+            settings.EnabledPlugins = plugins.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+        }
+
         // Klartext fürs Log, weil Android Passwörter in der Oberfläche maskiert
         field.TextChanged += (_, _) => Android.Util.Log.Info("zBoardTest", "FIELD " + field.Text);
         SetContentView(field);

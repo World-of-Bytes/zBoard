@@ -847,6 +847,12 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     void UpdateSuggestions()
     {
         if (_suggestionBar == null || _emojiSearchActive || _voiceActive) return;
+        if (HandwritingOpen)
+        {
+            ShowHandwritingBar();
+            return;
+        }
+
         if (_toolbarOpen || TextEditOpen) // Textbearbeitung: Die Leiste bleibt ruhig, während der Cursor wandert
         {
             ShowToolbar();

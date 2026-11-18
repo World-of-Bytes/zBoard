@@ -57,6 +57,7 @@ Finished versions: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Floating keyboard | ✓ | ✓ from the toolbar, movable by its handle |
 | Split keyboard (tablets, foldables) | ✓ | ✓ on screens from 600 dp wide, in landscape by default |
 | Translation | ✓ | ✓ via the plugin app "zBoard DeepL" (your own DeepL API key) |
+| Handwriting | ✓ | ✓ via the plugin app "zBoard Pen" (Google ML Kit, recognition on the device) |
 | Sync between devices | learned words via the Google account | ✓ via the plugin app "zBoard Sync": settings, learned words, email addresses via Google Drive, OneDrive, Dropbox or WebDAV (HiDrive, Nextcloud …) |
 | Google services | ✓ | not planned |
 
@@ -126,7 +127,7 @@ prepared form in the app's cache after loading it for the first time (`cache/dic
 | Folder | Contents |
 | --- | --- |
 | `Ime/` | `ZBoardImeService` (the heart of it), `EditorProfile` (properties of the input field), `TextBoundaries` |
-| `Keyboard/` | `TextEditPanelView` (text editing), layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
+| `Keyboard/` | `HandwritingPanelView` (writing area), `TextEditPanelView` (text editing), layout model, all layouts, `KeyboardView` (drawing and touch), `PopupGrid` (popup layout), colours |
 | `Emoji/` | `EmojiCatalog` (data, search, skin tones), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
 | `Suggestions/` | `WordDictionary` (sorted array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (language model), `TouchTrace` (finger positions), `UserHistory`, `EmailMemory`, `PersonalDictionary` (own words and shortcuts), `KeyProximity`, `TextCase` (upper and lower case per language), `PinyinEngine` and `PinyinLearned` (Chinese), `Telex` (Vietnamese), `CandidateStrip` (layout of the candidate row), `SuggestionBarView` |
@@ -136,6 +137,7 @@ prepared form in the app's cache after loading it for the first time (`cache/dic
 | `Assets/emoji/` | emoji by category, names and search terms per language |
 | `Plugins/` | `PluginContract` (interface), `PluginRegistry` (installed plugins), `PluginClient` (messenger) |
 | `plugin-apps/DeepL/` | plugin app "zBoard DeepL" (a separate app with internet permission) |
+| `plugin-apps/Pen/` | plugin app "zBoard Pen" (handwriting with Google ML Kit) |
 | `Sync/` | `SyncManager` (sync through a plugin), `SyncFileProvider` (hands the file to the plugin) |
 | `plugin-apps/Sync/` | plugin app "zBoard Sync" (Google Drive, OneDrive, Dropbox, WebDAV); provider setup in its README |
 | `tools/` | `build_dictionaries.py` (word lists), `NgramBuilder` (language models), `SuggestionEval` (suggestion measurement), `LoadBench` (loading times, time per keystroke), `build_emoji.py` (emoji data), `emulator_test.py` |
@@ -310,6 +312,10 @@ used. zBoard has no internet permission (release build).
   repeat while held, "ABC" returns to the keys.
 - **Accented characters:** long-press a letter. As in Gboard, the characters appear in a grid above your finger,
   with the most frequent one (ö on o, ä on a, é on e in French …) preselected.
+- **Handwriting:** with the plugin app **zBoard Pen** a pen appears in the toolbar. It opens a writing area; the
+  recognized word appears underlined in the field, alternatives in the bar. After a short pause the next word begins,
+  delete discards the word you just wrote, "ABC" returns to the keyboard. Recognition runs on the device with Google
+  ML Kit; zBoard Pen only needs the internet for the handwriting models (about 20 MB per language).
 - **Plugins:** online features as separate apps, e.g. **zBoard DeepL** for translating (`plugin-apps/DeepL`).
   zBoard itself stays offline; turn plugins on under Settings → Plugins and use them via the puzzle icon in the bar.
   Interface for your own plugins: [docs/PLUGINS.md](docs/PLUGINS.md).

@@ -954,7 +954,14 @@ public sealed class SettingsActivity : Activity
                 if (_settings.EnabledPlugins.Contains(plugin.Package)) return;
                 new AlertDialog.Builder(this)
                     .SetTitle(L.T($"{plugin.Label} einschalten?", $"Turn on {plugin.Label}?"))!
-                    .SetMessage(plugin.CanSync
+                    .SetMessage(plugin.CanInk
+                        ? L.T("Das Plugin bekommt, was du auf der Schreibfläche schreibst (die Striche), und die letzten "
+                              + "20 Zeichen vor dem Cursor, damit es besser erkennt. Internet braucht zBoard Pen nur, um "
+                              + "die Schriftmodelle zu laden; erkannt wird auf dem Gerät.",
+                            "The plugin receives what you write on the writing area (the strokes) and the last 20 "
+                            + "characters before the cursor to recognize better. zBoard Pen only needs the internet to "
+                            + "download handwriting models; recognition runs on the device.")
+                        : plugin.CanSync
                         ? L.T("Das Plugin bekommt deine Einstellungen, gelernten Wörter und E-Mail-Adressen, sobald du unter "
                               + "„Sichern & wiederherstellen“ die Synchronisation einschaltest, und speichert sie in deinem Cloud-Speicher.",
                             "The plugin receives your settings, learned words and email addresses once you turn on sync under "

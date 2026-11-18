@@ -31,6 +31,7 @@ public sealed partial class ZBoardImeService : ITextEditPanelListener
         _keyboardView.Visibility = ViewStates.Gone;
         _emojiPanel?.Visibility = ViewStates.Gone;
         _clipboardPanel?.Visibility = ViewStates.Gone;
+        _handwritingPanel?.Visibility = ViewStates.Gone;
         _textEditPanel.Visibility = ViewStates.Visible;
         _toolbarOpen = false;
         ShowToolbar();

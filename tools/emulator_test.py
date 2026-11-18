@@ -2,7 +2,7 @@
 """
 Emulator-Test für zBoard (läuft in GitHub Actions, geht aber auch lokal mit laufendem Emulator).
 
-    python3 tools/emulator_test.py <pfad-zur-debug.apk> <ausgabeordner>
+    python3 tools/emulator_test.py <pfad-zur-debug.apk> <ausgabeordner> [<pfad-zur-pen.apk>]
 
 Installiert die Debug-APK, macht zBoard zur aktiven Tastatur, öffnet das Testfeld (TypingTestActivity) und
 tippt echte Fingertipps und eine Wischgeste. Geprüft wird der Text im Eingabefeld. Die Tastenpositionen schreibt
@@ -278,6 +278,7 @@ def crashes():
 
 def main():
     apk, out_dir = sys.argv[1], sys.argv[2]
+    pen_apk = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else None  # Plugin zBoard Pen (optional)
     os.makedirs(out_dir, exist_ok=True)
     results = []
 
@@ -572,6 +573,53 @@ def main():
                 time.sleep(1)
         docked = kb.wait_for("de", timeout=20)
         check("Schwebende Tastatur: wieder unten", docked["p"][0] - docked["q"][0] >= width_before * 0.95)
+
+        # Handschrift mit zBoard Pen: Plugin installieren und freischalten, über den Stift in der Werkzeugleiste
+        # schreiben. Beim ersten Mal lädt das Plugin das Schriftmodell (rund 20 MB), zBoard fragt von selbst wieder.
+        if pen_apk:
+            try:
+                print(adb("install", "-r", pen_apk, timeout=300).strip())
+                shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es plugins de.World_of_Bytes.zBoard.Pen")
+                time.sleep(3)
+                kb.wait_for("de")
+                for target in ("toolbar-open", "handwriting"):
+                    pos = bar_targets().get(target)
+                    if pos:
+                        tap(pos)
+                        time.sleep(1)
+                areas = re.findall(r"PEN area@(\d+),(\d+),(\d+),(\d+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False))
+                check("Handschrift: Schreibfläche öffnet sich", bool(areas))
+                if areas:
+                    x1, y1, x2, y2 = map(int, areas[-1])
+                    cx, cy, r = (x1 + x2) // 2, (y1 + y2) // 2, (y2 - y1) // 4
+                    import math
+                    # ein „o“: Kreis gegen den Uhrzeigersinn, oben beginnend
+                    points = [(int(cx + r * math.sin(-a / 24 * 2 * math.pi)), int(cy - r * math.cos(a / 24 * 2 * math.pi))) for a in range(25)]
+                    commands = [f"input motionevent DOWN {points[0][0]} {points[0][1]}"]
+                    commands += [f"input motionevent MOVE {x} {y}" for x, y in points[1:]]
+                    commands.append(f"input motionevent UP {points[-1][0]} {points[-1][1]}")
+                    adb("logcat", "-c", check=False)
+                    shell("; ".join(commands))
+                    candidates = []
+                    end = time.time() + 180
+                    while time.time() < end and not candidates:
+                        time.sleep(3)
+                        found = re.findall(r"CANDIDATES (.*)$", adb("logcat", "-d", "-s", "zBoardTest:I", check=False), re.M)
+                        candidates = [c for c in found[-1].split("|") if c] if found else []
+                    screenshot(out_dir, "5e-handschrift")
+                    check("Handschrift: zBoard Pen erkennt ein „o“", any(c.lower() in ("o", "0", "ο", "о") for c in candidates),
+                          f"→ {candidates[:6]}")
+                    pen = {k: tuple(map(int, v.split(","))) for k, v in re.findall(r"(\w+)@(\d+,\d+)", (re.findall(r"PEN (.*)$", adb("logcat", "-d", "-s", "zBoardTest:I", check=False), re.M) or [""])[-1])}
+                    if "Close" in pen:
+                        tap(pen["Close"])
+                        time.sleep(1)
+                    text = field_text()
+                    check("Handschrift: Wort steht im Feld", candidates and text.strip() != "" and text != "Testfeld", f"→ „{text}“")
+            except Exception as e:  # noqa: BLE001
+                check("Handschrift mit zBoard Pen", False, str(e))
+            finally:
+                shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es plugins ,")
+                time.sleep(2)
 
         # Passwortfeld: Buchstaben und Ziffern müssen ankommen (Android zeigt sie maskiert)
         shell(f"am start -W --activity-clear-task -n {TEST_ACTIVITY} --es password text")
