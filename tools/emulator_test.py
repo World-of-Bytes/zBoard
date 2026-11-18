@@ -486,6 +486,21 @@ def main():
 
         found = crashes()
         check("Keine Abstürze", not found, "; ".join(found[:3]))
+
+        # Zeitmessung: Tastatur noch dreimal ganz neu laden (Prozess beenden, Testfeld öffnen). Nur Messwerte,
+        # kein Prüfergebnis: Die Zeiten im Emulator schwanken stark.
+        try:
+            for _ in range(3):
+                before = len(perf_values().get("engines-ready", []))
+                shell(f"am force-stop {PACKAGE}")
+                time.sleep(2)
+                shell(f"am start -W -S -n {TEST_ACTIVITY}")
+                end = time.time() + 90
+                while time.time() < end and len(perf_values().get("engines-ready", [])) <= before:
+                    time.sleep(1)
+                time.sleep(3)
+        except Exception as e:  # noqa: BLE001
+            print(f"Zeitmessung abgebrochen: {e}")
     except Exception as e:  # noqa: BLE001 – jeder Fehler ist ein Testfehler
         check("Testablauf", False, str(e))
         try:
@@ -503,15 +518,32 @@ def main():
                         print(f"SCREENSHOT {name} {i // 3000} {data[i:i + 3000]}")
         with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as f:
             f.write(adb("logcat", "-d", check=False))
-        write_summary(out_dir, results)
+        write_summary(out_dir, results, perf_values())
 
     sys.exit(0 if results and all(ok for _, ok, _ in results) else 1)
 
 
-def write_summary(out_dir, results):
+def perf_values():
+    """Messwerte der Testversion aus dem Log: Zeilen „PERF name millisekunden“, je Name in zeitlicher Reihenfolge."""
+    values = {}
+    for name, value in re.findall(r"PERF (\S+) ([0-9.]+)", adb("logcat", "-d", "-s", "zBoardTest:I", check=False)):
+        values.setdefault(name, []).append(float(value))
+    return values
+
+
+def write_summary(out_dir, results, perf=None):
     lines = ["## zBoard im Emulator", "", "| Prüfung | Ergebnis | Detail |", "| --- | --- | --- |"]
     for name, ok, detail in results:
         lines.append(f"| {name} | {'✅' if ok else '❌'} | {detail.replace('|', '/')} |")
+    if perf:
+        lines += ["", "### Zeiten (ms)", "", "| Messwert | Anzahl | Median | kleinster | größter | erste Werte |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for name in sorted(perf):
+            v = perf[name]
+            ordered = sorted(v)
+            first = " · ".join(f"{x:.0f}" for x in v[:6])
+            lines.append(f"| {name} | {len(v)} | {ordered[len(v) // 2]:.0f} | {ordered[0]:.0f} | {ordered[-1]:.0f} | {first} |")
+        print("\n".join(lines[-len(perf) - 4:]))
     lines += ["", "Screenshots und Log: Artefakt **emulator-test**."]
     summary = "\n".join(lines) + "\n"
     with open(os.path.join(out_dir, "zusammenfassung.md"), "w", encoding="utf-8") as f:

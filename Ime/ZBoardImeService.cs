@@ -12,6 +12,7 @@ using Android.Widget;
 using ZBoard.Keyboard;
 using ZBoard.Settings;
 using ZBoard.Suggestions;
+using ZBoard.Testing;
 // Gleichnamige Typen in Android.InputMethodServices / Android.Content.Res eindeutig machen
 using KeyboardView = ZBoard.Keyboard.KeyboardView;
 using Keycode = Android.Views.Keycode;
@@ -91,6 +92,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         _audio = GetSystemService(AudioService) as Android.Media.AudioManager;
         InitClipboard();
+        Perf.Log("process-to-service", Perf.SinceProcessStart);
     }
 
     static string LearningFile(Context context, string language) =>
@@ -124,11 +126,18 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         SavePinyinLearning();
     }
 
-    public override View? OnCreateInputView() => BuildInputView();
+    public override View? OnCreateInputView()
+    {
+        long started = Perf.Now;
+        var view = BuildInputView();
+        Perf.Log("create-input-view", Perf.Since(started));
+        return view;
+    }
 
     public override void OnStartInputView(EditorInfo? info, bool restarting)
     {
         base.OnStartInputView(info, restarting);
+        long started = Perf.Now;
 
         _profile = EditorProfile.From(info);
         _composing.Clear();
@@ -150,13 +159,22 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         StartPanels();
         RefreshSystemBarPadding();
         UpdatePopupSpace(); // Platz für Popups über der Tastatur (falls Android das Fenster neu aufgebaut hat)
+        Perf.Log("start-panels-window", Perf.Since(started));
+        long step = Perf.Now;
         SetLanguage(_settings.CurrentLanguage);
+        Perf.Log("start-language", Perf.Since(step));
+        step = Perf.Now;
         ApplyTheme();
+        Perf.Log("start-theme", Perf.Since(step));
+        step = Perf.Now;
         _keyboardView?.EnterLabel = _profile.EnterLabel;
         _keyboardView?.GlideEnabled = _settings.GlideTyping && _profile.AllowSuggestions;
         _keyboardView?.ShowKeyPreview = _settings.KeyPreview;
         StartEmailInput();
+        Perf.Log("start-email", Perf.Since(step));
+        step = Perf.Now;
         StartPlugins();
+        Perf.Log("start-plugins", Perf.Since(step));
         if (_suggestionBar != null)
         {
             _suggestionBar.Visibility = ViewStates.Visible;
@@ -166,6 +184,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         UpdateAutoShift();
         Sync.SyncManager.SyncIfDue(this); // holt Neues von anderen Geräten (höchstens alle 15 Minuten)
+        Perf.Log("start-input-view", Perf.Since(started));
     }
 
     public override void OnFinishInputView(bool finishingInput)
@@ -841,7 +860,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var typed = _composing.ToString();
+        long suggestStarted = Perf.Now;
         var result = engine.Suggest(typed, SentenceContext(), touches: Touches());
+        Perf.Log("suggest", Perf.Since(suggestStarted));
         _currentSuggestions = result;
         bool autocorrectActive = _settings.AutoCorrect && _profile.AllowAutocorrect;
 
@@ -948,10 +969,22 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _settings.CurrentLanguage = language;
         EnsurePinyin();
         var languages = InputLanguages();
+        long started = Perf.Now;
         var tasks = languages.Select(l => Engines.GetOrAdd(l, lang => Task.Run(() => LoadEngine(lang)))).ToArray();
+        bool loading = tasks.Any(t => !t.IsCompleted);
         _engineTask = CombineEngines(languages, tasks);
         _engineTask.ContinueWith(
-            _ => new Handler(Looper.MainLooper!).Post(UpdateSuggestions),
+            _ =>
+            {
+                if (loading)
+                {
+                    Perf.Log("engines-ready", Perf.Since(started));
+                    Perf.Log("engines-ready-since-process-start", Perf.SinceProcessStart);
+                    Perf.Log("managed-heap-mb", GC.GetTotalMemory(false) / 1048576.0);
+                }
+
+                new Handler(Looper.MainLooper!).Post(UpdateSuggestions);
+            },
             TaskContinuationOptions.OnlyOnRanToCompletion);
         ApplyLayout();
     }
@@ -985,6 +1018,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     SuggestionEngine LoadEngine(string language)
     {
+        long started = Perf.Now;
         WordDictionary dictionary;
         using (var stream = Assets!.Open($"dict/{language}.txt"))
         {
@@ -992,6 +1026,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal, language);
         }
 
+        Perf.Log($"load-{language}-dictionary", Perf.Since(started));
+        long modelStarted = Perf.Now;
         var model = NgramModel.Empty;
         try
         {
@@ -1003,6 +1039,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             // Sprache ohne Sprachmodell: Vorhersage nur aus Gelerntem
         }
 
+        Perf.Log($"load-{language}-model", Perf.Since(modelStarted));
         var history = new UserHistory();
         var learningFile = LearningFile(this, language);
         if (File.Exists(learningFile))
@@ -1012,6 +1049,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var proximity = KeyProximity.FromLayout(Layouts.Alphabet(language, showLanguageKey: false));
+        Perf.Log($"load-{language}", Perf.Since(started));
         return new SuggestionEngine(dictionary, proximity, model, history);
     }
 
