@@ -1092,6 +1092,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
         var proximity = KeyProximity.FromLayout(Layouts.Alphabet(language, showLanguageKey: false));
         Perf.Log($"load-{language}", Perf.Since(started));
+        Perf.Log($"ready-{language}-since-process-start", Perf.SinceProcessStart);
         Task.Run(() => WarmUp(language, new SuggestionEngine(dictionary, proximity, model))); // hält das Laden nicht auf
         return new SuggestionEngine(dictionary, proximity, model, history);
     }

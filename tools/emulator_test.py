@@ -491,17 +491,18 @@ def main():
         # kein Prüfergebnis: Die Zeiten im Emulator schwanken stark.
         try:
             for _ in range(3):
-                before = len(perf_values().get("engines-ready", []))
+                loaded = lambda: len(perf_values().get("ready-de-since-process-start", []))  # noqa: E731
+                before = loaded()
                 shell(f"am force-stop {PACKAGE}")
                 time.sleep(2)
                 shell(f"ime enable {IME}", check=False)  # Android wählt eine beendete Tastatur ab
                 shell(f"ime set {IME}", check=False)
                 shell(f"am start -W -n {TEST_ACTIVITY}")  # ohne -S: Das würde die Tastatur (dasselbe Paket) erneut beenden
                 end = time.time() + 60
-                while time.time() < end and len(perf_values().get("engines-ready", [])) <= before:
+                while time.time() < end and loaded() <= before:
                     time.sleep(1)
                 time.sleep(3)
-                print("Neu geladen:", len(perf_values().get("engines-ready", [])) > before,
+                print("Neu geladen:", loaded() > before,
                       "– Tastatur:", shell("settings get secure default_input_method", check=False).strip())
         except Exception as e:  # noqa: BLE001
             print(f"Zeitmessung abgebrochen: {e}")
