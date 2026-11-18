@@ -326,14 +326,19 @@ public sealed class SuggestionBarView : View
             _targets.Add((new RectF(0, 0, x, Height), ToolbarCloseId, string.Empty, Resource.Drawable.ms_arrow_back));
         }
 
+        var leading = ToolbarItems.Where(t => !t.Trailing).ToList();
         if (_clipChip != null)
         {
-            float chipWidth = Width * 0.45f;
-            _targets.Add((new RectF(x, 0, x + chipWidth, Height), ClipChipId, Shorten(_clipChip), Resource.Drawable.ms_content_paste));
-            x += chipWidth;
+            // Der kopierte Text weicht den Werkzeugen, wenn die Leiste schmal ist (schwebende Tastatur, viele Werkzeuge):
+            // Jedes Symbol behält mindestens 44 dp, der Vorschlag mindestens 96 dp – sonst entfällt er.
+            float chipWidth = Math.Min(Width * 0.45f, right - x - leading.Count * 44 * _dp);
+            if (chipWidth >= 96 * _dp)
+            {
+                _targets.Add((new RectF(x, 0, x + chipWidth, Height), ClipChipId, Shorten(_clipChip), Resource.Drawable.ms_content_paste));
+                x += chipWidth;
+            }
         }
 
-        var leading = ToolbarItems.Where(t => !t.Trailing).ToList();
         if (leading.Count == 0) return;
         float w = Math.Min(slot, (right - x) / leading.Count);
         foreach (var item in leading)

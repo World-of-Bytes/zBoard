@@ -54,6 +54,8 @@ Finished versions: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Voice typing | ✓ | ✓ via the system's speech recognition, offline only by default |
 | Toolbar (clipboard, microphone, settings) | ✓ | ✓ via the arrow at the left of the suggestion bar |
 | One-handed mode, height, number row | ✓ | ✓ |
+| Floating keyboard | ✓ | ✓ from the toolbar, movable by its handle |
+| Split keyboard (tablets, foldables) | ✓ | ✓ on screens from 600 dp wide, in landscape by default |
 | Translation | ✓ | ✓ via the plugin app "zBoard DeepL" (your own DeepL API key) |
 | Sync between devices | learned words via the Google account | ✓ via the plugin app "zBoard Sync": settings, learned words, email addresses via Google Drive, OneDrive, Dropbox or WebDAV (HiDrive, Nextcloud …) |
 | Google services | ✓ | not planned |
@@ -299,6 +301,10 @@ used. zBoard has no internet permission (release build).
 - **Themes:** besides light, dark and Material You there is "My image": the chosen picture sits behind the bar and the
   keys, a slider darkens it, and the labels turn light or dark to match. "Key borders" off draws only the labels (as
   in Gboard). The image stays on the device and is not part of backup and sync.
+- **Floating keyboard:** the four-way arrow in the toolbar makes the keyboard narrower and freely movable (handle
+  below the keys); the app underneath is not resized. Tap it again to dock the keyboard at the bottom.
+- **Split keyboard:** on screens at least 600 dp wide (tablets, unfolded foldables) the two halves of the keys move to
+  the edges, with a space bar on each side. Settings → Preferences → Layout: off, in landscape (default) or always.
 - **Text editing:** the cursor icon in the toolbar replaces the keys with arrow keys (including start and end of
   line). "Select" makes the arrows select text; next to them are Select all, Copy, Cut and Paste. Arrows and delete
   repeat while held, "ABC" returns to the keys.

@@ -215,6 +215,23 @@ public sealed class KeyboardView : View
         }
     } = true;
 
+    /// <summary>
+    /// Geteiltes Layout: Anteil der Breite, der als Lücke zwischen den Tastenhälften frei bleibt (0 = nicht geteilt).
+    /// Tasten links der Mitte bleiben links, die übrigen rücken nach rechts; die Leertaste gibt es auf beiden Seiten.
+    /// </summary>
+    public float SplitGap
+    {
+        get;
+        set
+        {
+            float clamped = Math.Clamp(value, 0f, 0.5f);
+            if (clamped == field) return;
+            field = clamped;
+            LayoutKeys();
+            Invalidate();
+        }
+    }
+
     /// <summary>Wischeingabe über die Buchstaben.</summary>
     public bool GlideEnabled { get; set; } = true;
 
@@ -310,7 +327,10 @@ public sealed class KeyboardView : View
         _keyCenters.Clear();
         if (_layout == null || Width == 0) return;
 
-        _unit = (Width - 2 * HorizontalPadding) / _layout.Units;
+        // Geteilt (nicht beim Ziffernfeld): Tasten auf die schmalere Breite verteilen, dann die rechte Hälfte verschieben
+        float gap = SplitGap > 0 && _layout.Id != Layouts.NumpadId ? Width * SplitGap : 0;
+        float half = (Width - gap) / 2;
+        _unit = (Width - gap - 2 * HorizontalPadding) / _layout.Units;
         _rowHeight = Math.Min(KeyHeight, (Height - TopPadding - BottomPadding) / _layout.Rows.Count);
         if (_rowHeight <= 0) _rowHeight = KeyHeight;
         float y = TopPadding;
@@ -328,6 +348,16 @@ public sealed class KeyboardView : View
             {
                 float w = (key.Width > 0 ? key.Width : fillUnits) * _unit;
                 var bounds = new RectF(x + GapX, y + GapY, x + w - GapX, y + _rowHeight - GapY);
+                if (gap > 0 && key.Action == KeyAction.Space && bounds.Left < half && bounds.Right > half)
+                {
+                    // Leertaste über die Mitte: auf beiden Seiten eine
+                    _keys.Add(new PlacedKey(key, new RectF(bounds.Left, bounds.Top, half - GapX, bounds.Bottom), false));
+                    _keys.Add(new PlacedKey(key, new RectF(half + gap + GapX, bounds.Top, bounds.Right + gap, bounds.Bottom), false));
+                    x += w;
+                    continue;
+                }
+
+                if (gap > 0 && bounds.CenterX() > half) bounds.Offset(gap, 0);
                 _keys.Add(new PlacedKey(key, bounds, key.IsCharacter && row == lastRow));
 
                 if (key.IsCharacter && key.Label.Length == 1 && char.IsLetter(key.Label[0]))

@@ -289,6 +289,17 @@ public sealed class SettingsActivity : Activity
             (L.T("Links", "Left"), _settings.OneHanded == OneHandedMode.Left, () => _settings.OneHanded = OneHandedMode.Left),
         ]);
 
+        Choice(L.T("Geteilte Tastatur (Tablets, Foldables)", "Split keyboard (tablets, foldables)"),
+        [
+            (L.T("Aus", "Off"), _settings.Split == SplitMode.Off, () => _settings.Split = SplitMode.Off),
+            (L.T("Im Querformat", "In landscape"), _settings.Split == SplitMode.Auto, () => _settings.Split = SplitMode.Auto),
+            (L.T("Immer", "Always"), _settings.Split == SplitMode.On, () => _settings.Split = SplitMode.On),
+        ]);
+        Note(L.T("Gilt auf Bildschirmen ab 600 dp Breite. Die schwebende Tastatur schaltest du in der Werkzeugleiste ein "
+                 + "und aus (Pfeilkreuz); verschieben lässt sie sich am Griff unter den Tasten.",
+            "Applies to screens at least 600 dp wide. Turn the floating keyboard on and off in the toolbar (four-way "
+            + "arrow); move it by the handle below the keys."));
+
         var heightLabel = Label($"{L.T("Tastaturhöhe", "Keyboard height")}: {_settings.HeightPercent} %", 17, _colors.Text);
         heightLabel.SetPadding(Dp(24), Dp(12), Dp(24), 0);
         _content.AddView(heightLabel);
