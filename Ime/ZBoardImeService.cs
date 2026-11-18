@@ -1024,40 +1024,45 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     }
 
     /// <summary>
-    /// Lässt Vorschläge, Korrektur, Vorhersage und Wischeingabe einmal im Hintergrund laufen, bevor die Sprache
-    /// benutzt wird. Der erste Aufruf ist langsam, weil die Laufzeit den Code dafür erst übersetzt; ohne das Aufwärmen
-    /// träfe diese Wartezeit den ersten Tastendruck. Die Ergebnisse werden verworfen.
+    /// Lässt Vorschläge, Korrektur, Vorhersage und Wischeingabe einmal im Hintergrund laufen. Der erste Aufruf ist
+    /// langsam, weil die Laufzeit den Code dafür erst übersetzt; ohne das Aufwärmen träfe diese Wartezeit den ersten
+    /// Tastendruck. Die Ergebnisse werden verworfen.
     /// </summary>
+    /// <param name="engine">
+    /// Eine eigene Engine nur für diesen Zweck (mit leerer Lernliste): Die echte wird währenddessen schon benutzt,
+    /// und ihre Lernliste verträgt keinen gleichzeitigen Zugriff. Wortliste und Sprachmodell ändern sich nicht mehr
+    /// und dürfen geteilt werden.
+    /// </param>
     static void WarmUp(string language, SuggestionEngine engine)
     {
         long started = Perf.Now;
         try
         {
-            // Einmal allein und einmal im Verbund mehrerer Sprachen (dieselbe Engine doppelt: nur für diesen Zweck)
-            foreach (var warm in new[] { new MultilingualEngine(language, engine), new MultilingualEngine([(language, engine), (language, engine)]) })
+            var context = new WordContext("und", "ich");
+            new MultilingualEngine(language, engine).Suggest("hal", context);
+
+            // Der Verbund mehrerer Sprachen hat eigenen Code: dieselbe Engine doppelt, nur für diesen Zweck
+            var warm = new MultilingualEngine([(language, engine), (language, engine)]);
+            warm.Suggest("h", WordContext.None);
+            warm.Suggest("hallp", context);
+            warm.Suggest("esist", WordContext.FromText("Das ist ein ")); // fehlendes Leerzeichen
+            warm.Predict(context);
+            warm.ContinuePhrase("mit");
+
+            // Kurze Wischspur von q nach p auf einem gedachten QWERTY-Feld
+            var keys = new Dictionary<char, Vector2>();
+            string[] rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+            for (int r = 0; r < rows.Length; r++)
             {
-                var context = new WordContext("und", "ich");
-                warm.Suggest("h", WordContext.None);
-                warm.Suggest("hallp", context);
-                warm.Suggest("ichhabe", WordContext.FromText("Das ist ein ")); // fehlendes Leerzeichen, Zusammensetzungen
-                warm.Predict(context);
-                warm.ContinuePhrase("mit");
-
-                // Wischspur von h nach o auf einem gedachten QWERTY-Feld
-                var keys = new Dictionary<char, Vector2>();
-                string[] rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
-                for (int r = 0; r < rows.Length; r++)
-                {
-                    for (int i = 0; i < rows[r].Length; i++) keys[rows[r][i]] = new Vector2(i + 0.5f * (r + 1), r * 1.45f);
-                }
-
-                Vector2 from = keys['h'], to = keys['o'];
-                warm.Glide([.. Enumerable.Range(0, 12).Select(i => Vector2.Lerp(from, to, i / 11f))], keys, context);
+                for (int i = 0; i < rows[r].Length; i++) keys[rows[r][i]] = new Vector2(i + 0.5f * (r + 1), r * 1.45f);
             }
+
+            Vector2 from = keys['q'], to = keys['p'];
+            warm.Glide([.. Enumerable.Range(0, 12).Select(i => Vector2.Lerp(from, to, i / 11f))], keys, context);
         }
         catch (Exception e)
         {
-            // Das Aufwärmen ist nur eine Beschleunigung: Ein Fehler hier darf das Laden der Sprache nicht verhindern.
+            // Das Aufwärmen ist nur eine Beschleunigung: Ein Fehler hier darf nichts weiter stören.
             Android.Util.Log.Warn("zBoard", $"Aufwärmen für {language} abgebrochen: {e.Message}");
         }
 
@@ -1086,10 +1091,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var proximity = KeyProximity.FromLayout(Layouts.Alphabet(language, showLanguageKey: false));
-        var engine = new SuggestionEngine(dictionary, proximity, model, history);
         Perf.Log($"load-{language}", Perf.Since(started));
-        WarmUp(language, engine);
-        return engine;
+        Task.Run(() => WarmUp(language, new SuggestionEngine(dictionary, proximity, model))); // hält das Laden nicht auf
+        return new SuggestionEngine(dictionary, proximity, model, history);
     }
 
     NgramModel LoadModel(string language)
