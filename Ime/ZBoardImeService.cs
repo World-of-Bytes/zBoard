@@ -1016,30 +1016,56 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         return new MultilingualEngine(loaded);
     }
 
+    /// <summary>
+    /// Lässt Vorschläge, Korrektur, Vorhersage und Wischeingabe einmal im Hintergrund laufen, bevor die Sprache
+    /// benutzt wird. Der erste Aufruf ist langsam, weil die Laufzeit den Code dafür erst übersetzt; ohne das Aufwärmen
+    /// träfe diese Wartezeit den ersten Tastendruck. Die Ergebnisse werden verworfen.
+    /// </summary>
+    static void WarmUp(string language, SuggestionEngine engine)
+    {
+        long started = Perf.Now;
+        try
+        {
+            // Einmal allein und einmal im Verbund mehrerer Sprachen (dieselbe Engine doppelt: nur für diesen Zweck)
+            foreach (var warm in new[] { new MultilingualEngine(language, engine), new MultilingualEngine([(language, engine), (language, engine)]) })
+            {
+                var context = new WordContext("und", "ich");
+                warm.Suggest("h", WordContext.None);
+                warm.Suggest("hallp", context);
+                warm.Suggest("ichhabe", WordContext.FromText("Das ist ein ")); // fehlendes Leerzeichen, Zusammensetzungen
+                warm.Predict(context);
+                warm.ContinuePhrase("mit");
+
+                // Wischspur von h nach o auf einem gedachten QWERTY-Feld
+                var keys = new Dictionary<char, Vector2>();
+                string[] rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+                for (int r = 0; r < rows.Length; r++)
+                {
+                    for (int i = 0; i < rows[r].Length; i++) keys[rows[r][i]] = new Vector2(i + 0.5f * (r + 1), r * 1.45f);
+                }
+
+                Vector2 from = keys['h'], to = keys['o'];
+                warm.Glide([.. Enumerable.Range(0, 12).Select(i => Vector2.Lerp(from, to, i / 11f))], keys, context);
+            }
+        }
+        catch (Exception e)
+        {
+            // Das Aufwärmen ist nur eine Beschleunigung: Ein Fehler hier darf das Laden der Sprache nicht verhindern.
+            Android.Util.Log.Warn("zBoard", $"Aufwärmen für {language} abgebrochen: {e.Message}");
+        }
+
+        Perf.Log($"warm-up-{language}", Perf.Since(started));
+    }
+
     SuggestionEngine LoadEngine(string language)
     {
         long started = Perf.Now;
-        WordDictionary dictionary;
-        using (var stream = Assets!.Open($"dict/{language}.txt"))
-        {
-            // Gemeinsamer Maßstab, damit sich die Sprachen bei mehrsprachiger Eingabe vergleichen lassen
-            dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal, language);
-        }
 
-        Perf.Log($"load-{language}-dictionary", Perf.Since(started));
-        long modelStarted = Perf.Now;
-        var model = NgramModel.Empty;
-        try
-        {
-            using var stream = Assets!.Open($"dict/{language}.ngrams.bin");
-            model = NgramModel.Load(stream);
-        }
-        catch (Java.IO.FileNotFoundException)
-        {
-            // Sprache ohne Sprachmodell: Vorhersage nur aus Gelerntem
-        }
+        // Sprachmodell und Wortliste gleichzeitig laden
+        var modelTask = Task.Run(() => LoadModel(language));
+        var dictionary = LoadDictionary(language);
+        var model = modelTask.GetAwaiter().GetResult();
 
-        Perf.Log($"load-{language}-model", Perf.Since(modelStarted));
         var history = new UserHistory();
         var learningFile = LearningFile(this, language);
         if (File.Exists(learningFile))
@@ -1049,8 +1075,112 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var proximity = KeyProximity.FromLayout(Layouts.Alphabet(language, showLanguageKey: false));
+        var engine = new SuggestionEngine(dictionary, proximity, model, history);
         Perf.Log($"load-{language}", Perf.Since(started));
-        return new SuggestionEngine(dictionary, proximity, model, history);
+        WarmUp(language, engine);
+        return engine;
+    }
+
+    NgramModel LoadModel(string language)
+    {
+        long started = Perf.Now;
+        try
+        {
+            using var stream = Assets!.Open($"dict/{language}.ngrams.bin");
+            var model = NgramModel.Load(stream);
+            Perf.Log($"load-{language}-model", Perf.Since(started));
+            return model;
+        }
+        catch (Java.IO.FileNotFoundException)
+        {
+            // Sprache ohne Sprachmodell: Vorhersage nur aus Gelerntem
+            return NgramModel.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Lädt die Wortliste einer Sprache. Das Auswerten der mitgelieferten Textdatei (Normieren, Sortieren) dauert auf
+    /// einem Telefon spürbar; deshalb legt zBoard nach dem ersten Laden eine fertig vorbereitete Fassung im
+    /// Zwischenspeicher der App ab. Jedes weitere Neuladen der Tastatur liest diese um ein Vielfaches schneller.
+    /// </summary>
+    WordDictionary LoadDictionary(string language)
+    {
+        long started = Perf.Now;
+        string? cache = DictionaryCacheFile(language);
+        if (cache != null && File.Exists(cache))
+        {
+            try
+            {
+                using var stream = File.OpenRead(cache);
+                var compiled = WordDictionary.LoadCompiled(stream, language);
+                Perf.Log($"load-{language}-dictionary-cached", Perf.Since(started));
+                return compiled;
+            }
+            catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                Android.Util.Log.Warn("zBoard", $"Zwischenspeicher für {language} unbrauchbar, lade die Wortliste: {e.Message}");
+            }
+        }
+
+        WordDictionary dictionary;
+        using (var stream = Assets!.Open($"dict/{language}.txt"))
+        {
+            // Gemeinsamer Maßstab, damit sich die Sprachen bei mehrsprachiger Eingabe vergleichen lassen
+            dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal, language);
+        }
+
+        Perf.Log($"load-{language}-dictionary", Perf.Since(started));
+        if (cache != null) Task.Run(() => SaveDictionaryCache(dictionary, cache, language)); // hält das Laden nicht auf
+        return dictionary;
+    }
+
+    static string? s_dictionaryCacheStamp;
+
+    /// <summary>
+    /// Datei der vorbereiteten Wortliste. Der Name enthält den Zeitpunkt der Installation: Nach einem Update (neue
+    /// Wortlisten, anderer Maßstab) gilt der alte Zwischenspeicher nicht mehr. null: kein Zwischenspeicher möglich.
+    /// </summary>
+    string? DictionaryCacheFile(string language)
+    {
+        try
+        {
+            if (s_dictionaryCacheStamp == null)
+            {
+                var installed = File.GetLastWriteTimeUtc(ApplicationInfo!.SourceDir!);
+                if (installed.Year < 2000) return null; // Zeitpunkt unbekannt: lieber ohne Zwischenspeicher
+                s_dictionaryCacheStamp = installed.Ticks.ToString("x");
+            }
+
+            return Path.Combine(CacheDir!.AbsolutePath, "dict", $"{language}.{s_dictionaryCacheStamp}.zbwd");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    static void SaveDictionaryCache(WordDictionary dictionary, string file, string language)
+    {
+        try
+        {
+            string dir = Path.GetDirectoryName(file)!;
+            Directory.CreateDirectory(dir);
+
+            // Erst fertig schreiben, dann umbenennen: Eine halb geschriebene Datei wird nie gelesen.
+            string temp = $"{file}.{Environment.CurrentManagedThreadId}.tmp";
+            using (var stream = File.Create(temp)) dictionary.Save(stream);
+            File.Move(temp, file, overwrite: true);
+
+            foreach (var old in Directory.GetFiles(dir, $"{language}.*"))
+            {
+                if (old != file) File.Delete(old); // Fassungen früherer Versionen
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Ohne Zwischenspeicher lädt die Tastatur beim nächsten Mal wieder aus der Wortliste.
+            Android.Util.Log.Warn("zBoard", $"Zwischenspeicher für {language} nicht geschrieben: {e.Message}");
+        }
     }
 
     public void OnLanguageSelected(string language)
