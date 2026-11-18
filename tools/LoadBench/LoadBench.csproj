@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Misst, wie lange das Laden der Wörterbücher und Sprachmodelle dauert und wie viel Speicher es braucht
+    Misst, wie lange das Laden der Wörterbücher und Sprachmodelle dauert und wie viel Speicher es braucht, und
+    die Rechenzeit je Tastendruck beim Tippen
     (Aufruf: siehe Kopf von Program.cs). Dieselben Quelltexte wie die App, ohne weitere Pakete.
   -->
   <PropertyGroup>
@@ -23,6 +24,7 @@
     <Compile Include="../../Suggestions/TouchTrace.cs" Link="Core/TouchTrace.cs" />
     <Compile Include="../../Suggestions/UserHistory.cs" Link="Core/UserHistory.cs" />
     <Compile Include="../../Suggestions/GlideDecoder.cs" Link="Core/GlideDecoder.cs" />
+    <Compile Include="../../Suggestions/MultilingualEngine.cs" Link="Core/MultilingualEngine.cs" />
   </ItemGroup>
 
 </Project>
