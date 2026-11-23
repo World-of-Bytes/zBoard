@@ -33,6 +33,20 @@ Sätze aus Wikipedia und, für Deutsch, aus den Protokollen des Europäischen Pa
 gemeinfrei unter [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) weiter. Die Modelle enthalten keine
 Sätze, nur gezählte Wortfolgen.
 
+## Assets/lm/ (neuronale Sprachmodelle)
+
+**Lizenz:** [Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/),
+wie die Wortlisten, deren Wörter und Schreibweisen das Vokabular (`<Sprache>.vocab.txt`) übernimmt.
+
+Kleine LSTM-Netze, trainiert mit `tools/LanguageModel/train_lm.py` auf derselben Satzsammlung von
+[Mozilla Common Voice](https://github.com/common-voice/common-voice) wie die N-Gramm-Modelle (CC0 1.0). Die Netze
+enthalten keine Sätze, nur gelernte Gewichte. Kommen weitere Texte dazu (`--source`), steht deren Lizenz hier.
+
+## ONNX Runtime (Microsoft.ML.OnnxRuntime)
+
+© Microsoft Corporation, [MIT License](https://github.com/microsoft/onnxruntime/blob/main/LICENSE). Führt die
+neuronalen Sprachmodelle auf dem Gerät aus. Als NuGet-Paket eingebunden, unverändert.
+
 ## Assets/dict/fr.txt, es.txt, it.txt und die Wortlisten der weiteren Sprachen
 
 Französisch, Spanisch, Italienisch, Niederländisch, Polnisch, Tschechisch, Ungarisch, Rumänisch, Türkisch,

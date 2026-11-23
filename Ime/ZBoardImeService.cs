@@ -726,7 +726,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             before = before[..^current.Length];
         }
 
-        return WordContext.FromText(before, fromFieldStart);
+        return WordContext.FromTextWithSentence(before, fromFieldStart);
     }
 
     /// <summary>Merkt sich zu den Zeichen, die gleich an das Wort in Bearbeitung angehängt werden, den Fingerpunkt.</summary>
@@ -1116,10 +1116,44 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         var proximity = KeyProximity.FromLayout(Layouts.Alphabet(language, showLanguageKey: false));
+        var neural = NeuralModel(language);
+        neural?.Preload(); // lädt im Hintergrund weiter; bis dahin sagt das N-Gramm-Modell allein vorher
         Perf.Log($"load-{language}", Perf.Since(started));
         Perf.Log($"ready-{language}-since-process-start", Perf.SinceProcessStart);
         Task.Run(() => WarmUp(language, new SuggestionEngine(dictionary, proximity, model))); // hält das Laden nicht auf
-        return new SuggestionEngine(dictionary, proximity, model, history);
+        return new SuggestionEngine(dictionary, proximity, model, history, neural);
+    }
+
+    /// <summary>
+    /// Das neuronale Sprachmodell einer Sprache (Assets/lm/&lt;Sprache&gt;.lm.onnx und .vocab.txt), oder null, wenn die
+    /// Sprache keins hat. Geladen wird erst beim ersten Gebrauch und nur, solange „KI-Vorhersage“ eingeschaltet ist.
+    /// </summary>
+    NeuralLanguageModel? NeuralModel(string language)
+    {
+        string modelAsset = $"lm/{language}.lm.onnx", vocabAsset = $"lm/{language}.vocab.txt";
+        var available = Assets!.List("lm") ?? [];
+        if (!available.Contains($"{language}.lm.onnx") || !available.Contains($"{language}.vocab.txt")) return null;
+
+        var assets = Assets!;
+        var settings = _settings;
+        return new NeuralLanguageModel(
+            () =>
+            {
+                long started = Perf.Now;
+                byte[] bytes;
+                using (var stream = assets.Open(modelAsset))
+                using (var buffer = new MemoryStream())
+                {
+                    stream.CopyTo(buffer);
+                    bytes = buffer.ToArray();
+                }
+
+                using var vocabulary = assets.Open(vocabAsset);
+                var loaded = OnnxLanguageModel.Load(bytes, vocabulary, language);
+                Perf.Log($"load-{language}-neural", Perf.Since(started));
+                return loaded;
+            },
+            enabled: () => settings.NeuralPrediction);
     }
 
     NgramModel LoadModel(string language)

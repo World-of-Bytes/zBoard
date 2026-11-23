@@ -28,7 +28,7 @@ Fertige Versionen: [Releases](https://github.com/World-of-Bytes/zBoard/releases)
 | Sprachen | sehr viele Sprachen und Layouts | 18 Sprachen: Deutsch, Tschechisch, Ungarisch (QWERTZ); Englisch, Spanisch, Italienisch, Niederländisch, Polnisch, Rumänisch, Türkisch, Vietnamesisch (QWERTY); Französisch (AZERTY); Griechisch; Russisch, Ukrainisch, Bulgarisch (kyrillisch); Arabisch; Chinesisch (Pinyin, vereinfachte Schriftzeichen) |
 | Tippen, Umschalt, Symbole, langer Druck für Sonderzeichen | ✓ | ✓ in Gboard-Reihenfolge, häufigstes Zeichen vorausgewählt |
 | Wortvorschläge und Autokorrektur | ✓ | ✓ 120 000 deutsche, 100 000 englische Wörter, bis zu 80 000 je weiterer Sprache; rechnet mit der Stelle, an der der Finger die Taste traf; Vertauschungen, weggelassene Umlaute und Apostrophe |
-| Sprachmodell | neuronales Netz, sieht den ganzen Satz | Zähltabelle häufiger Wortfolgen, sieht die zwei Wörter davor; jeder Wert nachvollziehbar, bis rund 2,5 MB je Sprache |
+| Sprachmodell | neuronales Netz, sieht den ganzen Satz | Zähltabelle häufiger Wortfolgen (zwei Wörter davor) plus kleines neuronales Netz auf dem Gerät, das den ganzen Satz sieht (abschaltbar); je bis rund 2,5 MB pro Sprache |
 | Korrektur nach dem Satz | ✓ | ✓ „ich hae“ → „habe“; richtig geschriebene Wörter nur, wenn der Finger fast auf der Tastengrenze lag („heute drei“ → „frei“) |
 | Fehlende und versehentliche Leerzeichen | ✓ | ✓ „ichhabe“ → „ich habe“, „da ke“ → „danke“ |
 | Zusammengesetzte deutsche Substantive | ✓ | ✓ aus bekannten Substantiven erkannt, großgeschrieben und vervollständigt („Haustürschlüssel“) |
@@ -130,17 +130,18 @@ ersten Laden fertig vorbereitet im Zwischenspeicher der App ab (`cache/dict/`; n
 | `Keyboard/` | `HandwritingPanelView` (Schreibfläche), `TextEditPanelView` (Textbearbeitung), Layout-Modell, alle Layouts, `KeyboardView` (Zeichnen und Touch), `PopupGrid` (Anordnung im Popup), Farben |
 | `Emoji/` | `EmojiCatalog` (Daten, Suche, Hauttöne), `EmojiPanelView` |
 | `Clipboard/` | `ClipboardHistory`, `ClipboardPanelView` |
-| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `PersonalDictionary` (eigene Wörter und Kürzel), `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
+| `Suggestions/` | `WordDictionary` (sortiertes Array), `SuggestionEngine`, `GlideDecoder`, `NgramModel` (Sprachmodell), `NeuralModel` und `OnnxLanguageModel` (KI-Vorhersage), `TouchTrace` (Fingerpositionen), `UserHistory`, `EmailMemory`, `PersonalDictionary` (eigene Wörter und Kürzel), `KeyProximity`, `TextCase` (Groß-/Kleinschreibung je Sprache), `PinyinEngine` und `PinyinLearned` (Chinesisch), `Telex` (Vietnamesisch), `CandidateStrip` (Anordnung der Vorschlagszeile), `SuggestionBarView` |
 | `Settings/` | `SettingsActivity` (Startbildschirm), `ZBoardSettings` |
 | `Backup/` | `BackupArchive` (Sicherungsdatei: Schreiben, Lesen, Prüfen) |
 | `Assets/dict/` | Wortlisten und Sprachmodelle pro Sprache |
+| `Assets/lm/` | neuronale Sprachmodelle (`<Sprache>.lm.onnx`, `<Sprache>.vocab.txt`) |
 | `Assets/emoji/` | Emoji nach Kategorien, Namen und Suchbegriffe pro Sprache |
 | `Plugins/` | `PluginContract` (Schnittstelle), `PluginRegistry` (installierte Plugins), `PluginClient` (Messenger) |
 | `plugin-apps/DeepL/` | Plugin-App „zBoard DeepL“ (eigene App mit Internet-Berechtigung) |
 | `plugin-apps/Pen/` | Plugin-App „zBoard Pen“ (Handschrift mit Google ML Kit) |
 | `Sync/` | `SyncManager` (Abgleich über ein Plugin), `SyncFileProvider` (Datei-Übergabe an das Plugin) |
 | `plugin-apps/Sync/` | Plugin-App „zBoard Sync“ (Google Drive, OneDrive, Dropbox, WebDAV); Einrichtung der Anbieter in der README dort |
-| `tools/` | `build_dictionaries.py` (Wortlisten), `NgramBuilder` (Sprachmodelle), `SuggestionEval` (Vorschlagsmessung), `LoadBench` (Ladezeiten, Zeit je Tastendruck), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
+| `tools/` | `build_dictionaries.py` (Wortlisten), `NgramBuilder` (Sprachmodelle), `LanguageModel/train_lm.py` (KI-Vorhersage), `SuggestionEval` (Vorschlagsmessung), `LoadBench` (Ladezeiten, Zeit je Tastendruck), `build_emoji.py` (Emoji-Daten), `emulator_test.py` |
 | `tests/` | Unit-Tests der plattformunabhängigen Logik |
 
 ## Wörterbücher
@@ -218,7 +219,7 @@ unter **CC BY-SA 4.0**; Quellen und Pflichten in `THIRD_PARTY_NOTICES.md`. Die A
 
 ## Vorschläge und Autokorrektur
 
-Vorschläge und Korrekturen entstehen aus fünf Quellen. Alle liegen auf dem Gerät, keine ist ein neuronales Netz:
+Vorschläge und Korrekturen entstehen aus sechs Quellen. Alle liegen auf dem Gerät:
 
 - **Wörterbuch** (`WordDictionary`): wie häufig ein Wort ist.
 - **Sprachmodell** (`NgramModel`): eine Zähltabelle, welches Wort wie oft auf die ein oder zwei Wörter davor folgt.
@@ -226,6 +227,12 @@ Vorschläge und Korrekturen entstehen aus fünf Quellen. Alle liegen auf dem Ger
   Reihenfolge der Vorschläge, die Wahl der Korrektur („ich hae“ → „habe“, nicht das häufigere „hat“) und die
   Großschreibung mehrdeutiger Wörter. Jeder Wert ist eine Zählung und lässt sich nachvollziehen; mehr als zwei Wörter
   zurück sieht das Modell nicht.
+- **KI-Vorhersage** (`NeuralLanguageModel`, `Assets/lm/`): ein kleines LSTM-Netz je Sprache (rund 2,5 MB, int8,
+  ausgeführt mit ONNX Runtime), das den ganzen Satz bis zur Schreibstelle sieht. Es wird mit dem Zählmodell gemischt –
+  bei der Vorhersage, der Reihenfolge der Vorschläge, der Wahl der Korrektur und beim Wischen. Ob ein richtig
+  geschriebenes Wort korrigiert wird, entscheidet es nicht. Läuft offline, lernt nichts aus deinen Eingaben und lässt
+  sich unter Einstellungen → Vorschläge → „KI-Vorhersage“ abschalten. Trainieren und messen:
+  [tools/LanguageModel](tools/LanguageModel/README.md).
 - **Fingerposition** (`TouchTrace`): Die Tastatur merkt sich zu jedem Buchstaben, wo der Finger die Taste traf. Ein
   Treffer am Rand zwischen „g“ und „h“ lässt beide Buchstaben fast gleich wahrscheinlich, ein Treffer mitten auf dem
   „g“ spricht gegen das „h“.

@@ -34,7 +34,20 @@ if (File.Exists(modelPath))
 }
 
 var layout = Layouts.Alphabet(options.Language, showLanguageKey: false);
-var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), model, new UserHistory());
+NeuralLanguageModel? neural = null;
+string neuralPath = options.Neural ?? Path.Combine(root, "Assets", "lm", $"{options.Language}.lm.onnx");
+if (options.UseNeural && File.Exists(neuralPath))
+{
+    string vocabPath = neuralPath.EndsWith(".lm.onnx", StringComparison.Ordinal)
+        ? neuralPath[..^".lm.onnx".Length] + ".vocab.txt"
+        : Path.ChangeExtension(neuralPath, ".vocab.txt");
+    using var vocabulary = File.OpenRead(vocabPath);
+    var loaded = OnnxLanguageModel.Load(File.ReadAllBytes(neuralPath), vocabulary, options.Language);
+    neural = new NeuralLanguageModel(() => loaded, loadSynchronously: true);
+    Console.WriteLine($"Neuronales Sprachmodell: {neuralPath} ({loaded.Vocabulary.Count} Einträge)");
+}
+
+var engine = new SuggestionEngine(dictionary, KeyProximity.FromLayout(layout), model, new UserHistory(), neural);
 var words = Corpus.Load(textPath);
 if (words.Count == 0)
 {
@@ -323,11 +336,11 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, string? Model, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose)
+        string Language, string? Text, string? Root, string? Model, string? Neural, bool UseNeural, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose)
     {
         public static Options? Parse(string[] args)
         {
-            var options = new Options("de", null, null, null, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, UseTouch: true, Verbose: false);
+            var options = new Options("de", null, null, null, null, UseNeural: true, Seed: 1, Runs: 5, Sigma: 0.24, Lazy: 0.3, UseContext: true, UseTouch: true, Verbose: false);
             for (int i = 0; i < args.Length; i++)
             {
                 string? Value() => i + 1 < args.Length ? args[++i] : null;
@@ -336,6 +349,8 @@ namespace ZBoard.Tools.SuggestionEval
                     case "--lang" when Value() is { } v: options = options with { Language = v }; break;
                     case "--text" when Value() is { } v: options = options with { Text = v }; break;
                     case "--model" when Value() is { } v: options = options with { Model = v }; break;
+                    case "--neural" when Value() is { } v: options = options with { Neural = v }; break;
+                    case "--no-neural": options = options with { UseNeural = false }; break;
                     case "--root" when Value() is { } v: options = options with { Root = v }; break;
                     case "--seed" when Value() is { } v && int.TryParse(v, out var n): options = options with { Seed = n }; break;
                     case "--runs" when Value() is { } v && int.TryParse(v, out var n) && n > 0: options = options with { Runs = n }; break;
@@ -364,6 +379,9 @@ namespace ZBoard.Tools.SuggestionEval
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben
                               --model <Datei>         anderes Sprachmodell (Vorgabe: Assets/dict/<Sprache>.ngrams.bin)
+                              --neural <Datei>        anderes neuronales Sprachmodell (Vorgabe: Assets/lm/<Sprache>.lm.onnx,
+                                                      Vokabular daneben als <Sprache>.vocab.txt)
+                              --no-neural             ohne neuronales Sprachmodell messen (nur N-Gramme)
                               --root <Ordner>         zBoard-Ordner, falls nicht von dort gestartet
                             """);
                         return null;
