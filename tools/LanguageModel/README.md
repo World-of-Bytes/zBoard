@@ -76,6 +76,24 @@ Nach Änderungen an der Wortliste daher neu trainieren.
 Chinesisch trennt die Wörter mit jieba; beim Tippen bekommt das Netz bisher nur das zuletzt eingesetzte Wort
 (`ChineseContext`).
 
+## Messwerte
+
+Deutsch, mitgelieferte Testsätze (`tools/SuggestionEval`, 5 Durchläufe). Das Modell in `Assets/lm/de.lm.onnx` ist ein
+**Probelauf**: nur 7 000 Schritte auf der CPU (knapp eine halbe Runde durch die Sätze, Perplexität 88). Mit den
+vorgegebenen 30 000 Schritten auf einer Grafikkarte sollte es noch deutlich besser werden.
+
+| | nur N-Gramme | mit Netz (Probelauf) |
+| --- | --- | --- |
+| Nächstes Wort vorhergesagt, Platz 1 | 14,5 % | 15,6 % |
+| Nächstes Wort vorhergesagt, unter den ersten 3 | 31,0 % | **34,2 %** |
+| Wort nach der Hälfte der Buchstaben in der Leiste | 76,6 % | 80,8 % |
+| Gesparte Tastendrücke | 51,0 % | **53,5 %** |
+| Tippfehler richtig korrigiert | 81,9 % | 82,7 % |
+| Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % |
+| Falsche Wörter im Text nach der Korrektur | 4,8 % | 4,6 % |
+
+`NeuralWeight` 0,35 und 0,7 waren beide schlechter als 0,5 (unter den ersten 3: 33,1 % bzw. 33,3 %).
+
 ## Messen und abstimmen
 
 `tools/SuggestionEval` nimmt das Modell aus `Assets/lm/` automatisch mit; Vergleich ohne Netz:
