@@ -496,7 +496,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         if (!_profile.AllowSuggestions || _profile.IsEmail || IsChinese || _emojiSearchActive || _voiceActive) return false;
         var ic = Ic;
         if (ic == null) return false;
-        if (ic.GetSelectedTextFormatted(0) is { Length: > 0 }) return false; // Markierung löscht der Editor
+        if (ic.GetSelectedTextFormatted(0)?.ToString() is { Length: > 0 }) return false; // Markierung löscht der Editor
 
         const int Window = 64;
         string before = TextBeforeCursor(Window);
