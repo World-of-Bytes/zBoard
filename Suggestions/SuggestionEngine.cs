@@ -109,6 +109,14 @@ public sealed class SuggestionEngine
     public const double RareWordRatio = 3000.0;
 
     /// <summary>
+    /// Untergrenze, wenn der Satz entscheidet: Ist die Korrektur ohne Kontext mindestens so viel wahrscheinlicher wie das
+    /// getippte Wörterbuchwort, reicht es, wenn sie <em>mit</em> Satzkontext <see cref="RareWordRatio"/>-mal
+    /// wahrscheinlicher ist ("sag mor" → "mir", "für ie" → "die"). Darunter bleibt das Wort immer stehen
+    /// ("ganz fettig": "fertig" ist nur etwa 30-mal wahrscheinlicher). Abgestimmt mit tools/SuggestionEval.
+    /// </summary>
+    public const double RareWordContextRatio = 300.0;
+
+    /// <summary>
     /// Anteil des neuronalen Sprachmodells (<see cref="INeuralLanguageModel"/>) am Satzkontext, gegenüber dem
     /// N-Gramm-Modell: 0 = nur N-Gramme, 1 = nur das Netz. Der Kontextfaktor beider wird geometrisch gemittelt, die
     /// Vorhersage des nächsten Worts linear. Abgestimmt mit tools/SuggestionEval (--neural).
@@ -192,7 +200,11 @@ public sealed class SuggestionEngine
         {
             if ((!analysis.TypedIsWord || analysis.CorrectionOverrides) && analysis.Correction is { } correction && typed.Length >= 2)
             {
-                autoCorrection = MatchCase(correction.Word, typed, _dictionary.Language);
+                // Die Korrektur in der Schreibweise, die in den Satz passt: "das trwffen" → "Treffen"
+                string word = IsLowerCase(typed) && IsLowerCase(correction.Word) && !correction.Word.Contains(' ')
+                    ? NounInContext(correction.Word, context) ?? correction.Word
+                    : correction.Word;
+                autoCorrection = MatchCase(word, typed, _dictionary.Language);
             }
             else if (analysis.NounForm is { } noun)
             {
@@ -255,7 +267,7 @@ public sealed class SuggestionEngine
         float maxDistance = lower.Length switch
         {
             <= 1 => 0f,
-            2 => WordDictionary.MissingApostropheCost, // nur Umlaut, Akzent oder Apostroph: "im" → "I'm", "ol" → "Öl"
+            2 => 1f, // "ic" → "ich", "su" → "du"; echte Wörter schützt RareWordRatio
             <= 5 => 1f,
             _ => 2f,
         };
@@ -288,7 +300,8 @@ public sealed class SuggestionEngine
             {
                 if (distance <= 0) continue;
                 double score = freq / Math.Pow(DistancePenaltyBase, distance);
-                Offer(word, score);
+                // Nach zwei Buchstaben gehört die Leiste den Vervollständigungen; die Korrektur ("ic" → "ich") zählt trotzdem.
+                if (lower.Length > 2 || distance <= WordDictionary.MissingApostropheCost) Offer(word, score);
                 bool nearMiss = hasTouches && distance <= NearMissDistance && word.Length == lower.Length
                     && !KeyProximity.IsLazySpelling(lower, word);
                 corrections.Add((word, score, score, nearMiss));
@@ -343,7 +356,7 @@ public sealed class SuggestionEngine
         bool splitOverrides = false;
         if (compound == null && !learned && _history.CountOf(lower) == 0 && Split(lower, context) is { } split
             && (typedFrequency == 0 || split.Score >= LazySpellingRatio * typedFrequency)
-            && (best == null || split.Score > best.Value.InContext))
+            && (best == null || split.Score > best.Value.InContext || DropsSplitPart(best.Value.Word, split.Text)))
         {
             best = (split.Text, split.Score, split.Score, false);
             splitOverrides = typedFrequency > 0;
@@ -378,10 +391,15 @@ public sealed class SuggestionEngine
             }
             else
             {
-                // Großgeschriebene Einträge sind geprüfte Substantive und Namen ("Ost", "DDR") und bleiben stehen.
+                // Großgeschriebene Einträge sind geprüfte Substantive und Namen ("Ost", "DDR") und bleiben stehen –
+                // außer Abkürzungen in Großbuchstaben, wenn sie klein getippt wurden: "ic" ist kein "IC", sondern "ich".
+                string entry = _dictionary.Lookup(lower)?.Word ?? "A";
+                bool protectedEntry = char.IsUpper(entry[0]) && !(IsAcronym(entry) && !IsAcronym(typed));
                 overrides = best.Value.Word != bestLazySpelling?.Word
-                    && best.Value.Score >= RareWordRatio * typedFrequency
-                    && !char.IsUpper(_dictionary.Lookup(lower)?.Word[0] ?? 'A');
+                    && !protectedEntry
+                    && (best.Value.Score >= RareWordRatio * typedFrequency
+                        || (best.Value.Score >= RareWordContextRatio * typedFrequency
+                            && best.Value.InContext >= RareWordRatio * typedInContext));
             }
 
             // Der Finger lag fast auf der Grenze zur Nachbartaste, und das Wort mit dem Nachbarbuchstaben passt viel
@@ -713,9 +731,16 @@ public sealed class SuggestionEngine
 
         // Die Alternative: Nur das Stück, das kein Wort ist, wird für sich korrigiert. Sind beide keine Wörter,
         // müssten beide korrigiert werden; das ist unwahrscheinlicher.
-        double aloneScore = secondIsWord
-            ? Analyze(previousTyped, context, proximity).Correction?.Score ?? 0
-            : Analyze(typed, new WordContext(previousTyped, context.Previous), proximity).Correction?.Score ?? 0;
+        string alone = secondIsWord ? previousTyped : typed;
+        var aloneCorrection = secondIsWord
+            ? Analyze(previousTyped, context, proximity).Correction
+            : Analyze(typed, new WordContext(previousTyped, context.Previous), proximity).Correction;
+        // Ein Stück aus zwei Buchstaben ist meist ein abgetrennter Wortteil ("th ink", "go ing"), kein Vertipper
+        // ("th" → "the"): Dafür zählen hier nur Umlaut, Akzent und Apostroph.
+        double aloneScore = aloneCorrection is { } c
+            && (alone.Length > 2 || KeyProximity.IsLazySpelling(_dictionary.Lower(alone), c.Word))
+            ? c.Score
+            : 0;
         if (!firstIsWord && !secondIsWord) aloneScore /= DistancePenaltyBase;
 
         return best.Value.Score > aloneScore ? (MatchCase(best.Value.Word, previousTyped, _dictionary.Language), best.Value.Score) : null;
@@ -745,18 +770,35 @@ public sealed class SuggestionEngine
         var forms = _dictionary.Forms(lower);
         if (forms.Count < 2 || !forms.Contains(lower)) return null;
 
+        // Nur das Sprachmodell: Das Netz schreibt mehrdeutige Wörter zu oft groß ("und liebe" → "Liebe"; tools/SuggestionEval).
+        double Probability(string form) => _model.FormProbability(context, form);
+
         string? best = null;
-        double bestProbability = _model.FormProbability(context, lower) * NounContextRatio;
+        double bestProbability = Probability(lower) * NounContextRatio;
         if (bestProbability <= 0) return null;
         foreach (var form in forms)
         {
             if (form == lower || !char.IsUpper(form[0])) continue;
-            double probability = _model.FormProbability(context, form);
+            double probability = Probability(form);
             if (probability >= bestProbability) (best, bestProbability) = (form, probability);
         }
 
         return best;
     }
+
+    /// <summary>
+    /// Die beste Korrektur lässt einfach eines der beiden Wörter weg ("fora" → "for" statt "for a", "isa" → "is"): Dann
+    /// ist das fehlende Leerzeichen die bessere Erklärung, auch wenn das eine Wort allein häufiger ist.
+    /// </summary>
+    static bool DropsSplitPart(string correction, string split)
+    {
+        int space = split.IndexOf(' ');
+        return space > 0 && (string.Equals(correction, split[..space], StringComparison.OrdinalIgnoreCase)
+            || string.Equals(correction, split[(space + 1)..], StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>"IC", "DDR", "UN": mindestens zwei Buchstaben, alle groß.</summary>
+    static bool IsAcronym(string word) => word.Count(char.IsLetter) >= 2 && word.Where(char.IsLetter).All(char.IsUpper);
 
     static bool IsLowerCase(string text) => text.Length > 0 && !text.Any(char.IsUpper);
 
