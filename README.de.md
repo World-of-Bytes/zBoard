@@ -343,6 +343,14 @@ von Google werden nicht übernommen. zBoard hat keine Internet-Berechtigung (Rel
   sie stehen und setzt die gespeicherte Schreibweise ein („zboard“ → „zBoard“). Tippst du ein Kürzel („mfg“), zeigt die
   Leiste seinen Text („Mit freundlichen Grüßen“); wie bei Gboard setzt ihn erst das Antippen ein. Die Einträge gelten in
   allen Sprachen und gehören zu den Einstellungen – Sicherung und Synchronisation nehmen sie mit.
+- **Siezen:** Steht im Feld schon „Sehr geehrte …“ oder ein großgeschriebenes „Sie“, „Ihnen“, „Ihre“ mitten im Satz,
+  schreibt zBoard diese Wörter auch danach groß („erhalten sie“ → „Sie“; Löschen direkt danach macht es rückgängig).
+  Sonst steht die großgeschriebene Form in der Leiste.
+- **Persönliches Tippmuster:** zBoard lernt, wie weit dein Finger bei jeder Taste im Mittel danebenliegt (viele tippen
+  etwas zu tief), und wertet Treffer entsprechend aus – bei der getroffenen Taste und bei der Autokorrektur. Gespeichert
+  werden nur Verschiebungen je Taste, keine Texte; getrennt für Hoch- und Querformat, gelöscht mit dem Gelernten.
+- **Ähnliche Wörter:** Passt im Satz ein ähnliches Wort besser als das richtig getippte („ich bin in Urlaub“ → „im“),
+  steht es links in der Leiste; korrigiert wird nicht.
 - **Zwischenablage:** Verlauf der letzten Stunde, Anheften (📌) hält Einträge dauerhaft. Nur Angeheftetes wird
   gespeichert; als vertraulich markierte Inhalte (z. B. aus Passwort-Managern) und Kopien aus Passwortfeldern
   werden nie übernommen.

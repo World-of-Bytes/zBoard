@@ -58,6 +58,19 @@ public readonly record struct WordContext(string? Previous, string? BeforePrevio
             : new WordContext(tokens[^1], tokens[^2]) { Sentence = sentence };
     }
 
+    /// <summary>
+    /// Im Eingabefeld wird gesiezt (Deutsch): "Sehr geehrte …" oder ein großgeschriebenes "Sie", "Ihnen", "Ihre" … mitten
+    /// im Satz. Dann schreibt zBoard diese Wörter groß ("erhalten sie" → "Sie"). Setzt der Tastaturdienst für das ganze Feld.
+    /// </summary>
+    public bool Formal { get; init; }
+
+    static readonly System.Text.RegularExpressions.Regex FormalAddress = new(
+        @"(?<![.!?…:]\s*)(?<=[\p{L},;]\s+)\b(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b|\b[Ss]ehr geehrte[rs]?\b",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>Ob im Text gesiezt wird (siehe <see cref="Formal"/>). "Sie" am Satzanfang zählt nicht: Das könnte auch "sie" sein.</summary>
+    public static bool HasFormalAddress(string text) => text.Length > 0 && FormalAddress.IsMatch(text);
+
     /// <summary>So viele Wörter (mit Satzanfang und Kommas) bekommt das neuronale Sprachmodell höchstens.</summary>
     public const int MaxSentenceTokens = 24;
 

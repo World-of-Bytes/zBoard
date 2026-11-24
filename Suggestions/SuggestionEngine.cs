@@ -117,6 +117,14 @@ public sealed class SuggestionEngine
     public const double RareWordContextRatio = 300.0;
 
     /// <summary>
+    /// Ein ähnliches Wort, das im Satz mindestens so viel (Faktor) wahrscheinlicher ist als das richtig getippte, kommt in die Leiste
+    /// ("ich wohne in Hamburg" bleibt, "ich bin in Urlaub" → "im" links). Abgestimmt mit tools/SuggestionEval.
+    /// </summary>
+    public const double RealWordBarRatio = 1.0;
+
+    const int BarSlots = 3;
+
+    /// <summary>
     /// Anteil des neuronalen Sprachmodells (<see cref="INeuralLanguageModel"/>) am Satzkontext, gegenüber dem
     /// N-Gramm-Modell: 0 = nur N-Gramme, 1 = nur das Netz. Der Kontextfaktor beider wird geometrisch gemittelt, die
     /// Vorhersage des nächsten Worts linear. Abgestimmt mit tools/SuggestionEval (--neural).
@@ -200,11 +208,7 @@ public sealed class SuggestionEngine
         {
             if ((!analysis.TypedIsWord || analysis.CorrectionOverrides) && analysis.Correction is { } correction && typed.Length >= 2)
             {
-                // Die Korrektur in der Schreibweise, die in den Satz passt: "das trwffen" → "Treffen"
-                string word = IsLowerCase(typed) && IsLowerCase(correction.Word) && !correction.Word.Contains(' ')
-                    ? NounInContext(correction.Word, context) ?? correction.Word
-                    : correction.Word;
-                autoCorrection = MatchCase(word, typed, _dictionary.Language);
+                autoCorrection = MatchCase(CaseInSentence(typed, correction.Word, context), typed, _dictionary.Language);
             }
             else if (analysis.NounForm is { } noun)
             {
@@ -212,9 +216,49 @@ public sealed class SuggestionEngine
             }
         }
 
+        autoCorrection = ApplyFormal(typed, autoCorrection, candidates, context, analysis.CorrectionSuppressed, max);
+
         if (autoCorrection == typed) autoCorrection = null;
         return new SuggestionResult(typed, candidates, autoCorrection, analysis.TypedIsWord);
     }
+
+    /// <summary>Eine Korrektur in der Schreibweise, die in den Satz passt: "das trwffen" → "Treffen".</summary>
+    public string CaseInSentence(string typed, string correction, WordContext context) =>
+        IsLowerCase(typed) && IsLowerCase(correction) && !correction.Contains(' ')
+            ? NounInContext(_dictionary.Lower(correction), context) ?? correction
+            : correction;
+
+    /// <summary>
+    /// Höflichkeitsform (nur Deutsch): Im förmlichen Feld (<see cref="WordContext.Formal"/>) wird "sie", "ihnen", "ihre" …
+    /// mitten im Satz großgeschrieben; sonst steht die großgeschriebene Form wenigstens in der Leiste.
+    /// </summary>
+    /// <returns>Die Autokorrektur, gegebenenfalls ersetzt; <paramref name="candidates"/> wird ergänzt.</returns>
+    public string? ApplyFormal(
+        string typed, string? autoCorrection, List<string> candidates, WordContext context, bool suppressed, int max)
+    {
+        if (!IsLowerCase(typed)) return autoCorrection;
+
+        string result = autoCorrection ?? typed;
+        if (context.Formal && !suppressed && context.Previous is not (null or NgramModel.SentenceStart)
+            && IsLowerCase(result) && FormalForm(_dictionary.Lower(result)) is { } formalResult)
+        {
+            autoCorrection = formalResult;
+        }
+
+        if (FormalForm(_dictionary.Lower(typed)) is { } formal && !candidates.Contains(formal))
+        {
+            candidates.Insert(Math.Min(candidates.Count, context.Formal ? 0 : 1), formal);
+            if (candidates.Count > max) candidates.RemoveAt(candidates.Count - 1);
+        }
+
+        return autoCorrection;
+    }
+
+    /// <summary>Großgeschriebene Höflichkeitsform eines Pronomens ("ihnen" → "Ihnen"), nur Deutsch.</summary>
+    string? FormalForm(string lower) =>
+        _dictionary.Language == "de" && lower is "sie" or "ihnen" or "ihr" or "ihre" or "ihren" or "ihrem" or "ihrer" or "ihres"
+            ? char.ToUpperInvariant(lower[0]) + lower[1..]
+            : null;
 
     /// <summary>
     /// Bewertete Vorschläge und Korrekturen für <paramref name="typed"/>, ohne sich schon zu entscheiden. Grundlage für
@@ -407,6 +451,21 @@ public sealed class SuggestionEngine
             if (!overrides && bestNearMiss is { } near && near.InContext >= NearMissRatio * typedInContext)
             {
                 (best, overrides) = (near, true);
+            }
+        }
+
+        // Richtig geschrieben, aber im Satz passt ein ähnliches Wort besser ("in" → "im", "den" → "dem", "then" → "than"):
+        // nicht korrigieren (das Getippte ist ein echtes Wort), aber auf den linken Platz der Leiste.
+        if (typedIsWord && !overrides && context.Previous != null && best is { } alternative
+            && !alternative.Word.Contains(' ') && alternative.InContext >= RealWordBarRatio * typedInContext)
+        {
+            string form = MatchCase(CaseInSentence(typed, alternative.Word, context), typed, _dictionary.Language);
+            int index = candidates.FindIndex(c => c.Word == form);
+            if (index is < 0 or >= BarSlots && candidates.Count > 0)
+            {
+                if (index >= 0) candidates.RemoveAt(index);
+                candidates.Insert(1, (form, candidates[0].Score)); // gleich bewertet wie das Erste: bleibt auch mehrsprachig vorn
+                if (candidates.Count > max) candidates.RemoveAt(candidates.Count - 1);
             }
         }
 

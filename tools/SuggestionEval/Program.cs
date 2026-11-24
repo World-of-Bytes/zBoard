@@ -22,7 +22,7 @@ if (!File.Exists(textPath))
 WordDictionary dictionary;
 using (var stream = File.OpenRead(Path.Combine(dictDir, $"{options.Language}.txt")))
 {
-    dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal);
+    dictionary = WordDictionary.Load(stream, WordDictionary.ReferenceTotal, options.Language); // wie im Tastaturdienst
 }
 
 var model = NgramModel.Empty;
@@ -117,13 +117,19 @@ foreach (var word in words)
 // ---------- 2. Autokorrektur bei ungenauem Tippen ----------
 
 int wrongJoins = 0;
+// Persönliches Tippmuster: lernt über alle Durchläufe mit, wie auf dem Gerät über die Zeit
+var touchModel = options.Adapt ? new TouchModel() : null;
 var noisy = new Outcome();
 var clean = new Outcome();
 List<string> examples = [];
 
 for (int run = 0; run < options.Runs; run++)
 {
-    var noise = new TypingNoise(layout, options.Seed + run) { Sigma = options.Sigma, LazyAccentRate = options.Lazy };
+    var noise = new TypingNoise(layout, options.Seed + run)
+    {
+        Sigma = options.Sigma, LazyAccentRate = options.Lazy, Bias = options.Bias, ThumbPull = options.Thumbs,
+        HitShift = touchModel == null ? null : () => touchModel.HitShift,
+    };
     string? previousTyped = null;
     foreach (var word in words)
     {
@@ -131,8 +137,9 @@ for (int run = 0; run < options.Runs; run++)
         var (typed, points) = noise.Type(intended);
         bool typo = !string.Equals(typed, intended, StringComparison.OrdinalIgnoreCase);
 
-        var result = engine.Suggest(typed, Context(word), touches: Touches(points, noise.Keys, points.Length));
+        var result = engine.Suggest(typed, Context(word), touches: Touches(points, touchModel?.Shift(noise.Keys) ?? noise.Keys, points.Length));
         string final = result.AutoCorrection ?? typed;
+        touchModel?.Learn(final, points, noise.Keys);
 
         // Fehlalarm der Leertasten-Regel: Zwei Wörter dürfen nicht verschmelzen, auch wenn eines vertippt ist –
         // weder das richtige vorherige mit diesem noch das vertippte vorherige mit dem richtigen hier.
@@ -336,7 +343,8 @@ namespace ZBoard.Tools.SuggestionEval
     }
 
     sealed record Options(
-        string Language, string? Text, string? Root, string? Model, string? Neural, bool UseNeural, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose)
+        string Language, string? Text, string? Root, string? Model, string? Neural, bool UseNeural, int Seed, int Runs, double Sigma, double Lazy, bool UseContext, bool UseTouch, bool Verbose,
+        System.Numerics.Vector2 Bias = default, float Thumbs = 0, bool Adapt = false)
     {
         public static Options? Parse(string[] args)
         {
@@ -363,6 +371,16 @@ namespace ZBoard.Tools.SuggestionEval
                         options = options with { Lazy = l };
                         break;
                     case "--no-touch": options = options with { UseTouch = false }; break;
+                    case "--bias" when Value() is { } v && v.Split(',') is [var bx, var by]
+                        && float.TryParse(bx, NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                        && float.TryParse(by, NumberStyles.Float, CultureInfo.InvariantCulture, out var y):
+                        options = options with { Bias = new System.Numerics.Vector2(x, y) };
+                        break;
+                    case "--thumbs" when Value() is { } v
+                        && float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var t):
+                        options = options with { Thumbs = t };
+                        break;
+                    case "--adapt": options = options with { Adapt = true }; break;
                     case "--no-context": options = options with { UseContext = false }; break;
                     case "--verbose": options = options with { Verbose = true }; break;
                     default:
@@ -375,6 +393,9 @@ namespace ZBoard.Tools.SuggestionEval
                               --sigma <x>             Streuung der Fingerposition in Tastenbreiten; Vorgabe 0.24
                               --lazy <x>              Anteil der Umlaute/Akzente, die als Grundbuchstabe getippt werden; Vorgabe 0.3
                               --seed <n>              Startwert des Zufallsgenerators; Vorgabe 1
+                              --bias <x,y>            systematische Abweichung der Finger in Tastenbreiten (y > 0: zu tief)
+                              --thumbs <t>            Daumen ziehen zur Mitte: am Rand t Tastenbreiten
+                              --adapt                 persönliches Tippmuster lernen (TouchModel) und nutzen
                               --no-touch              ohne Fingerpositionen messen (nur Nachbartasten)
                               --no-context            ohne vorheriges Wort messen
                               --verbose               Fehlerbeispiele ausgeben

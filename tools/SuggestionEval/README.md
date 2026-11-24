@@ -94,6 +94,30 @@ entscheidet („ich mochte“ → „möchte“), brachte 0,4 Prozentpunkte, ver
 deshalb nicht drin. Auch auf Sätzen aus Common Voice für Französisch, Spanisch, Italienisch und Polnisch steigen die
 richtig korrigierten Tippfehler um 1,5 bis 2,8 Prozentpunkte.
 
+Danach (Siezen, Tippmuster, ähnliche Wörter; 20 Durchläufe, Deutsch mit neuronalem Probemodell):
+
+| | Deutsch vorher | Deutsch nachher | Englisch vorher | Englisch nachher |
+| --- | --- | --- | --- | --- |
+| Echtes Wort vertippt, gemeintes Wort nicht in der Leiste | 0,8 % | **0,4 %** | 2,4 % | **1,3 %** |
+| Richtig getippte Wörter mit falscher Groß-/Kleinschreibung | 0,9 % | **0,5 %** | 1,0 % | 1,0 % |
+| Falsche Wörter im Text nach der Korrektur | 3,7 % | **3,3 %** | 3,5 % | 3,5 % |
+| Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 0,0 % | 0,0 % |
+| Gesparte Tastendrücke | 53,6 % | 52,9 % | 49,7 % | 49,1 % |
+
+1. **Siezen** (`WordContext.Formal`, `SuggestionEngine.ApplyFormal`): Der Brief in `samples/de.txt` steht dafür jetzt in
+   einer Zeile wie in einer E-Mail (die Messung liest eine Zeile als ein Eingabefeld). In Common Voice sind nach einer
+   förmlichen Anrede im selben Satz 80 % der weiteren „sie“ und rund 90 % der „ihre“, „Ihnen“ usw. förmlich. Ein
+   Gegentest mit förmlichen Briefen, die über Dritte sprechen („meine Tochter hat ihre Prüfung …“), zeigt die Kehrseite:
+   dort steigt die falsche Großschreibung von 4,1 auf 14 %.
+2. **Ähnliche echte Wörter** (`RealWordBarRatio`): kosten etwa 0,6 Punkte gesparte Tastendrücke, weil das Nachbarwort
+   manchmal eine Vervollständigung verdrängt.
+3. **Tippmuster** (`TouchModel`, `--adapt`): Ohne systematische Abweichung ändert sich nichts (86,2 % → 86,1 %
+   korrigiert). Mit simulierter Abweichung (`--bias 0.05,0.3 --thumbs 0.2`: 0,3 Tastenbreiten zu tief, Daumen ziehen
+   zur Mitte) sinken die vertippten Wörter von 35,8 % auf 28,4 % und die falschen Wörter im Text von 5,0 % auf 3,7 %
+   (Englisch 5,8 % → 4,2 %). Wie stark echte Finger abweichen, zeigt erst das Gerät.
+
+Außerdem lädt die Messung die Wortliste jetzt mit Sprachangabe wie die App (vorher griffen sprachabhängige Regeln nicht).
+
 ## Grenzen
 
 - Die Testsätze in `samples/` sind wenige (rund 1 000 Wörter je Sprache) und eigens geschrieben. Unterschiede unter

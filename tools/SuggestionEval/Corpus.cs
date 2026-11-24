@@ -54,7 +54,7 @@ public static class Corpus
             string word = line[start..pos];
             if (word.All(c => char.IsLetter(c) || c is '\'' or '-'))
             {
-                yield return new TestWord(word, WordContext.FromTextWithSentence(line[..start]));
+                yield return new TestWord(word, WordContext.FromTextWithSentence(line[..start]) with { Formal = WordContext.HasFormalAddress(line[..start]) });
             }
         }
     }

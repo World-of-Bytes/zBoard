@@ -342,6 +342,14 @@ used. zBoard has no internet permission (release build).
   applies the stored spelling (“zboard” → “zBoard”). When you type a shortcut (“brb”), the bar shows its text (“be
   right back”); as in Gboard it is only inserted when you tap it. Entries apply to all languages and are part of the
   settings – backup and sync include them.
+- **Formal address (German):** once the field contains "Sehr geehrte …" or a capitalised "Sie", "Ihnen", "Ihre" in
+  mid-sentence, zBoard capitalises these words from then on ("erhalten sie" → "Sie"; deleting right after undoes it).
+  Otherwise the capitalised form is offered in the bar.
+- **Personal touch pattern:** zBoard learns how far your finger lands from each key's centre on average (many people
+  tap slightly low) and reads touches accordingly, both for the key that was hit and for autocorrect. Only an offset
+  per key is stored, no text; separately for portrait and landscape, deleted together with what was learned.
+- **Similar words:** if a similar word fits the sentence better than the correctly spelled one ("ich bin in Urlaub" →
+  "im"), it appears on the left of the bar; nothing is corrected.
 - **Clipboard:** history of the last hour, pinning (📌) keeps items permanently. Only pinned items are saved;
   content marked as sensitive (e.g. from password managers) and copies from password fields are never taken.
 - **Backup & restore:** Settings → Backup & restore saves your settings, learned words and phrases, remembered email

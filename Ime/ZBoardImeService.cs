@@ -47,6 +47,9 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
 
     readonly StringBuilder _composing = new();
 
+    /// <summary>Wird in diesem Feld gesiezt? Null: noch nicht geprüft (siehe <see cref="WordContext.Formal"/>).</summary>
+    bool? _formalField;
+
     ZBoardSettings _settings = null!;
 
     KeyboardView? _keyboardView;
@@ -114,9 +117,44 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         ClearPinyinLearning();
+        foreach (var model in TouchModels.Values) model.Clear();
 
         var dir = Path.Combine(context.FilesDir!.AbsolutePath, "learning");
         if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+    }
+
+    // ---------- Persönliches Tippmuster ----------
+    // Je Ausrichtung ein Muster: Im Querformat sind die Tasten breiter und flacher, der Finger trifft anders.
+
+    static readonly ConcurrentDictionary<string, TouchModel> TouchModels = new();
+
+    static string TouchFile(Context context, string orientation) =>
+        Path.Combine(context.FilesDir!.AbsolutePath, "learning", $"touch-{orientation}.tsv");
+
+    string ScreenOrientation => Resources?.Configuration?.Orientation == Android.Content.Res.Orientation.Landscape ? "landscape" : "portrait";
+
+    TouchModel CurrentTouchModel => TouchModels.GetOrAdd(ScreenOrientation, orientation =>
+    {
+        try
+        {
+            string path = TouchFile(this, orientation);
+            return File.Exists(path) ? TouchModel.Load(File.ReadAllText(path)) : new TouchModel();
+        }
+        catch (IOException)
+        {
+            return new TouchModel();
+        }
+    });
+
+    /// <summary>Lernt aus dem eben abgeschlossenen Wort, wo dieser Finger die Tasten trifft (ohne Inhalte, siehe TouchModel).</summary>
+    void LearnTouches(string final)
+    {
+        if (_keyboardView == null || !_settings.LearnWords || !_profile.AllowLearning) return;
+        if (TouchPoints() is not { } points) return;
+
+        var model = CurrentTouchModel;
+        model.Learn(final, points, _keyboardView.KeyCenters);
+        _keyboardView.TouchShift = model.HitShift;
     }
 
     void SaveLearning()
@@ -131,6 +169,14 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         SavePinyinLearning();
+
+        foreach (var (orientation, model) in TouchModels)
+        {
+            if (!model.IsDirty) continue;
+            var path = TouchFile(this, orientation);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, model.Save());
+        }
     }
 
     public override View? OnCreateInputView()
@@ -147,6 +193,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         long started = Perf.Now;
 
         _profile = EditorProfile.From(info);
+        _formalField = null; // neu bestimmen: weiter vorn im Feld kann schon gesiezt sein
         _composing.Clear();
         _lastCorrection = null;
         _restoredWord = null;
@@ -603,6 +650,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         ic.CommitText(J(final + separator), 1);
+        if (!restored) LearnTouches(final); // vor dem Leeren: braucht die Fingerpunkte des Worts
         if (separator == " " && !_glideActive && !restored) _lastSpaceCommit = new SpaceCommit(typed, final, context, previous);
         _composing.Clear();
         _glideActive = false;
@@ -726,7 +774,10 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             before = before[..^current.Length];
         }
 
-        return WordContext.FromTextWithSentence(before, fromFieldStart);
+        // Einmal pro Feld weit zurückschauen (Antwort auf eine E-Mail), danach reicht das kleine Fenster beim Tippen.
+        _formalField ??= WordContext.HasFormalAddress(fromFieldStart ? before : TextBeforeCursor(2000));
+        if (_formalField != true && WordContext.HasFormalAddress(before)) _formalField = true;
+        return WordContext.FromTextWithSentence(before, fromFieldStart) with { Formal = _formalField == true };
     }
 
     /// <summary>Merkt sich zu den Zeichen, die gleich an das Wort in Bearbeitung angehängt werden, den Fingerpunkt.</summary>
@@ -744,7 +795,13 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     /// Fingerpunkte zum Wort in Bearbeitung für die Autokorrektur; null, wenn keine bekannt sind. Punkte zählen nur,
     /// wo das gemerkte Zeichen noch an derselben Stelle steht.
     /// </summary>
-    TouchTrace? Touches()
+    TouchTrace? Touches() =>
+        _keyboardView != null && TouchPoints() is { } points
+            ? new TouchTrace(points, CurrentTouchModel.Shift(_keyboardView.KeyCenters))
+            : null;
+
+    /// <summary>Je Buchstabe des Worts in Bearbeitung der Fingerpunkt, oder null, wenn keiner bekannt ist.</summary>
+    Vector2?[]? TouchPoints()
     {
         if (_keyboardView == null || _glideActive || _composing.Length == 0 || _touches.Count < _composing.Length) return null;
 
@@ -757,7 +814,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             any |= points[i] != null;
         }
 
-        return any ? new TouchTrace(points, _keyboardView.KeyCenters) : null;
+        return any ? points : null;
     }
 
     // ---------- Wischeingabe ----------
