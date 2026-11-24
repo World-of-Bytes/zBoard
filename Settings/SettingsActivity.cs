@@ -1045,7 +1045,8 @@ public sealed class SettingsActivity : Activity
                    + "von mozillazg (MIT).\n\n"
                    + "Sprachmodelle für die Vorhersage: Wortfolgen aus der Satzsammlung von Mozilla Common Voice "
                    + "(gemeinfrei, CC0), in der Schreibweise der Wortlisten; die KI-Vorhersage ist auf denselben Sätzen "
-                   + "trainiert und läuft mit ONNX Runtime von Microsoft (MIT).\n\n"
+                   + "trainiert, für Deutsch zusätzlich auf der Leipzig Corpora Collection der Universität Leipzig "
+                   + "(CC BY 4.0), und läuft mit ONNX Runtime von Microsoft (MIT).\n\n"
                    + "Emoji-Daten: unicode-emoji-json von Mu-An Chiou (MIT); Namen und Suchbegriffe: Unicode CLDR "
                    + "(Unicode License v3), © Unicode, Inc.\n\n"
                    + "Symbole: Material Symbols von Google (Apache License 2.0).",
@@ -1056,7 +1057,8 @@ public sealed class SettingsActivity : Activity
                    + "by mozillazg (MIT).\n\n"
                    + "Language models for prediction: word sequences from the Mozilla Common Voice sentence "
                    + "collection (public domain, CC0), spelled as in the word lists; AI prediction is trained on the "
-                   + "same sentences and runs with ONNX Runtime by Microsoft (MIT).\n\n"
+                   + "same sentences, for German also on the Leipzig Corpora Collection of Leipzig University "
+                   + "(CC BY 4.0), and runs with ONNX Runtime by Microsoft (MIT).\n\n"
                    + "Emoji data: unicode-emoji-json by Mu-An Chiou (MIT); names and keywords: Unicode CLDR "
                    + "(Unicode License v3), © Unicode, Inc.\n\n"
                    + "Icons: Material Symbols by Google (Apache License 2.0)."));

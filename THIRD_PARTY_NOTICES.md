@@ -42,6 +42,11 @@ Kleine LSTM-Netze, trainiert mit `tools/LanguageModel/train_lm.py` auf derselben
 [Mozilla Common Voice](https://github.com/common-voice/common-voice) wie die N-Gramm-Modelle (CC0 1.0). Die Netze
 enthalten keine Sätze, nur gelernte Gewichte. Kommen weitere Texte dazu (`--source`), steht deren Lizenz hier.
 
+**Deutsch** (`de.lm.onnx`) zusätzlich mit dem Korpus `deu-de_web_2021_1M` der
+[Leipzig Corpora Collection](https://wortschatz.uni-leipzig.de/de/download/deu) (Universität Leipzig),
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Quelle: D. Goldhahn, T. Eckart, U. Quasthoff: *Building
+Large Monolingual Dictionaries at the Leipzig Corpora Collection: From 100 to 200 Languages*, LREC 2012.
+
 ## ONNX Runtime (Microsoft.ML.OnnxRuntime)
 
 © Microsoft Corporation, [MIT License](https://github.com/microsoft/onnxruntime/blob/main/LICENSE). Führt die

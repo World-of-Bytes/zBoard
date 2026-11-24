@@ -78,19 +78,30 @@ Chinesisch trennt die Wörter mit jieba; beim Tippen bekommt das Netz bisher nur
 
 ## Messwerte
 
-Deutsch, mitgelieferte Testsätze (`tools/SuggestionEval`, 5 Durchläufe). Das Modell in `Assets/lm/de.lm.onnx` ist ein
-**Probelauf**: nur 7 000 Schritte auf der CPU (knapp eine halbe Runde durch die Sätze, Perplexität 88). Mit den
-vorgegebenen 30 000 Schritten auf einer Grafikkarte sollte es noch deutlich besser werden.
+Deutsch, mitgelieferte Testsätze (`tools/SuggestionEval`, 5 Durchläufe, Stand mit Siezen, Tippmuster und ähnlichen
+Wörtern). Das Modell in `Assets/lm/de.lm.onnx`: 30 000 Schritte auf einer RTX 5070, Common Voice plus
+`deu-de_web_2021_1M` der Leipzig Corpora Collection mit Gewicht 2:
 
-| | nur N-Gramme | mit Netz (Probelauf) |
-| --- | --- | --- |
-| Nächstes Wort vorhergesagt, Platz 1 | 14,5 % | 15,6 % |
-| Nächstes Wort vorhergesagt, unter den ersten 3 | 31,0 % | **34,2 %** |
-| Wort nach der Hälfte der Buchstaben in der Leiste | 76,6 % | 80,8 % |
-| Gesparte Tastendrücke | 51,0 % | **53,5 %** |
-| Tippfehler richtig korrigiert | 81,9 % | 82,7 % |
-| Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % |
-| Falsche Wörter im Text nach der Korrektur | 4,8 % | 4,6 % |
+```bash
+python3 tools/LanguageModel/train_lm.py --lang de --common-voice common-voice/server/data/de \
+  --source leipzig-de-web.txt:2
+```
+
+`leipzig-de-web.txt` ist die zweite Spalte (der Satz) aus `deu-de_web_2021_1M-sentences.txt`.
+
+| | nur N-Gramme | nur Common Voice | + Leipzig-Web |
+| --- | --- | --- | --- |
+| Nächstes Wort vorhergesagt, Platz 1 | 14,5 % | 15,9 % | 16,0 % |
+| Nächstes Wort vorhergesagt, unter den ersten 3 | 31,0 % | 34,0 % | **36,4 %** |
+| Wort nach der Hälfte der Buchstaben in der Leiste | 75,0 % | 80,2 % | 81,1 % |
+| Gesparte Tastendrücke | 50,4 % | 53,0 % | **54,1 %** |
+| Tippfehler richtig korrigiert | 84,9 % | 85,4 % | 85,8 % |
+| Richtig getippte Wörter, die verändert wurden | 0,0 % | 0,0 % | 0,0 % |
+| Falsche Wörter im Text nach der Korrektur | 3,6 % | 3,5 % | 3,4 % |
+
+Viermal längeres Training (7 000 → 30 000 Schritte) brachte allein kaum etwas (34,2 % → 34,0 %, innerhalb der
+Messstreuung von gut einem Prozentpunkt); der Gewinn kam erst mit mehr Text. Für die anderen Sprachen daher zuerst
+Text dazunehmen (Web-Korpus der Leipzig Corpora Collection für das Land der Sprache, 1M).
 
 `NeuralWeight` 0,35 und 0,7 waren beide schlechter als 0,5 (unter den ersten 3: 33,1 % bzw. 33,3 %).
 
