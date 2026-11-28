@@ -68,6 +68,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
     readonly List<(char Char, Vector2? Point)> _touches = [];
     Correction? _lastCorrection;
     string? _restoredWord;      // per Rücktaste wiederhergestelltes Original; das nächste Leerzeichen übernimmt und lernt es
+    string? _resumedWord;       // per Rücktaste wieder aufgenommenes Wort; unverändert abgeschlossen: nicht korrigieren, nicht erneut lernen
     SuggestionResult _currentSuggestions = SuggestionResult.Empty;
 
     bool _glideActive;                          // das Wort in Bearbeitung kam aus der Wischeingabe
@@ -150,6 +151,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _composing.Clear();
         _lastCorrection = null;
         _restoredWord = null;
+        _resumedWord = null;
         _autoSpaceInserted = false;
         _toolbarOpen = false;
         _glideActive = false;
@@ -238,6 +240,7 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             _composing.Clear();
             _glideActive = false;
             _restoredWord = null;
+            _resumedWord = null;
             Ic?.FinishComposingText();
             UpdateSuggestions();
         }
@@ -470,6 +473,10 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
             }
             UpdateSuggestions();
         }
+        else if (TryDeleteIntoWord())
+        {
+            UpdateSuggestions(); // die Vorschläge des Worts erscheinen wieder
+        }
         else
         {
             SendDownUpKeyEvents(Keycode.Del);
@@ -477,6 +484,38 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         }
 
         UpdateAutoShift();
+    }
+
+    /// <summary>
+    /// Wie Gboard: Löscht die Rücktaste bis an ein Wort heran ("Haste rene␣" → "Haste rene"), wird es wieder zum Wort
+    /// in Bearbeitung. Die Leiste zeigt dann dieselben Vorschläge wie beim Tippen, und Weitertippen oder Löschen
+    /// verändert dieses Wort. false: Zeichen nicht selbst gelöscht, das übernimmt wie bisher die Entf-Taste.
+    /// </summary>
+    bool TryDeleteIntoWord()
+    {
+        if (!_profile.AllowSuggestions || _profile.IsEmail || IsChinese || _emojiSearchActive || _voiceActive) return false;
+        var ic = Ic;
+        if (ic == null) return false;
+        if (ic.GetSelectedTextFormatted(0)?.ToString() is { Length: > 0 }) return false; // Markierung löscht der Editor
+
+        const int Window = 64;
+        string before = TextBeforeCursor(Window);
+        string after = ic.GetTextAfterCursorFormatted(1, 0)?.ToString() ?? string.Empty;
+        if (TextBoundaries.WordAfterDelete(before, after, windowFull: before.Length >= Window) is not { } word) return false;
+
+        // Zeichen und Wort in einem Schritt ersetzen: das Wort steht danach als Wort in Bearbeitung da.
+        ic.BeginBatchEdit();
+        ic.DeleteSurroundingText(1 + word.Length, 0);
+        ic.SetComposingText(J(word), 1);
+        ic.EndBatchEdit();
+
+        _composing.Clear().Append(word);
+        _touches.Clear(); // Fingerpunkte gehören zu einem früheren Wort
+        _resumedWord = word;
+        _restoredWord = null;
+        _lastSpaceCommit = null;
+        _glideActive = false;
+        return true;
     }
 
     void HandleEnter()
@@ -556,12 +595,14 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         string final = typed;
         bool restored = typed == _restoredWord; // wiederhergestelltes Original: nicht korrigieren, sondern lernen
         _restoredWord = null;
+        bool resumed = typed == _resumedWord;   // unverändert wieder aufgenommenes Wort: stand schon so da
+        _resumedWord = null;
 
         // Derselbe Kontext wie in der Vorschlagsleiste, damit eingesetzt wird, was dort hervorgehoben ist.
         string? previous = PreviousWord();
         var context = SentenceContext();
         bool inUrl = InUrlOrAddress();
-        bool mayCorrect = autocorrect && !restored && !inUrl && _settings.AutoCorrect && _profile.AllowAutocorrect;
+        bool mayCorrect = autocorrect && !restored && !resumed && !inUrl && _settings.AutoCorrect && _profile.AllowAutocorrect;
 
         // Leertaste mitten im Wort ("da ke", "ha llo"): Das Stück davor und dieses ergeben zusammen das gemeinte Wort.
         var before = _lastSpaceCommit;
@@ -608,7 +649,8 @@ public sealed partial class ZBoardImeService : InputMethodService, IKeyboardActi
         _composing.Clear();
         _glideActive = false;
         _currentSuggestions = SuggestionResult.Empty;
-        if (!inUrl) Learn(previous, final, accepted: restored); // Teile von Links nicht als Wörter lernen
+        // Teile von Links nicht als Wörter lernen; ein unverändert wieder aufgenommenes Wort ist schon gelernt
+        if (!inUrl && !resumed) Learn(previous, final, accepted: restored);
     }
 
     /// <summary>
