@@ -29,7 +29,7 @@ public class DeleteIntoWordTests
     [InlineData("www.example ", "")]
     [InlineData("#zboard ", "")]                     // Hashtag
     [InlineData("Hallo 😀", "")]                     // Emoji löscht der Editor
-    [InlineData("Hallo ❤️", "")]               // Variantenwahl
+    [InlineData("Hallo ❤\uFE0F", "")]               // Variantenwahl
     public void Leaves_deletion_to_editor(string before, string after) =>
         Assert.Null(TextBoundaries.WordAfterDelete(before, after, windowFull: false));
 
