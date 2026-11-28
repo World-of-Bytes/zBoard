@@ -47,6 +47,14 @@ tools/LanguageModel/train_all.sh                 # alle
 tools/LanguageModel/train_all.sh de en fr        # nur diese
 ```
 
+Unter Windows (PowerShell) mit zusätzlichem Text aus der Leipzig Corpora Collection – das Skript sucht je Sprache das
+neueste Web-Korpus des Landes (sonst Nachrichten), lädt es nach `..\lm-daten` und trainiert:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\LanguageModel\train_all.ps1                  # alle ohne Modell
+powershell -ExecutionPolicy Bypass -File tools\LanguageModel\train_all.ps1 -Languages en,fr
+```
+
 Das Skript zeigt alle 5 000 Schritte die Perplexität und wie oft das nächste Wort im Prüftext auf Platz 1 bzw. unter
 den ersten 3 steht, prüft das fertige int8-Modell gegen PyTorch und schreibt beide Dateien nach `Assets/lm/`.
 
@@ -104,6 +112,35 @@ Messstreuung von gut einem Prozentpunkt); der Gewinn kam erst mit mehr Text. Fü
 Text dazunehmen (Web-Korpus der Leipzig Corpora Collection für das Land der Sprache, 1M).
 
 `NeuralWeight` 0,35 und 0,7 waren beide schlechter als 0,5 (unter den ersten 3: 33,1 % bzw. 33,3 %).
+
+### Alle Sprachen, fremder Text
+
+Je 300 Sätze aus einem kleinen Korpus (10K) der Leipzig Corpora Collection, das keins der beiden Modelle kennt (andere
+Quelle oder anderes Jahr als im Training, nicht Common Voice); `tools/LanguageModel/compare_all.ps1`, ohne → mit Netz.
+Nachrichtentext ist schwerer vorherzusagen als die Testsätze oben, die absoluten Werte liegen daher niedriger.
+
+| Sprache | Nächstes Wort unter den ersten 3 | Gesparte Tastendrücke | Falsche Wörter im Text |
+| --- | --- | --- | --- |
+| Deutsch | 13,4 % → **20,3 %** | 28,8 % → 32,6 % | 17,1 % → 16,5 % |
+| Englisch | 18,2 % → **24,2 %** | 30,6 % → 35,2 % | 15,7 % → 15,3 % |
+| Arabisch | 3,1 % → **12,5 %** | 16,2 % → 22,1 % | 19,9 % → 19,1 % |
+| Bulgarisch | 9,6 % → **21,6 %** | 22,2 % → 29,3 % | 15,0 % → 14,3 % |
+| Tschechisch | 10,6 % → **17,8 %** | 21,9 % → 26,8 % | 19,5 % → 18,8 % |
+| Griechisch | 5,9 % → **21,6 %** | 25,6 % → 34,3 % | 15,7 % → 15,1 % |
+| Spanisch | 21,2 % → **27,9 %** | 33,4 % → 37,2 % | 14,5 % → 14,2 % |
+| Französisch | 16,6 % → **27,0 %** | 30,8 % → 36,4 % | 15,8 % → 14,9 % |
+| Ungarisch | 13,6 % → **20,7 %** | 21,2 % → 24,5 % | 23,7 % → 23,3 % |
+| Italienisch | 13,2 % → **21,8 %** | 29,4 % → 34,7 % | 15,0 % → 14,3 % |
+| Niederländisch | 14,4 % → **24,9 %** | 32,4 % → 38,0 % | 12,7 % → 12,1 % |
+| Polnisch | 11,0 % → **20,2 %** | 21,2 % → 26,4 % | 20,5 % → 20,0 % |
+| Rumänisch | 10,3 % → **23,0 %** | 24,4 % → 31,6 % | 17,7 % → 17,2 % |
+| Russisch | 9,1 % → **17,9 %** | 20,0 % → 25,4 % | 20,0 % → 19,8 % |
+| Türkisch | 6,9 % → **12,7 %** | 18,2 % → 22,0 % | 26,9 % → 26,2 % |
+| Ukrainisch | 6,8 % → **13,0 %** | 17,5 % → 22,0 % | 23,0 % → 22,5 % |
+| Vietnamesisch | 9,6 % → **26,7 %** | 24,1 % → 36,5 % | 18,0 % → 16,2 % |
+
+In allen Sprachen ist das Netz bei allen drei Werten besser. Mit Sätzen aus Common Voice als Test (die das
+N-Gramm-Modell wörtlich kennt) sah es dagegen oft nach Gleichstand aus – für solche Vergleiche nie Trainingstext nehmen.
 
 ## Messen und abstimmen
 

@@ -42,10 +42,31 @@ Kleine LSTM-Netze, trainiert mit `tools/LanguageModel/train_lm.py` auf derselben
 [Mozilla Common Voice](https://github.com/common-voice/common-voice) wie die N-Gramm-Modelle (CC0 1.0). Die Netze
 enthalten keine Sätze, nur gelernte Gewichte. Kommen weitere Texte dazu (`--source`), steht deren Lizenz hier.
 
-**Deutsch** (`de.lm.onnx`) zusätzlich mit dem Korpus `deu-de_web_2021_1M` der
-[Leipzig Corpora Collection](https://wortschatz.uni-leipzig.de/de/download/deu) (Universität Leipzig),
+Alle Sprachen zusätzlich mit je einem Korpus (1 Mio. Sätze) der
+[Leipzig Corpora Collection](https://wortschatz.uni-leipzig.de/de/download) (Universität Leipzig),
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Quelle: D. Goldhahn, T. Eckart, U. Quasthoff: *Building
 Large Monolingual Dictionaries at the Leipzig Corpora Collection: From 100 to 200 Languages*, LREC 2012.
+
+| Sprache | Korpus |
+| --- | --- |
+| Arabisch (`ar.lm.onnx`) | `ara-ae_web_2017_1M` |
+| Bulgarisch (`bg.lm.onnx`) | `bul_news_2022_1M` |
+| Tschechisch (`cs.lm.onnx`) | `ces_news_2024_1M` |
+| Deutsch (`de.lm.onnx`) | `deu-de_web_2021_1M` |
+| Griechisch (`el.lm.onnx`) | `ell-gr_web_2015_1M` |
+| Englisch (`en.lm.onnx`) | `eng_web_2014_1M` |
+| Spanisch (`es.lm.onnx`) | `spa_web_2016_1M` |
+| Französisch (`fr.lm.onnx`) | `fra_news_2024_1M` |
+| Ungarisch (`hu.lm.onnx`) | `hun-hu_web_2019_1M` |
+| Italienisch (`it.lm.onnx`) | `ita_news_2024_1M` |
+| Niederländisch (`nl.lm.onnx`) | `nld_news_2024_1M` |
+| Polnisch (`pl.lm.onnx`) | `pol_news_2024_1M` |
+| Rumänisch (`ro.lm.onnx`) | `ron-ro_web_2015_1M` |
+| Russisch (`ru.lm.onnx`) | `rus_news_2024_1M` |
+| Türkisch (`tr.lm.onnx`) | `tur-tr_web_2019_1M` |
+| Ukrainisch (`uk.lm.onnx`) | `ukr-ua_web_2019_1M` |
+| Vietnamesisch (`vi.lm.onnx`) | `vie-vn_web_2015_1M` |
+| Chinesisch (`zh.lm.onnx`) | `zho-cn_web_2015_1M` |
 
 ## ONNX Runtime (Microsoft.ML.OnnxRuntime)
 
